@@ -14,163 +14,419 @@ export type Database = {
   }
   public: {
     Tables: {
-      budgets_and_repairs: {
+      clients: {
         Row: {
-          capital_budget_actual: number | null
-          capital_budget_estimated: number | null
-          capital_budget_year: number | null
+          address: string | null
+          city: string | null
+          company_name: string
+          contact_name: string | null
           created_at: string
+          email: string | null
           id: string
-          preventative_budget_actual: number | null
-          preventative_budget_estimated: number | null
-          property_id: string
-          scope_of_work: string | null
-          total_leak_expense_12mo: number | null
-          total_leaks_12mo: number | null
+          phone: string | null
+          state: string | null
+          status: string | null
+          updated_at: string
+          zip: string | null
+        }
+        Insert: {
+          address?: string | null
+          city?: string | null
+          company_name: string
+          contact_name?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          phone?: string | null
+          state?: string | null
+          status?: string | null
+          updated_at?: string
+          zip?: string | null
+        }
+        Update: {
+          address?: string | null
+          city?: string | null
+          company_name?: string
+          contact_name?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          phone?: string | null
+          state?: string | null
+          status?: string | null
+          updated_at?: string
+          zip?: string | null
+        }
+        Relationships: []
+      }
+      inspection_reports: {
+        Row: {
+          created_at: string
+          estimated_cost: number | null
+          findings: string | null
+          id: string
+          inspection_id: string | null
+          photos_urls: string[] | null
+          priority_level: string | null
+          recommendations: string | null
+          report_url: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
+          status: string | null
           updated_at: string
         }
         Insert: {
-          capital_budget_actual?: number | null
-          capital_budget_estimated?: number | null
-          capital_budget_year?: number | null
           created_at?: string
+          estimated_cost?: number | null
+          findings?: string | null
           id?: string
-          preventative_budget_actual?: number | null
-          preventative_budget_estimated?: number | null
-          property_id: string
-          scope_of_work?: string | null
-          total_leak_expense_12mo?: number | null
-          total_leaks_12mo?: number | null
+          inspection_id?: string | null
+          photos_urls?: string[] | null
+          priority_level?: string | null
+          recommendations?: string | null
+          report_url?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
           updated_at?: string
         }
         Update: {
-          capital_budget_actual?: number | null
-          capital_budget_estimated?: number | null
-          capital_budget_year?: number | null
           created_at?: string
+          estimated_cost?: number | null
+          findings?: string | null
           id?: string
-          preventative_budget_actual?: number | null
-          preventative_budget_estimated?: number | null
-          property_id?: string
-          scope_of_work?: string | null
-          total_leak_expense_12mo?: number | null
-          total_leaks_12mo?: number | null
+          inspection_id?: string | null
+          photos_urls?: string[] | null
+          priority_level?: string | null
+          recommendations?: string | null
+          report_url?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          status?: string | null
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "budgets_and_repairs_property_id_fkey"
-            columns: ["property_id"]
+            foreignKeyName: "inspection_reports_inspection_id_fkey"
+            columns: ["inspection_id"]
             isOneToOne: false
-            referencedRelation: "properties"
-            referencedColumns: ["property_id"]
+            referencedRelation: "inspections"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inspection_reports_reviewed_by_fkey"
+            columns: ["reviewed_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
           },
         ]
       }
-      properties: {
+      inspections: {
+        Row: {
+          completed_date: string | null
+          created_at: string
+          id: string
+          inspection_type: string | null
+          inspector_id: string | null
+          notes: string | null
+          roof_id: string | null
+          scheduled_date: string | null
+          status: string | null
+          updated_at: string
+          weather_conditions: string | null
+        }
+        Insert: {
+          completed_date?: string | null
+          created_at?: string
+          id?: string
+          inspection_type?: string | null
+          inspector_id?: string | null
+          notes?: string | null
+          roof_id?: string | null
+          scheduled_date?: string | null
+          status?: string | null
+          updated_at?: string
+          weather_conditions?: string | null
+        }
+        Update: {
+          completed_date?: string | null
+          created_at?: string
+          id?: string
+          inspection_type?: string | null
+          inspector_id?: string | null
+          notes?: string | null
+          roof_id?: string | null
+          scheduled_date?: string | null
+          status?: string | null
+          updated_at?: string
+          weather_conditions?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inspections_inspector_id_fkey"
+            columns: ["inspector_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inspections_roof_id_fkey"
+            columns: ["roof_id"]
+            isOneToOne: false
+            referencedRelation: "roofs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      roofs: {
         Row: {
           address: string
           city: string
+          client_id: string | null
           created_at: string
-          install_year: number | null
-          market: string | null
-          property_id: string
+          id: string
+          install_date: string | null
+          last_inspection_date: string | null
+          next_inspection_due: string | null
+          notes: string | null
           property_name: string
-          region: string | null
           roof_area: number | null
-          roof_section: string | null
-          roof_system: string | null
-          site_contact_email: string | null
-          site_contact_name: string | null
-          site_contact_phone: string | null
+          roof_type: string | null
           state: string
+          status: string | null
           updated_at: string
+          warranty_expiration: string | null
           zip: string
         }
         Insert: {
           address: string
           city: string
+          client_id?: string | null
           created_at?: string
-          install_year?: number | null
-          market?: string | null
-          property_id?: string
+          id?: string
+          install_date?: string | null
+          last_inspection_date?: string | null
+          next_inspection_due?: string | null
+          notes?: string | null
           property_name: string
-          region?: string | null
           roof_area?: number | null
-          roof_section?: string | null
-          roof_system?: string | null
-          site_contact_email?: string | null
-          site_contact_name?: string | null
-          site_contact_phone?: string | null
+          roof_type?: string | null
           state: string
+          status?: string | null
           updated_at?: string
+          warranty_expiration?: string | null
           zip: string
         }
         Update: {
           address?: string
           city?: string
+          client_id?: string | null
           created_at?: string
-          install_year?: number | null
-          market?: string | null
-          property_id?: string
+          id?: string
+          install_date?: string | null
+          last_inspection_date?: string | null
+          next_inspection_due?: string | null
+          notes?: string | null
           property_name?: string
-          region?: string | null
           roof_area?: number | null
-          roof_section?: string | null
-          roof_system?: string | null
-          site_contact_email?: string | null
-          site_contact_name?: string | null
-          site_contact_phone?: string | null
+          roof_type?: string | null
           state?: string
+          status?: string | null
           updated_at?: string
+          warranty_expiration?: string | null
           zip?: string
-        }
-        Relationships: []
-      }
-      warranties: {
-        Row: {
-          contractor_name: string | null
-          created_at: string
-          expiration_date: string | null
-          id: string
-          installer_expiration_date: string | null
-          installer_warranty_term: number | null
-          manufacturer_name: string | null
-          property_id: string
-          updated_at: string
-          warranty_term: number | null
-        }
-        Insert: {
-          contractor_name?: string | null
-          created_at?: string
-          expiration_date?: string | null
-          id?: string
-          installer_expiration_date?: string | null
-          installer_warranty_term?: number | null
-          manufacturer_name?: string | null
-          property_id: string
-          updated_at?: string
-          warranty_term?: number | null
-        }
-        Update: {
-          contractor_name?: string | null
-          created_at?: string
-          expiration_date?: string | null
-          id?: string
-          installer_expiration_date?: string | null
-          installer_warranty_term?: number | null
-          manufacturer_name?: string | null
-          property_id?: string
-          updated_at?: string
-          warranty_term?: number | null
         }
         Relationships: [
           {
-            foreignKeyName: "warranties_property_id_fkey"
-            columns: ["property_id"]
+            foreignKeyName: "roofs_client_id_fkey"
+            columns: ["client_id"]
             isOneToOne: false
-            referencedRelation: "properties"
-            referencedColumns: ["property_id"]
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      users: {
+        Row: {
+          auth_user_id: string | null
+          created_at: string
+          email: string
+          first_name: string | null
+          id: string
+          is_active: boolean | null
+          last_name: string | null
+          phone: string | null
+          role: string | null
+          updated_at: string
+        }
+        Insert: {
+          auth_user_id?: string | null
+          created_at?: string
+          email: string
+          first_name?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_name?: string | null
+          phone?: string | null
+          role?: string | null
+          updated_at?: string
+        }
+        Update: {
+          auth_user_id?: string | null
+          created_at?: string
+          email?: string
+          first_name?: string | null
+          id?: string
+          is_active?: boolean | null
+          last_name?: string | null
+          phone?: string | null
+          role?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      vendors: {
+        Row: {
+          address: string | null
+          city: string | null
+          company_name: string
+          contact_name: string | null
+          created_at: string
+          email: string | null
+          id: string
+          phone: string | null
+          state: string | null
+          status: string | null
+          updated_at: string
+          vendor_type: string | null
+          zip: string | null
+        }
+        Insert: {
+          address?: string | null
+          city?: string | null
+          company_name: string
+          contact_name?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          phone?: string | null
+          state?: string | null
+          status?: string | null
+          updated_at?: string
+          vendor_type?: string | null
+          zip?: string | null
+        }
+        Update: {
+          address?: string | null
+          city?: string | null
+          company_name?: string
+          contact_name?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          phone?: string | null
+          state?: string | null
+          status?: string | null
+          updated_at?: string
+          vendor_type?: string | null
+          zip?: string | null
+        }
+        Relationships: []
+      }
+      work_orders: {
+        Row: {
+          actual_cost: number | null
+          assigned_to: string | null
+          completed_date: string | null
+          created_at: string
+          created_by: string | null
+          description: string | null
+          estimated_cost: number | null
+          id: string
+          inspection_report_id: string | null
+          priority: string | null
+          roof_id: string | null
+          scheduled_end: string | null
+          scheduled_start: string | null
+          status: string | null
+          title: string
+          updated_at: string
+          vendor_id: string | null
+        }
+        Insert: {
+          actual_cost?: number | null
+          assigned_to?: string | null
+          completed_date?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          estimated_cost?: number | null
+          id?: string
+          inspection_report_id?: string | null
+          priority?: string | null
+          roof_id?: string | null
+          scheduled_end?: string | null
+          scheduled_start?: string | null
+          status?: string | null
+          title: string
+          updated_at?: string
+          vendor_id?: string | null
+        }
+        Update: {
+          actual_cost?: number | null
+          assigned_to?: string | null
+          completed_date?: string | null
+          created_at?: string
+          created_by?: string | null
+          description?: string | null
+          estimated_cost?: number | null
+          id?: string
+          inspection_report_id?: string | null
+          priority?: string | null
+          roof_id?: string | null
+          scheduled_end?: string | null
+          scheduled_start?: string | null
+          status?: string | null
+          title?: string
+          updated_at?: string
+          vendor_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "work_orders_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_orders_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_orders_inspection_report_id_fkey"
+            columns: ["inspection_report_id"]
+            isOneToOne: false
+            referencedRelation: "inspection_reports"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_orders_roof_id_fkey"
+            columns: ["roof_id"]
+            isOneToOne: false
+            referencedRelation: "roofs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "work_orders_vendor_id_fkey"
+            columns: ["vendor_id"]
+            isOneToOne: false
+            referencedRelation: "vendors"
+            referencedColumns: ["id"]
           },
         ]
       }
