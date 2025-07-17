@@ -18,14 +18,11 @@ export function RoofsTab() {
   const fetchRoofs = async () => {
     try {
       setLoading(true);
+      console.log('Fetching roofs...');
+      
       let query = supabase
         .from('roofs')
-        .select(`
-          *,
-          clients!roofs_client_id_fkey (
-            company_name
-          )
-        `)
+        .select('*')
         .or('is_deleted.is.null,is_deleted.eq.false');
 
       if (statusFilter !== "all") {
@@ -36,8 +33,11 @@ export function RoofsTab() {
         query = query.or(`property_name.ilike.%${searchTerm}%,address.ilike.%${searchTerm}%,city.ilike.%${searchTerm}%`);
       }
 
+      console.log('Query built, executing...');
       const { data, error } = await query.order('created_at', { ascending: false });
 
+      console.log('Query result:', { data: data?.length, error });
+      
       if (error) {
         console.error('Error fetching roofs:', error);
         return;
