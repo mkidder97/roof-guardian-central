@@ -182,57 +182,195 @@ export type Database = {
       roofs: {
         Row: {
           address: string
+          capital_budget_actual: string | null
+          capital_budget_category: string | null
+          capital_budget_completed: string | null
+          capital_budget_estimated: number | null
+          capital_budget_scope_of_work: string | null
+          capital_budget_year: number | null
           city: string
           client_id: string | null
           created_at: string
+          customer: string | null
+          customer_sensitivity: string | null
           id: string
           install_date: string | null
+          install_year: number | null
+          installer_has_warranty: boolean | null
+          installer_warranty_expiration: string | null
+          installer_warranty_number: string | null
+          installer_warranty_term: string | null
+          installing_contractor: string | null
+          is_deleted: boolean | null
           last_inspection_date: string | null
+          manufacturer: string | null
+          manufacturer_has_warranty: boolean | null
+          manufacturer_warranty_expiration: string | null
+          manufacturer_warranty_number: string | null
+          manufacturer_warranty_term: string | null
+          market: string | null
           next_inspection_due: string | null
           notes: string | null
+          preventative_budget_actual: string | null
+          preventative_budget_category: string | null
+          preventative_budget_completed: string | null
+          preventative_budget_estimated: number | null
+          preventative_budget_scope_of_work: string | null
+          preventative_budget_year: number | null
+          property_code: string | null
           property_name: string
+          region: string | null
+          repair_contractor: string | null
+          roof_access: string | null
+          roof_access_location: string | null
+          roof_access_requirements: string | null
+          roof_access_safety_concern: string | null
           roof_area: number | null
+          roof_area_unit: string | null
+          roof_category: string | null
+          roof_group: string | null
+          roof_section: string | null
+          roof_system: string | null
+          roof_system_description: string | null
           roof_type: string | null
+          site_contact: string | null
+          site_contact_email: string | null
+          site_contact_mobile_phone: string | null
+          site_contact_office_phone: string | null
           state: string
           status: string | null
+          total_leak_expense_12mo: string | null
+          total_leaks_12mo: string | null
           updated_at: string
           warranty_expiration: string | null
           zip: string
         }
         Insert: {
           address: string
+          capital_budget_actual?: string | null
+          capital_budget_category?: string | null
+          capital_budget_completed?: string | null
+          capital_budget_estimated?: number | null
+          capital_budget_scope_of_work?: string | null
+          capital_budget_year?: number | null
           city: string
           client_id?: string | null
           created_at?: string
+          customer?: string | null
+          customer_sensitivity?: string | null
           id?: string
           install_date?: string | null
+          install_year?: number | null
+          installer_has_warranty?: boolean | null
+          installer_warranty_expiration?: string | null
+          installer_warranty_number?: string | null
+          installer_warranty_term?: string | null
+          installing_contractor?: string | null
+          is_deleted?: boolean | null
           last_inspection_date?: string | null
+          manufacturer?: string | null
+          manufacturer_has_warranty?: boolean | null
+          manufacturer_warranty_expiration?: string | null
+          manufacturer_warranty_number?: string | null
+          manufacturer_warranty_term?: string | null
+          market?: string | null
           next_inspection_due?: string | null
           notes?: string | null
+          preventative_budget_actual?: string | null
+          preventative_budget_category?: string | null
+          preventative_budget_completed?: string | null
+          preventative_budget_estimated?: number | null
+          preventative_budget_scope_of_work?: string | null
+          preventative_budget_year?: number | null
+          property_code?: string | null
           property_name: string
+          region?: string | null
+          repair_contractor?: string | null
+          roof_access?: string | null
+          roof_access_location?: string | null
+          roof_access_requirements?: string | null
+          roof_access_safety_concern?: string | null
           roof_area?: number | null
+          roof_area_unit?: string | null
+          roof_category?: string | null
+          roof_group?: string | null
+          roof_section?: string | null
+          roof_system?: string | null
+          roof_system_description?: string | null
           roof_type?: string | null
+          site_contact?: string | null
+          site_contact_email?: string | null
+          site_contact_mobile_phone?: string | null
+          site_contact_office_phone?: string | null
           state: string
           status?: string | null
+          total_leak_expense_12mo?: string | null
+          total_leaks_12mo?: string | null
           updated_at?: string
           warranty_expiration?: string | null
           zip: string
         }
         Update: {
           address?: string
+          capital_budget_actual?: string | null
+          capital_budget_category?: string | null
+          capital_budget_completed?: string | null
+          capital_budget_estimated?: number | null
+          capital_budget_scope_of_work?: string | null
+          capital_budget_year?: number | null
           city?: string
           client_id?: string | null
           created_at?: string
+          customer?: string | null
+          customer_sensitivity?: string | null
           id?: string
           install_date?: string | null
+          install_year?: number | null
+          installer_has_warranty?: boolean | null
+          installer_warranty_expiration?: string | null
+          installer_warranty_number?: string | null
+          installer_warranty_term?: string | null
+          installing_contractor?: string | null
+          is_deleted?: boolean | null
           last_inspection_date?: string | null
+          manufacturer?: string | null
+          manufacturer_has_warranty?: boolean | null
+          manufacturer_warranty_expiration?: string | null
+          manufacturer_warranty_number?: string | null
+          manufacturer_warranty_term?: string | null
+          market?: string | null
           next_inspection_due?: string | null
           notes?: string | null
+          preventative_budget_actual?: string | null
+          preventative_budget_category?: string | null
+          preventative_budget_completed?: string | null
+          preventative_budget_estimated?: number | null
+          preventative_budget_scope_of_work?: string | null
+          preventative_budget_year?: number | null
+          property_code?: string | null
           property_name?: string
+          region?: string | null
+          repair_contractor?: string | null
+          roof_access?: string | null
+          roof_access_location?: string | null
+          roof_access_requirements?: string | null
+          roof_access_safety_concern?: string | null
           roof_area?: number | null
+          roof_area_unit?: string | null
+          roof_category?: string | null
+          roof_group?: string | null
+          roof_section?: string | null
+          roof_system?: string | null
+          roof_system_description?: string | null
           roof_type?: string | null
+          site_contact?: string | null
+          site_contact_email?: string | null
+          site_contact_mobile_phone?: string | null
+          site_contact_office_phone?: string | null
           state?: string
           status?: string | null
+          total_leak_expense_12mo?: string | null
+          total_leaks_12mo?: string | null
           updated_at?: string
           warranty_expiration?: string | null
           zip?: string

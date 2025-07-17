@@ -1,0 +1,55 @@
+-- Expand roofs table to match roof_sections schema
+ALTER TABLE public.roofs 
+ADD COLUMN IF NOT EXISTS region TEXT,
+ADD COLUMN IF NOT EXISTS market TEXT,
+ADD COLUMN IF NOT EXISTS roof_group TEXT,
+ADD COLUMN IF NOT EXISTS property_code TEXT,
+ADD COLUMN IF NOT EXISTS roof_section TEXT,
+ADD COLUMN IF NOT EXISTS customer TEXT,
+ADD COLUMN IF NOT EXISTS is_deleted BOOLEAN DEFAULT false,
+ADD COLUMN IF NOT EXISTS site_contact TEXT,
+ADD COLUMN IF NOT EXISTS site_contact_office_phone TEXT,
+ADD COLUMN IF NOT EXISTS site_contact_mobile_phone TEXT,
+ADD COLUMN IF NOT EXISTS site_contact_email TEXT,
+ADD COLUMN IF NOT EXISTS customer_sensitivity TEXT,
+ADD COLUMN IF NOT EXISTS roof_access TEXT,
+ADD COLUMN IF NOT EXISTS roof_access_requirements TEXT,
+ADD COLUMN IF NOT EXISTS roof_access_safety_concern TEXT,
+ADD COLUMN IF NOT EXISTS roof_access_location TEXT,
+ADD COLUMN IF NOT EXISTS roof_area_unit TEXT DEFAULT 'sq ft',
+ADD COLUMN IF NOT EXISTS roof_system TEXT,
+ADD COLUMN IF NOT EXISTS roof_system_description TEXT,
+ADD COLUMN IF NOT EXISTS roof_category TEXT,
+ADD COLUMN IF NOT EXISTS manufacturer TEXT,
+ADD COLUMN IF NOT EXISTS installing_contractor TEXT,
+ADD COLUMN IF NOT EXISTS repair_contractor TEXT,
+ADD COLUMN IF NOT EXISTS manufacturer_has_warranty BOOLEAN,
+ADD COLUMN IF NOT EXISTS manufacturer_warranty_term TEXT,
+ADD COLUMN IF NOT EXISTS manufacturer_warranty_number TEXT,
+ADD COLUMN IF NOT EXISTS manufacturer_warranty_expiration DATE,
+ADD COLUMN IF NOT EXISTS installer_has_warranty BOOLEAN,
+ADD COLUMN IF NOT EXISTS installer_warranty_term TEXT,
+ADD COLUMN IF NOT EXISTS installer_warranty_number TEXT,
+ADD COLUMN IF NOT EXISTS installer_warranty_expiration DATE,
+ADD COLUMN IF NOT EXISTS install_year INTEGER,
+ADD COLUMN IF NOT EXISTS capital_budget_year NUMERIC,
+ADD COLUMN IF NOT EXISTS capital_budget_estimated NUMERIC,
+ADD COLUMN IF NOT EXISTS capital_budget_actual TEXT,
+ADD COLUMN IF NOT EXISTS capital_budget_completed TEXT,
+ADD COLUMN IF NOT EXISTS capital_budget_category TEXT,
+ADD COLUMN IF NOT EXISTS capital_budget_scope_of_work TEXT,
+ADD COLUMN IF NOT EXISTS preventative_budget_year NUMERIC,
+ADD COLUMN IF NOT EXISTS preventative_budget_estimated NUMERIC,
+ADD COLUMN IF NOT EXISTS preventative_budget_actual TEXT,
+ADD COLUMN IF NOT EXISTS preventative_budget_completed TEXT,
+ADD COLUMN IF NOT EXISTS preventative_budget_category TEXT,
+ADD COLUMN IF NOT EXISTS preventative_budget_scope_of_work TEXT,
+ADD COLUMN IF NOT EXISTS total_leaks_12mo TEXT,
+ADD COLUMN IF NOT EXISTS total_leak_expense_12mo TEXT;
+
+-- Add indexes for better performance on commonly searched fields
+CREATE INDEX IF NOT EXISTS idx_roofs_region ON public.roofs(region);
+CREATE INDEX IF NOT EXISTS idx_roofs_market ON public.roofs(market);
+CREATE INDEX IF NOT EXISTS idx_roofs_property_code ON public.roofs(property_code);
+CREATE INDEX IF NOT EXISTS idx_roofs_customer ON public.roofs(customer);
+CREATE INDEX IF NOT EXISTS idx_roofs_manufacturer ON public.roofs(manufacturer);

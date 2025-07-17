@@ -4,11 +4,13 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, FileDown, Calendar, MapPin } from "lucide-react";
+import { Search, Plus, FileDown, Calendar, MapPin, Upload } from "lucide-react";
+import { ExcelImportDialog } from "@/components/excel/ExcelImportDialog";
 
 export function RoofsTab() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [importDialogOpen, setImportDialogOpen] = useState(false);
 
   // Mock data - replace with actual Supabase data
   const roofs = [
@@ -108,6 +110,14 @@ export function RoofsTab() {
             <FileDown className="h-4 w-4 mr-2" />
             Export
           </Button>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setImportDialogOpen(true)}
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            Import Excel
+          </Button>
           <Button variant="outline" size="sm">
             <Calendar className="h-4 w-4 mr-2" />
             Schedule
@@ -176,6 +186,15 @@ export function RoofsTab() {
           <Button variant="outline" size="sm">Next</Button>
         </div>
       </div>
+
+      <ExcelImportDialog
+        open={importDialogOpen}
+        onOpenChange={setImportDialogOpen}
+        onImportComplete={() => {
+          // Refresh the roofs data here when we integrate with real data
+          console.log('Import completed, refresh data');
+        }}
+      />
     </div>
   );
 }
