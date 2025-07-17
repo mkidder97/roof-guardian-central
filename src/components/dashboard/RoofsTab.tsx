@@ -26,7 +26,7 @@ export function RoofsTab() {
             company_name
           )
         `)
-        .eq('is_deleted', false);
+        .or('is_deleted.is.null,is_deleted.eq.false');
 
       if (statusFilter !== "all") {
         query = query.eq('status', statusFilter);
