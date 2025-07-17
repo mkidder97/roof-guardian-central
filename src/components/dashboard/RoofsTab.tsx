@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -6,51 +6,74 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Plus, FileDown, Calendar, MapPin, Upload } from "lucide-react";
 import { ExcelImportDialog } from "@/components/excel/ExcelImportDialog";
+import { supabase } from "@/integrations/supabase/client";
 
 export function RoofsTab() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [roofs, setRoofs] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  // Mock data - replace with actual Supabase data
-  const roofs = [
-    {
-      id: "1",
-      property_name: "Westfield Shopping Center",
-      address: "123 Main St, Dallas, TX",
-      client: "Westfield Properties",
-      roof_type: "EPDM",
-      roof_area: 50000,
-      last_inspection: "2024-01-10",
-      next_inspection: "2024-04-10",
-      status: "active",
-      warranty_status: "active"
-    },
-    {
-      id: "2", 
-      property_name: "Tech Office Building",
-      address: "456 Innovation Dr, Austin, TX",
-      client: "Tech Corp",
-      roof_type: "TPO",
-      roof_area: 35000,
-      last_inspection: "2023-12-15",
-      next_inspection: "2024-01-20",
-      status: "active",
-      warranty_status: "expiring"
-    },
-    {
-      id: "3",
-      property_name: "Manufacturing Plant A",
-      address: "789 Industrial Blvd, Houston, TX", 
-      client: "Manufacturing Inc",
-      roof_type: "Modified Bitumen",
-      roof_area: 75000,
-      last_inspection: "2023-11-30",
-      next_inspection: "2024-01-15",
-      status: "active",
-      warranty_status: "expired"
+  const fetchRoofs = async () => {
+    try {
+      setLoading(true);
+      let query = supabase
+        .from('roofs')
+        .select(`
+          *,
+          clients!roofs_client_id_fkey (
+            company_name
+          )
+        `)
+        .eq('is_deleted', false);
+
+      if (statusFilter !== "all") {
+        query = query.eq('status', statusFilter);
+      }
+
+      if (searchTerm) {
+        query = query.or(`property_name.ilike.%${searchTerm}%,address.ilike.%${searchTerm}%,city.ilike.%${searchTerm}%`);
+      }
+
+      const { data, error } = await query.order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching roofs:', error);
+        return;
+      }
+
+      setRoofs(data || []);
+    } catch (error) {
+      console.error('Error:', error);
+    } finally {
+      setLoading(false);
     }
-  ];
+  };
+
+  useEffect(() => {
+    fetchRoofs();
+  }, [statusFilter, searchTerm]);
+
+  const getWarrantyStatus = (roof: any) => {
+    const now = new Date();
+    const manufacturerExpiry = roof.manufacturer_warranty_expiration ? new Date(roof.manufacturer_warranty_expiration) : null;
+    const installerExpiry = roof.installer_warranty_expiration ? new Date(roof.installer_warranty_expiration) : null;
+    
+    // Check if any warranty is active
+    const hasActiveWarranty = (manufacturerExpiry && manufacturerExpiry > now) || (installerExpiry && installerExpiry > now);
+    
+    if (!hasActiveWarranty) return "expired";
+    
+    // Check if any warranty is expiring soon (within 90 days)
+    const ninetyDaysFromNow = new Date();
+    ninetyDaysFromNow.setDate(now.getDate() + 90);
+    
+    const isExpiringSoon = (manufacturerExpiry && manufacturerExpiry <= ninetyDaysFromNow) || 
+                          (installerExpiry && installerExpiry <= ninetyDaysFromNow);
+    
+    return isExpiringSoon ? "expiring" : "active";
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -147,30 +170,40 @@ export function RoofsTab() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {roofs.map((roof) => (
-              <TableRow key={roof.id} className="hover:bg-gray-50">
-                <TableCell className="font-medium">{roof.property_name}</TableCell>
-                <TableCell>{roof.client}</TableCell>
-                <TableCell>
-                  <div className="flex items-center">
-                    <MapPin className="h-4 w-4 mr-1 text-gray-400" />
-                    {roof.address}
-                  </div>
-                </TableCell>
-                <TableCell>{roof.roof_type}</TableCell>
-                <TableCell>{roof.roof_area.toLocaleString()}</TableCell>
-                <TableCell>{roof.last_inspection}</TableCell>
-                <TableCell>{roof.next_inspection}</TableCell>
-                <TableCell>{getStatusBadge(roof.status)}</TableCell>
-                <TableCell>{getWarrantyBadge(roof.warranty_status)}</TableCell>
-                <TableCell>
-                  <div className="flex space-x-2">
-                    <Button variant="outline" size="sm">View</Button>
-                    <Button variant="outline" size="sm">Edit</Button>
-                  </div>
-                </TableCell>
+            {loading ? (
+              <TableRow>
+                <TableCell colSpan={10} className="text-center py-8">Loading roofs...</TableCell>
               </TableRow>
-            ))}
+            ) : roofs.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={10} className="text-center py-8">No roofs found</TableCell>
+              </TableRow>
+            ) : (
+              roofs.map((roof) => (
+                <TableRow key={roof.id} className="hover:bg-gray-50">
+                  <TableCell className="font-medium">{roof.property_name}</TableCell>
+                  <TableCell>{roof.clients?.company_name || roof.customer || 'N/A'}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center">
+                      <MapPin className="h-4 w-4 mr-1 text-gray-400" />
+                      {`${roof.address}, ${roof.city}, ${roof.state} ${roof.zip}`}
+                    </div>
+                  </TableCell>
+                  <TableCell>{roof.roof_type || 'N/A'}</TableCell>
+                  <TableCell>{roof.roof_area ? roof.roof_area.toLocaleString() : 'N/A'}</TableCell>
+                  <TableCell>{roof.last_inspection_date || 'N/A'}</TableCell>
+                  <TableCell>{roof.next_inspection_due || 'N/A'}</TableCell>
+                  <TableCell>{getStatusBadge(roof.status || 'active')}</TableCell>
+                  <TableCell>{getWarrantyBadge(getWarrantyStatus(roof))}</TableCell>
+                  <TableCell>
+                    <div className="flex space-x-2">
+                      <Button variant="outline" size="sm">View</Button>
+                      <Button variant="outline" size="sm">Edit</Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
           </TableBody>
         </Table>
       </div>
@@ -191,8 +224,7 @@ export function RoofsTab() {
         open={importDialogOpen}
         onOpenChange={setImportDialogOpen}
         onImportComplete={() => {
-          // Refresh the roofs data here when we integrate with real data
-          console.log('Import completed, refresh data');
+          fetchRoofs(); // Refresh the roofs data after import
         }}
       />
     </div>
