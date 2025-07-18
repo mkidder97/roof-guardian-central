@@ -61,7 +61,7 @@ export default function Dashboard() {
         <Card className="shadow-sm">
           <CardContent className="p-0">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-13 h-12 bg-gray-100 rounded-none border-b">
+              <TabsList className="w-full h-12 bg-gray-100 rounded-none border-b flex overflow-x-auto">
                 <TabsTrigger value="summary" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-500">
                   Summary
                 </TabsTrigger>
