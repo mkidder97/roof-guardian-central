@@ -16,6 +16,7 @@ import { WarrantiesTab } from "@/components/dashboard/WarrantiesTab";
 import { BudgetsTab } from "@/components/dashboard/BudgetsTab";
 import { RegionalTab } from "@/components/dashboard/RegionalTab";
 import { MaintenanceTab } from "@/components/dashboard/MaintenanceTab";
+import { DataQualityDashboard } from "@/components/dashboard/DataQualityDashboard";
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("summary");
@@ -60,9 +61,12 @@ export default function Dashboard() {
         <Card className="shadow-sm">
           <CardContent className="p-0">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-12 h-12 bg-gray-100 rounded-none border-b">
+              <TabsList className="grid w-full grid-cols-13 h-12 bg-gray-100 rounded-none border-b">
                 <TabsTrigger value="summary" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-500">
                   Summary
+                </TabsTrigger>
+                <TabsTrigger value="data-quality" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-500">
+                  Data Quality
                 </TabsTrigger>
                 <TabsTrigger value="roofs" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-500">
                   Roofs
@@ -105,6 +109,9 @@ export default function Dashboard() {
                 <SummaryTab />
               </TabsContent>
               
+              <TabsContent value="data-quality" className="mt-0">
+                <DataQualityDashboard />
+              </TabsContent>
               <TabsContent value="roofs" className="mt-0">
                 <RoofsTab />
               </TabsContent>
