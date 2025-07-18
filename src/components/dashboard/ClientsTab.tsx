@@ -4,8 +4,9 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, FileDown, Phone, Mail, MapPin, Building, Loader2 } from "lucide-react";
+import { Search, Plus, FileDown, Phone, Mail, MapPin, Building, Loader2, Users, Eye } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { ClientContactsDialog } from './ClientContactsDialog';
 
 interface Client {
   id: string;
@@ -20,6 +21,8 @@ interface Client {
   status: string | null;
   properties_count: number;
   total_sq_ft: number;
+  contacts_count: number;
+  primary_contact: string | null;
 }
 
 export function ClientsTab() {
@@ -28,6 +31,8 @@ export function ClientsTab() {
   const [clients, setClients] = useState<Client[]>([]);
   const [filteredClients, setFilteredClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  const [contactsDialogOpen, setContactsDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchClients();
@@ -51,22 +56,38 @@ export function ClientsTab() {
         return;
       }
       
-      // Calculate total sq ft and property count for each client
+      // Calculate total sq ft, property count, and contacts for each client
       const clientsWithMetrics = await Promise.all(
         (clientsData || []).map(async (client) => {
+          // Get properties data
           const { data: roofs } = await supabase
             .from('roofs')
             .select('roof_area')
             .eq('client_id', client.id)
             .eq('is_deleted', false);
+
+          // Get contacts data
+          const { data: contacts } = await supabase
+            .from('client_contacts')
+            .select('id, first_name, last_name, is_primary')
+            .eq('client_id', client.id)
+            .eq('is_active', true);
             
           const total_sq_ft = roofs?.reduce((sum, roof) => sum + (roof.roof_area || 0), 0) || 0;
           const properties_count = roofs?.length || 0;
+          const contacts_count = contacts?.length || 0;
+          
+          const primaryContact = contacts?.find(c => c.is_primary);
+          const primary_contact = primaryContact 
+            ? `${primaryContact.first_name} ${primaryContact.last_name}`
+            : client.contact_name;
           
           return {
             ...client,
             properties_count,
-            total_sq_ft
+            total_sq_ft,
+            contacts_count,
+            primary_contact
           };
         })
       );
@@ -86,6 +107,7 @@ export function ClientsTab() {
       filtered = filtered.filter(client => 
         client.company_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         client.contact_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        client.primary_contact?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         client.email?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
@@ -113,7 +135,8 @@ export function ClientsTab() {
   const exportData = () => {
     const csvData = filteredClients.map(client => ({
       'Company Name': client.company_name,
-      'Contact Name': client.contact_name || '',
+      'Primary Contact': client.primary_contact || '',
+      'Contacts Count': client.contacts_count,
       'Email': client.email || '',
       'Phone': client.phone || '',
       'Address': `${client.address || ''}, ${client.city || ''}, ${client.state || ''} ${client.zip || ''}`.trim(),
@@ -134,6 +157,11 @@ export function ClientsTab() {
     a.download = `clients-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
+  };
+
+  const handleViewContacts = (client: Client) => {
+    setSelectedClient(client);
+    setContactsDialogOpen(true);
   };
 
   if (loading) {
@@ -198,7 +226,8 @@ export function ClientsTab() {
           <TableHeader>
             <TableRow className="bg-gray-50">
               <TableHead className="font-semibold">Company Name</TableHead>
-              <TableHead className="font-semibold">Contact Person</TableHead>
+              <TableHead className="font-semibold">Primary Contact</TableHead>
+              <TableHead className="font-semibold">Contacts</TableHead>
               <TableHead className="font-semibold">Email</TableHead>
               <TableHead className="font-semibold">Phone</TableHead>
               <TableHead className="font-semibold">Address</TableHead>
@@ -211,7 +240,7 @@ export function ClientsTab() {
           <TableBody>
             {filteredClients.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={9} className="text-center py-8">
+                <TableCell colSpan={10} className="text-center py-8">
                   <div className="text-gray-500">
                     <Building className="h-12 w-12 mx-auto mb-4 text-gray-400" />
                     <p>No clients found matching your criteria.</p>
@@ -224,8 +253,19 @@ export function ClientsTab() {
             ) : (
               filteredClients.map((client) => (
                 <TableRow key={client.id} className="hover:bg-gray-50">
-                  <TableCell className="font-medium">{client.company_name}</TableCell>
-                  <TableCell>{client.contact_name || 'N/A'}</TableCell>
+                  <TableCell className="font-medium">
+                    <div className="flex items-center gap-2">
+                      <Building className="h-4 w-4 text-muted-foreground" />
+                      {client.company_name}
+                    </div>
+                  </TableCell>
+                  <TableCell>{client.primary_contact || 'N/A'}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1">
+                      <Users className="h-4 w-4 text-muted-foreground" />
+                      <span>{client.contacts_count} contact{client.contacts_count !== 1 ? 's' : ''}</span>
+                    </div>
+                  </TableCell>
                   <TableCell>
                     {client.email ? (
                       <div className="flex items-center">
@@ -262,9 +302,15 @@ export function ClientsTab() {
                   <TableCell>{getStatusBadge(client.status)}</TableCell>
                   <TableCell>
                     <div className="flex space-x-2">
-                      <Button variant="outline" size="sm">View</Button>
-                      <Button variant="outline" size="sm">Edit</Button>
-                      <Button variant="outline" size="sm">Contact</Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => handleViewContacts(client)}
+                        className="flex items-center gap-1"
+                      >
+                        <Eye className="h-4 w-4" />
+                        Contacts
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -280,8 +326,16 @@ export function ClientsTab() {
         <div className="flex items-center space-x-4 text-sm text-gray-600">
           <span>Total Properties: {clients.reduce((sum, c) => sum + c.properties_count, 0)}</span>
           <span>Total Sq Ft: {clients.reduce((sum, c) => sum + c.total_sq_ft, 0).toLocaleString()}</span>
+          <span>Total Contacts: {clients.reduce((sum, c) => sum + c.contacts_count, 0)}</span>
         </div>
       </div>
+
+      {/* Client Contacts Dialog */}
+      <ClientContactsDialog
+        open={contactsDialogOpen}
+        onOpenChange={setContactsDialogOpen}
+        client={selectedClient}
+      />
     </div>
   );
 }

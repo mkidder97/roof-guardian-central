@@ -14,6 +14,68 @@ export type Database = {
   }
   public: {
     Tables: {
+      client_contacts: {
+        Row: {
+          client_id: string | null
+          created_at: string | null
+          department: string | null
+          email: string | null
+          first_name: string
+          id: string
+          is_active: boolean | null
+          is_primary: boolean | null
+          last_name: string
+          mobile_phone: string | null
+          notes: string | null
+          office_phone: string | null
+          role: string
+          title: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string | null
+          department?: string | null
+          email?: string | null
+          first_name: string
+          id?: string
+          is_active?: boolean | null
+          is_primary?: boolean | null
+          last_name: string
+          mobile_phone?: string | null
+          notes?: string | null
+          office_phone?: string | null
+          role?: string
+          title?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string | null
+          department?: string | null
+          email?: string | null
+          first_name?: string
+          id?: string
+          is_active?: boolean | null
+          is_primary?: boolean | null
+          last_name?: string
+          mobile_phone?: string | null
+          notes?: string | null
+          office_phone?: string | null
+          role?: string
+          title?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_contacts_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           address: string | null
@@ -214,6 +276,57 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      property_contact_assignments: {
+        Row: {
+          assigned_date: string | null
+          assignment_type: string
+          contact_id: string | null
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          notes: string | null
+          roof_id: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          assigned_date?: string | null
+          assignment_type?: string
+          contact_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          notes?: string | null
+          roof_id?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          assigned_date?: string | null
+          assignment_type?: string
+          contact_id?: string | null
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          notes?: string | null
+          roof_id?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_contact_assignments_contact_id_fkey"
+            columns: ["contact_id"]
+            isOneToOne: false
+            referencedRelation: "client_contacts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "property_contact_assignments_roof_id_fkey"
+            columns: ["roof_id"]
+            isOneToOne: false
+            referencedRelation: "roofs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       roofs: {
         Row: {
