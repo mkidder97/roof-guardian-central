@@ -84,14 +84,10 @@ export function AnalysisTab() {
         `)
         .eq('is_deleted', false);
 
-      // Fetch property contact assignments separately
-      const { data: assignments } = await supabase
-        .from('property_contact_assignments')
-        .select(`
-          roof_id,
-          client_contacts(first_name, last_name, role, email)
-        `)
-        .eq('is_active', true);
+      // Fetch client contacts to match with site contacts
+      const { data: contacts } = await supabase
+        .from('client_contacts')
+        .select('*');
 
       if (roofTypeFilter !== 'all') {
         query = query.eq('roof_type', roofTypeFilter);
@@ -106,19 +102,18 @@ export function AnalysisTab() {
 
       const roofsData = roofs || [];
       
-      // Add assignments to roof data
-      const assignmentsMap = new Map();
-      (assignments || []).forEach(assignment => {
-        if (!assignmentsMap.has(assignment.roof_id)) {
-          assignmentsMap.set(assignment.roof_id, []);
-        }
-        assignmentsMap.get(assignment.roof_id).push(assignment);
+      // Match roofs with their property managers via site_contact_email
+      const enrichedRoofs = roofsData.map(roof => {
+        const propertyManager = (contacts || []).find(contact => 
+          contact.email === roof.site_contact_email && 
+          contact.role === 'property_manager'
+        );
+        
+        return {
+          ...roof,
+          property_manager: propertyManager
+        };
       });
-
-      const enrichedRoofs = roofsData.map(roof => ({
-        ...roof,
-        property_contact_assignments: assignmentsMap.get(roof.id) || []
-      }));
       
       // Extract unique regions
       const uniqueRegions = [...new Set(enrichedRoofs.map(r => r.region).filter(Boolean))];
@@ -284,15 +279,11 @@ export function AnalysisTab() {
         ? Math.round(propertiesWithAge.reduce((sum, p) => sum + (currentYear - (p.install_year || currentYear)), 0) / propertiesWithAge.length)
         : 0;
 
-      // Count unique property managers
+      // Count unique property managers via site_contact_email
       const propertyManagers = new Set();
       properties.forEach(p => {
-        if (p.property_contact_assignments?.length > 0) {
-          p.property_contact_assignments.forEach((assignment: any) => {
-            if (assignment.client_contacts?.role === 'property_manager') {
-              propertyManagers.add(`${assignment.client_contacts.first_name} ${assignment.client_contacts.last_name}`);
-            }
-          });
+        if (p.property_manager) {
+          propertyManagers.add(`${p.property_manager.first_name} ${p.property_manager.last_name}`);
         }
       });
 
@@ -340,19 +331,14 @@ export function AnalysisTab() {
     const managerProperties = new Map<string, any[]>();
 
     roofs.forEach(property => {
-      console.log('Processing property:', property.property_name, 'Assignments:', property.property_contact_assignments);
-      if (property.property_contact_assignments?.length > 0) {
-        property.property_contact_assignments.forEach((assignment: any) => {
-          console.log('Assignment:', assignment, 'Contact role:', assignment.client_contacts?.role);
-          if (assignment.client_contacts?.role === 'property_manager') {
-            const managerName = `${assignment.client_contacts.first_name} ${assignment.client_contacts.last_name}`;
-            console.log('Found property manager:', managerName);
-            if (!managerProperties.has(managerName)) {
-              managerProperties.set(managerName, []);
-            }
-            managerProperties.get(managerName)?.push(property);
-          }
-        });
+      console.log('Processing property:', property.property_name, 'Manager:', property.property_manager);
+      if (property.property_manager) {
+        const managerName = `${property.property_manager.first_name} ${property.property_manager.last_name}`;
+        console.log('Found property manager:', managerName);
+        if (!managerProperties.has(managerName)) {
+          managerProperties.set(managerName, []);
+        }
+        managerProperties.get(managerName)?.push(property);
       }
     });
 
