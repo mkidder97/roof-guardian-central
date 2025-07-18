@@ -4,22 +4,20 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
 import { LogOut, User } from "lucide-react";
-import { SummaryTab } from "@/components/dashboard/SummaryTab";
+import { PortfolioOverviewTab } from "@/components/dashboard/PortfolioOverviewTab";
 import { RoofsTab } from "@/components/dashboard/RoofsTab";
 import { InspectionsTab } from "@/components/dashboard/InspectionsTab";
 import { WorkOrdersTab } from "@/components/dashboard/WorkOrdersTab";
 import { ClientsTab } from "@/components/dashboard/ClientsTab";
 import { ContractorsTab } from "@/components/dashboard/VendorsTab";
-import { AnalysisTab } from "@/components/dashboard/AnalysisTab";
 import { AccountsTab } from "@/components/dashboard/AccountsTab";
 import { WarrantiesTab } from "@/components/dashboard/WarrantiesTab";
 import { BudgetsTab } from "@/components/dashboard/BudgetsTab";
-import { RegionalTab } from "@/components/dashboard/RegionalTab";
 import { MaintenanceTab } from "@/components/dashboard/MaintenanceTab";
 import { DataQualityDashboard } from "@/components/dashboard/DataQualityDashboard";
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState("summary");
+  const [activeTab, setActiveTab] = useState("portfolio");
   const { user, userRole, signOut } = useAuth();
 
   const handleSignOut = async () => {
@@ -62,8 +60,8 @@ export default function Dashboard() {
           <CardContent className="p-0">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="w-full h-12 bg-gray-100 rounded-none border-b flex overflow-x-auto">
-                <TabsTrigger value="summary" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-500">
-                  Summary
+                <TabsTrigger value="portfolio" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-500">
+                  Portfolio Overview
                 </TabsTrigger>
                 <TabsTrigger value="data-quality" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-500">
                   Data Quality
@@ -76,12 +74,6 @@ export default function Dashboard() {
                 </TabsTrigger>
                 <TabsTrigger value="budgets" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-500">
                   Budgets
-                </TabsTrigger>
-                <TabsTrigger value="analysis" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-500">
-                  Analysis
-                </TabsTrigger>
-                <TabsTrigger value="regional" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-500">
-                  Regional
                 </TabsTrigger>
                 <TabsTrigger value="maintenance" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-500">
                   Maintenance
@@ -105,8 +97,8 @@ export default function Dashboard() {
                 )}
               </TabsList>
 
-              <TabsContent value="summary" className="mt-0">
-                <SummaryTab />
+              <TabsContent value="portfolio" className="mt-0">
+                <PortfolioOverviewTab />
               </TabsContent>
               
               <TabsContent value="data-quality" className="mt-0">
@@ -122,14 +114,6 @@ export default function Dashboard() {
               
               <TabsContent value="budgets" className="mt-0">
                 <BudgetsTab />
-              </TabsContent>
-              
-              <TabsContent value="analysis" className="mt-0">
-                <AnalysisTab />
-              </TabsContent>
-              
-              <TabsContent value="regional" className="mt-0">
-                <RegionalTab />
               </TabsContent>
               
               <TabsContent value="maintenance" className="mt-0">
