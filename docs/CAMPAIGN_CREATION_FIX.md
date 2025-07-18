@@ -33,17 +33,22 @@ The inspection campaign creation was failing due to several critical issues:
 ### 2. Updated InspectionSchedulingModal.tsx
 ```typescript
 // Fixed schema field mappings:
-✅ campaign_id: campaignId,              // Now provided (was missing)
-✅ campaign_metadata: { ... },           // Fixed from 'metadata'  
+✅ Removed: campaign_id field           // Not in actual table schema
 ✅ status: 'emails_sent',               // Fixed enum value
-✅ automation_settings: { ... },        // Correct structure
+✅ automation_settings: { ... },        // Correct structure and JSON format
 ❌ Removed: n8n_workflow_id            // Field doesn't exist
 ❌ Removed: contact_preferences        // Field doesn't exist
+❌ Removed: campaign_metadata          // Not in actual schema
+
+// Fixed RPC function calls:
+✅ generateCampaignName() with fallback
+✅ generateCampaignId() with fallback (direct implementation)
 
 // Added proper error handling:
 - RPC function fallbacks if functions fail
 - Better error messages with specific context
 - Graceful degradation for missing functions
+- Fixed TypeScript type errors
 ```
 
 ### 3. Enhanced Error Handling
