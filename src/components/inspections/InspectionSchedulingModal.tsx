@@ -572,21 +572,22 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     } catch (error) {
       console.error('Payload validation failed:', error);
       if (error instanceof z.ZodError) {
-        console.error('Detailed validation errors:', error.errors);
+        console.error('Detailed validation errors:', error.issues);
         
         // Log specific field errors for debugging
-        error.errors.forEach((err, index) => {
+        error.issues.forEach((err, index) => {
           console.error(`Validation Error ${index + 1}:`, {
             path: err.path.join('.'),
             message: err.message,
-            received: err.received,
-            expected: err.expected
+            code: err.code,
+            ...('received' in err && { received: err.received }),
+            ...('expected' in err && { expected: err.expected })
           });
         });
         
         toast({
           title: "Payload Validation Failed",
-          description: `Field validation error: ${error.errors[0]?.path.join('.')} - ${error.errors[0]?.message}`,
+          description: `Field validation error: ${error.issues[0]?.path.join('.')} - ${error.issues[0]?.message}`,
           variant: "destructive",
         });
       }
