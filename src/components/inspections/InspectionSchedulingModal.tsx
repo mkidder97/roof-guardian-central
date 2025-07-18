@@ -120,6 +120,8 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
   const [generatedGroups, setGeneratedGroups] = useState<PropertyGroup[]>([]);
   const [activeTab, setActiveTab] = useState<'properties' | 'grouping'>('properties');
   const [clients, setClients] = useState<any[]>([]);
+  const [availableRegions, setAvailableRegions] = useState<string[]>([]);
+  const [availableMarkets, setAvailableMarkets] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [propertiesLoading, setPropertiesLoading] = useState(false);
   const [workflowLoading, setWorkflowLoading] = useState(false);
@@ -143,6 +145,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
   useEffect(() => {
     if (open) {
       fetchClients();
+      fetchRegionsAndMarkets();
       resetWorkflowState();
       loadFiltersFromStorage();
       // Auto-fetch properties with default filters when modal opens
@@ -204,6 +207,50 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
       console.error('Error fetching clients:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchRegionsAndMarkets = async () => {
+    try {
+      // Get distinct regions
+      const { data: regionData, error: regionError } = await supabase
+        .from('roofs')
+        .select('region')
+        .not('region', 'is', null)
+        .eq('status', 'active')
+        .or('is_deleted.is.null,is_deleted.eq.false');
+
+      if (regionError) throw regionError;
+
+      // Get distinct markets
+      const { data: marketData, error: marketError } = await supabase
+        .from('roofs')
+        .select('market')
+        .not('market', 'is', null)
+        .eq('status', 'active')
+        .or('is_deleted.is.null,is_deleted.eq.false');
+
+      if (marketError) throw marketError;
+
+      // Extract unique values and combine with common options
+      const dbRegions = [...new Set(regionData?.map(r => r.region).filter(Boolean) || [])];
+      const dbMarkets = [...new Set(marketData?.map(m => m.market).filter(Boolean) || [])];
+
+      // Common regions (add if not already in db)
+      const commonRegions = ['Central', 'Southwest', 'Southeast', 'Northeast', 'Northwest', 'West Coast', 'Midwest'];
+      const allRegions = [...new Set([...dbRegions, ...commonRegions])].sort();
+
+      // Common markets (add if not already in db)
+      const commonMarkets = ['Dallas', 'Houston', 'Austin', 'San Antonio', 'Atlanta', 'Charlotte', 'Phoenix', 'Denver', 'Miami', 'Tampa', 'Nashville', 'Kansas City', 'Oklahoma City', 'Tulsa'];
+      const allMarkets = [...new Set([...dbMarkets, ...commonMarkets])].sort();
+
+      setAvailableRegions(allRegions);
+      setAvailableMarkets(allMarkets);
+    } catch (error) {
+      console.error('Error fetching regions and markets:', error);
+      // Fallback to common options if query fails
+      setAvailableRegions(['Central', 'Southwest', 'Southeast', 'Northeast', 'Northwest', 'West Coast', 'Midwest']);
+      setAvailableMarkets(['Dallas', 'Houston', 'Austin', 'San Antonio', 'Atlanta', 'Charlotte', 'Phoenix', 'Denver', 'Miami', 'Tampa', 'Nashville', 'Kansas City']);
     }
   };
 
@@ -880,13 +927,13 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                       <SelectTrigger>
                         <SelectValue placeholder="Select region" />
                       </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="central">Central</SelectItem>
-                        <SelectItem value="southwest">Southwest</SelectItem>
-                        <SelectItem value="southeast">Southeast</SelectItem>
-                        <SelectItem value="northeast">Northeast</SelectItem>
-                        <SelectItem value="northwest">Northwest</SelectItem>
-                      </SelectContent>
+                       <SelectContent>
+                         {availableRegions.map(region => (
+                           <SelectItem key={region} value={region}>
+                             {region}
+                           </SelectItem>
+                         ))}
+                       </SelectContent>
                     </Select>
                   </div>
 
@@ -900,12 +947,11 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                         <SelectValue placeholder="Select market" />
                       </SelectTrigger>
                        <SelectContent>
-                         <SelectItem value="Dallas">Dallas</SelectItem>
-                         <SelectItem value="Houston">Houston</SelectItem>
-                         <SelectItem value="Austin">Austin</SelectItem>
-                         <SelectItem value="San Antonio">San Antonio</SelectItem>
-                         <SelectItem value="Atlanta">Atlanta</SelectItem>
-                         <SelectItem value="Charlotte">Charlotte</SelectItem>
+                         {availableMarkets.map(market => (
+                           <SelectItem key={market} value={market}>
+                             {market}
+                           </SelectItem>
+                         ))}
                        </SelectContent>
                     </Select>
                   </div>
