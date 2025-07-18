@@ -15,6 +15,7 @@ import { WarrantiesTab } from "@/components/dashboard/WarrantiesTab";
 import { BudgetsTab } from "@/components/dashboard/BudgetsTab";
 import { MaintenanceTab } from "@/components/dashboard/MaintenanceTab";
 import { PropertyManagersTab } from "@/components/dashboard/PropertyManagersTab";
+import { CampaignTracker } from "@/components/dashboard/CampaignTracker";
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("portfolio");
@@ -75,6 +76,9 @@ export default function Dashboard() {
                 <TabsTrigger value="maintenance" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-500">
                   Maintenance
                 </TabsTrigger>
+                <TabsTrigger value="campaigns" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-500">
+                  Campaigns
+                </TabsTrigger>
                 <TabsTrigger value="inspections" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-500">
                   Inspections
                 </TabsTrigger>
@@ -114,6 +118,10 @@ export default function Dashboard() {
               
               <TabsContent value="maintenance" className="mt-0">
                 <MaintenanceTab />
+              </TabsContent>
+              
+              <TabsContent value="campaigns" className="mt-0">
+                <CampaignTracker />
               </TabsContent>
               
               <TabsContent value="inspections" className="mt-0">

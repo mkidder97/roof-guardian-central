@@ -1,66 +1,72 @@
 import { useState, useEffect } from "react";
-import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
-  PlayCircle, 
-  PauseCircle, 
-  CheckCircle, 
-  XCircle, 
+  Calendar, 
+  Mail, 
+  Phone, 
+  MapPin, 
   Clock,
+  CheckCircle,
+  AlertCircle,
   Eye,
-  BarChart3,
-  RefreshCw
+  Filter
 } from "lucide-react";
-import { format } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import { toast } from "@/hooks/use-toast";
+import { CampaignDetailModal } from "./CampaignDetailModal";
 
 interface Campaign {
   id: string;
   name: string;
-  client_id?: string;
-  region?: string;
+  campaign_id?: string;
   market?: string;
-  inspection_type: string;
+  region?: string;
   status: string;
   total_properties: number;
-  completed_properties: number;
-  failed_properties: number;
-  progress_percentage: number;
-  n8n_workflow_id?: string;
-  estimated_completion?: string;
+  property_manager_name?: string;
+  property_manager_email?: string;
   created_at: string;
-  completed_at?: string;
-  created_by?: string;
-  error_message?: string;
-  clients?: { company_name: string };
+  estimated_completion?: string;
+  actual_completion?: string;
 }
 
-interface CampaignTrackerProps {
-  refreshInterval?: number;
-  maxCampaigns?: number;
-  showCompleted?: boolean;
+interface CampaignStats {
+  total: number;
+  initiated: number;
+  emails_sent: number;
+  responses_received: number;
+  scheduled: number;
+  in_progress: number;
+  completed: number;
+  cancelled: number;
 }
 
-export function CampaignTracker({ 
-  refreshInterval = 30000, 
-  maxCampaigns = 10,
-  showCompleted = true 
-}: CampaignTrackerProps) {
-  const { toast } = useToast();
+export function CampaignTracker() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
+  const [stats, setStats] = useState<CampaignStats>({
+    total: 0,
+    initiated: 0,
+    emails_sent: 0,
+    responses_received: 0,
+    scheduled: 0,
+    in_progress: 0,
+    completed: 0,
+    cancelled: 0
+  });
   const [loading, setLoading] = useState(true);
-  const [lastRefresh, setLastRefresh] = useState<Date>(new Date());
+  const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
+  const [activeFilter, setActiveFilter] = useState<string>("all");
 
   useEffect(() => {
     fetchCampaigns();
     
     // Set up real-time subscription
-    const channel = supabase
-      .channel('campaign-updates')
+    const subscription = supabase
+      .channel('campaign-changes')
       .on(
         'postgres_changes',
         {
@@ -68,44 +74,55 @@ export function CampaignTracker({
           schema: 'public',
           table: 'inspection_campaigns'
         },
-        (payload) => {
-          console.log('Campaign updated:', payload);
-          handleRealtimeUpdate(payload);
+        () => {
+          fetchCampaigns();
         }
       )
       .subscribe();
 
-    // Set up polling as fallback
-    const pollInterval = setInterval(fetchCampaigns, refreshInterval);
-
     return () => {
-      supabase.removeChannel(channel);
-      clearInterval(pollInterval);
+      supabase.removeChannel(subscription);
     };
-  }, [refreshInterval]);
+  }, []);
 
   const fetchCampaigns = async () => {
     try {
-      let query = supabase
+      const { data, error } = await supabase
         .from('inspection_campaigns')
-        .select(`
-          *,
-          clients(company_name)
-        `)
-        .order('created_at', { ascending: false })
-        .limit(maxCampaigns);
+        .select('*')
+        .order('created_at', { ascending: false });
 
-      if (!showCompleted) {
-        query = query.not('status', 'eq', 'completed');
+      if (error) {
+        console.error('Error fetching campaigns:', error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch campaigns",
+          variant: "destructive",
+        });
+        return;
       }
 
-      const { data, error } = await query;
-
-      if (error) throw error;
       setCampaigns(data || []);
-      setLastRefresh(new Date());
+      
+      // Calculate stats
+      const newStats = {
+        total: data?.length || 0,
+        initiated: 0,
+        emails_sent: 0,
+        responses_received: 0,
+        scheduled: 0,
+        in_progress: 0,
+        completed: 0,
+        cancelled: 0
+      };
+
+      data?.forEach(campaign => {
+        newStats[campaign.status as keyof CampaignStats]++;
+      });
+
+      setStats(newStats);
     } catch (error) {
-      console.error('Error fetching campaigns:', error);
+      console.error('Error:', error);
       toast({
         title: "Error",
         description: "Failed to fetch campaigns",
@@ -116,217 +133,237 @@ export function CampaignTracker({
     }
   };
 
-  const handleRealtimeUpdate = (payload: any) => {
-    const { eventType, new: newRecord, old: oldRecord } = payload;
-    
-    setCampaigns(prev => {
-      switch (eventType) {
-        case 'INSERT':
-          return [newRecord, ...prev.slice(0, maxCampaigns - 1)];
-        case 'UPDATE':
-          return prev.map(campaign => 
-            campaign.id === newRecord.id ? { ...campaign, ...newRecord } : campaign
-          );
-        case 'DELETE':
-          return prev.filter(campaign => campaign.id !== oldRecord.id);
-        default:
-          return prev;
-      }
-    });
-  };
-
-  const cancelCampaign = async (campaignId: string) => {
-    try {
-      const { error } = await supabase
-        .from('inspection_campaigns')
-        .update({ 
-          status: 'cancelled',
-          completed_at: new Date().toISOString()
-        })
-        .eq('id', campaignId);
-
-      if (error) throw error;
-
-      toast({
-        title: "Campaign Cancelled",
-        description: "The campaign has been cancelled successfully.",
-      });
-    } catch (error) {
-      console.error('Error cancelling campaign:', error);
-      toast({
-        title: "Error",
-        description: "Failed to cancel campaign",
-        variant: "destructive",
-      });
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'completed':
+        return 'bg-green-500';
+      case 'in_progress':
+        return 'bg-blue-500';
+      case 'scheduled':
+        return 'bg-purple-500';
+      case 'responses_received':
+        return 'bg-yellow-500';
+      case 'emails_sent':
+        return 'bg-orange-500';
+      case 'initiated':
+        return 'bg-gray-500';
+      case 'cancelled':
+        return 'bg-red-500';
+      default:
+        return 'bg-gray-400';
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'initiated':
-        return <Clock className="h-4 w-4" />;
-      case 'processing':
-        return <PlayCircle className="h-4 w-4" />;
       case 'completed':
         return <CheckCircle className="h-4 w-4" />;
-      case 'failed':
-        return <XCircle className="h-4 w-4" />;
-      case 'cancelled':
-        return <PauseCircle className="h-4 w-4" />;
-      default:
+      case 'in_progress':
         return <Clock className="h-4 w-4" />;
+      case 'scheduled':
+        return <Calendar className="h-4 w-4" />;
+      case 'responses_received':
+        return <Mail className="h-4 w-4" />;
+      case 'emails_sent':
+        return <Mail className="h-4 w-4" />;
+      case 'initiated':
+        return <AlertCircle className="h-4 w-4" />;
+      default:
+        return <AlertCircle className="h-4 w-4" />;
     }
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'initiated':
-        return 'bg-blue-100 text-blue-800 border-blue-200';
-      case 'processing':
-        return 'bg-yellow-100 text-yellow-800 border-yellow-200';
-      case 'completed':
-        return 'bg-green-100 text-green-800 border-green-200';
-      case 'failed':
-        return 'bg-red-100 text-red-800 border-red-200';
-      case 'cancelled':
-        return 'bg-gray-100 text-gray-800 border-gray-200';
-      default:
-        return 'bg-gray-100 text-gray-800 border-gray-200';
-    }
+  const filteredCampaigns = campaigns.filter(campaign => {
+    if (activeFilter === "all") return true;
+    return campaign.status === activeFilter;
+  });
+
+  const calculateProgress = (status: string) => {
+    const statusOrder = ['initiated', 'emails_sent', 'responses_received', 'scheduled', 'in_progress', 'completed'];
+    const currentIndex = statusOrder.indexOf(status);
+    return ((currentIndex + 1) / statusOrder.length) * 100;
   };
 
   if (loading) {
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center space-x-2">
-            <BarChart3 className="h-5 w-5" />
-            <span>Active Campaigns</span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-center py-8">Loading campaigns...</div>
-        </CardContent>
-      </Card>
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i}>
+              <CardContent className="p-6">
+                <div className="animate-pulse space-y-2">
+                  <div className="h-4 bg-gray-200 rounded w-3/4"></div>
+                  <div className="h-8 bg-gray-200 rounded w-1/2"></div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
     );
   }
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="flex items-center space-x-2">
-            <BarChart3 className="h-5 w-5" />
-            <span>Active Campaigns</span>
-          </CardTitle>
-          <div className="flex items-center space-x-2">
-            <span className="text-xs text-gray-500">
-              Last updated: {format(lastRefresh, 'HH:mm:ss')}
-            </span>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={fetchCampaigns}
-              disabled={loading}
-            >
-              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            </Button>
+    <div className="space-y-6">
+      {/* Campaign Statistics */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Total Campaigns</p>
+                <p className="text-2xl font-bold">{stats.total}</p>
+              </div>
+              <div className="h-8 w-8 bg-blue-100 rounded-full flex items-center justify-center">
+                <Calendar className="h-4 w-4 text-blue-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Active</p>
+                <p className="text-2xl font-bold">{stats.in_progress + stats.scheduled}</p>
+              </div>
+              <div className="h-8 w-8 bg-orange-100 rounded-full flex items-center justify-center">
+                <Clock className="h-4 w-4 text-orange-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Completed</p>
+                <p className="text-2xl font-bold">{stats.completed}</p>
+              </div>
+              <div className="h-8 w-8 bg-green-100 rounded-full flex items-center justify-center">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-muted-foreground">Response Rate</p>
+                <p className="text-2xl font-bold">
+                  {stats.emails_sent > 0 ? Math.round((stats.responses_received / stats.emails_sent) * 100) : 0}%
+                </p>
+              </div>
+              <div className="h-8 w-8 bg-purple-100 rounded-full flex items-center justify-center">
+                <Mail className="h-4 w-4 text-purple-600" />
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Campaign List */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle>Inspection Campaigns</CardTitle>
+            <div className="flex items-center space-x-2">
+              <Filter className="h-4 w-4 text-muted-foreground" />
+              <Tabs value={activeFilter} onValueChange={setActiveFilter} className="w-auto">
+                <TabsList className="grid w-full grid-cols-4">
+                  <TabsTrigger value="all">All</TabsTrigger>
+                  <TabsTrigger value="in_progress">Active</TabsTrigger>
+                  <TabsTrigger value="responses_received">Responses</TabsTrigger>
+                  <TabsTrigger value="completed">Completed</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
           </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        {campaigns.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            No active campaigns found
-          </div>
-        ) : (
-          <ScrollArea className="h-96">
-            <div className="space-y-4">
-              {campaigns.map((campaign) => (
-                <div
-                  key={campaign.id}
-                  className="border rounded-lg p-4 space-y-3"
-                >
-                  {/* Campaign Header */}
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <Badge className={getStatusColor(campaign.status)}>
-                        {getStatusIcon(campaign.status)}
-                        <span className="ml-1 capitalize">{campaign.status}</span>
-                      </Badge>
-                      {campaign.clients && (
-                        <span className="text-sm text-gray-600">
-                          {campaign.clients.company_name}
-                        </span>
-                      )}
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4">
+            {filteredCampaigns.map((campaign) => (
+              <div
+                key={campaign.id}
+                className="border rounded-lg p-4 hover:bg-gray-50 transition-colors"
+              >
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center space-x-3">
+                    <div className={`p-2 rounded-full ${getStatusColor(campaign.status)} text-white`}>
+                      {getStatusIcon(campaign.status)}
+                    </div>
+                    <div>
+                      <h3 className="font-semibold">{campaign.name}</h3>
+                      <p className="text-sm text-muted-foreground">
+                        {campaign.market} • {campaign.total_properties} properties
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Badge variant="outline">
+                      {campaign.status.replace('_', ' ')}
+                    </Badge>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => setSelectedCampaign(campaign)}
+                    >
+                      <Eye className="h-4 w-4 mr-1" />
+                      View
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center text-sm text-muted-foreground space-x-4">
+                    <div className="flex items-center space-x-1">
+                      <MapPin className="h-3 w-3" />
+                      <span>{campaign.region || 'N/A'}</span>
                     </div>
                     <div className="flex items-center space-x-1">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => window.open(`/dashboard?tab=campaigns&campaign=${campaign.id}`, '_blank')}
-                      >
-                        <Eye className="h-4 w-4" />
-                      </Button>
-                      {campaign.status === 'processing' && (
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => cancelCampaign(campaign.id)}
-                        >
-                          <PauseCircle className="h-4 w-4" />
-                        </Button>
-                      )}
+                      <Mail className="h-3 w-3" />
+                      <span>{campaign.property_manager_name || 'N/A'}</span>
+                    </div>
+                    <div className="flex items-center space-x-1">
+                      <Calendar className="h-3 w-3" />
+                      <span>Est: {campaign.estimated_completion ? new Date(campaign.estimated_completion).toLocaleDateString() : 'N/A'}</span>
                     </div>
                   </div>
 
-                  {/* Campaign Info */}
-                  <div>
-                    <h4 className="font-medium text-sm">{campaign.name}</h4>
-                    <div className="text-xs text-gray-600 space-y-1">
-                      <div>
-                        {campaign.market && `${campaign.market} • `}
-                        {campaign.inspection_type} • {campaign.total_properties} properties
-                      </div>
-                      <div>
-                        Started: {format(new Date(campaign.created_at), 'MMM dd, yyyy HH:mm')}
-                      </div>
-                      {campaign.estimated_completion && (
-                        <div>
-                          Est. completion: {format(new Date(campaign.estimated_completion), 'MMM dd, yyyy HH:mm')}
-                        </div>
-                      )}
+                  <div className="space-y-1">
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Progress</span>
+                      <span>{Math.round(calculateProgress(campaign.status))}%</span>
                     </div>
+                    <Progress value={calculateProgress(campaign.status)} className="h-2" />
                   </div>
-
-                  {/* Progress */}
-                  {campaign.status === 'processing' && (
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span>Progress</span>
-                        <span>{campaign.progress_percentage}%</span>
-                      </div>
-                      <Progress value={campaign.progress_percentage} className="w-full" />
-                      <div className="flex justify-between text-xs text-gray-600">
-                        <span>Completed: {campaign.completed_properties}</span>
-                        <span>Failed: {campaign.failed_properties}</span>
-                        <span>Pending: {campaign.total_properties - campaign.completed_properties - campaign.failed_properties}</span>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Error Message */}
-                  {campaign.error_message && (
-                    <div className="bg-red-50 border border-red-200 rounded p-2">
-                      <p className="text-xs text-red-700">{campaign.error_message}</p>
-                    </div>
-                  )}
                 </div>
-              ))}
-            </div>
-          </ScrollArea>
-        )}
-      </CardContent>
-    </Card>
+              </div>
+            ))}
+
+            {filteredCampaigns.length === 0 && (
+              <div className="text-center py-8 text-muted-foreground">
+                <Calendar className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No campaigns found</p>
+                <p className="text-sm">Create your first inspection campaign to get started</p>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Campaign Detail Modal */}
+      {selectedCampaign && (
+        <CampaignDetailModal
+          campaignId={selectedCampaign.id}
+          open={!!selectedCampaign}
+          onOpenChange={(open) => !open && setSelectedCampaign(null)}
+        />
+      )}
+    </div>
   );
 }
