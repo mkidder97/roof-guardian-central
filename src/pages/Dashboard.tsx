@@ -14,6 +14,7 @@ import { AccountsTab } from "@/components/dashboard/AccountsTab";
 import { WarrantiesTab } from "@/components/dashboard/WarrantiesTab";
 import { BudgetsTab } from "@/components/dashboard/BudgetsTab";
 import { MaintenanceTab } from "@/components/dashboard/MaintenanceTab";
+import { PropertyManagersTab } from "@/components/dashboard/PropertyManagersTab";
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("portfolio");
@@ -86,6 +87,9 @@ export default function Dashboard() {
                 <TabsTrigger value="contractors" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-500">
                   Contractors
                 </TabsTrigger>
+                <TabsTrigger value="property-managers" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-500">
+                  Property Managers
+                </TabsTrigger>
                 {(userRole === 'super_admin' || userRole === 'manager') && (
                   <TabsTrigger value="accounts" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-500">
                     Accounts
@@ -126,6 +130,10 @@ export default function Dashboard() {
               
               <TabsContent value="contractors" className="mt-0">
                 <ContractorsTab />
+              </TabsContent>
+              
+              <TabsContent value="property-managers" className="mt-0">
+                <PropertyManagersTab />
               </TabsContent>
               
               {(userRole === 'super_admin' || userRole === 'manager') && (
