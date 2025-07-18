@@ -3,12 +3,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { MapPin, Building, ChevronDown, ChevronRight, Search, Users, DollarSign } from 'lucide-react';
+import { MapPin, Building, ChevronDown, ChevronRight, Search, Users, DollarSign, Home } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 
 interface RegionalHierarchy {
   [region: string]: {
-    [market: string]: any[];
+    [market: string]: {
+      [group: string]: any[];
+    };
   };
 }
 
@@ -16,6 +18,8 @@ export function RegionalTab() {
   const [roofs, setRoofs] = useState<any[]>([]);
   const [regionalData, setRegionalData] = useState<RegionalHierarchy>({});
   const [expandedRegions, setExpandedRegions] = useState<Set<string>>(new Set());
+  const [expandedMarkets, setExpandedMarkets] = useState<Set<string>>(new Set());
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(true);
 
@@ -51,15 +55,19 @@ export function RegionalTab() {
     roofsData.forEach(roof => {
       const region = roof.region || 'Unknown Region';
       const market = roof.market || 'Unknown Market';
+      const group = roof.roof_group || 'Ungrouped';
       
       if (!hierarchy[region]) {
         hierarchy[region] = {};
       }
       if (!hierarchy[region][market]) {
-        hierarchy[region][market] = [];
+        hierarchy[region][market] = {};
+      }
+      if (!hierarchy[region][market][group]) {
+        hierarchy[region][market][group] = [];
       }
       
-      hierarchy[region][market].push(roof);
+      hierarchy[region][market][group].push(roof);
     });
     
     setRegionalData(hierarchy);
@@ -73,6 +81,26 @@ export function RegionalTab() {
       newExpanded.add(region);
     }
     setExpandedRegions(newExpanded);
+  };
+
+  const toggleMarket = (marketKey: string) => {
+    const newExpanded = new Set(expandedMarkets);
+    if (newExpanded.has(marketKey)) {
+      newExpanded.delete(marketKey);
+    } else {
+      newExpanded.add(marketKey);
+    }
+    setExpandedMarkets(newExpanded);
+  };
+
+  const toggleGroup = (groupKey: string) => {
+    const newExpanded = new Set(expandedGroups);
+    if (newExpanded.has(groupKey)) {
+      newExpanded.delete(groupKey);
+    } else {
+      newExpanded.add(groupKey);
+    }
+    setExpandedGroups(newExpanded);
   };
 
   const getTotalBudget = (properties: any[]) => {
@@ -98,10 +126,28 @@ export function RegionalTab() {
     }).length;
   };
 
+  const getAllProperties = (data: RegionalHierarchy) => {
+    const allProps: any[] = [];
+    Object.values(data).forEach(markets => {
+      Object.values(markets).forEach(groups => {
+        Object.values(groups).forEach(properties => {
+          allProps.push(...properties);
+        });
+      });
+    });
+    return allProps;
+  };
+
   const filteredRegions = Object.keys(regionalData).filter(region =>
     region.toLowerCase().includes(searchTerm.toLowerCase()) ||
     Object.keys(regionalData[region]).some(market =>
-      market.toLowerCase().includes(searchTerm.toLowerCase())
+      market.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      Object.keys(regionalData[region][market]).some(group =>
+        group.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        regionalData[region][market][group].some((prop: any) =>
+          prop.property_name?.toLowerCase().includes(searchTerm.toLowerCase())
+        )
+      )
     )
   );
 
@@ -137,7 +183,7 @@ export function RegionalTab() {
             <Building className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{roofs.length}</div>
+            <div className="text-2xl font-bold">{getAllProperties(regionalData).length}</div>
             <p className="text-xs text-muted-foreground">
               Across all regions
             </p>
@@ -151,7 +197,7 @@ export function RegionalTab() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              ${getTotalBudget(roofs).toLocaleString()}
+              ${getTotalBudget(getAllProperties(regionalData)).toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground">
               Combined estimated budgets
@@ -166,7 +212,7 @@ export function RegionalTab() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {getTotalSqFt(roofs).toLocaleString()}
+              {getTotalSqFt(getAllProperties(regionalData)).toLocaleString()}
             </div>
             <p className="text-xs text-muted-foreground">
               Square feet
@@ -181,7 +227,7 @@ export function RegionalTab() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">
-              {getActiveWarranties(roofs)}
+              {getActiveWarranties(getAllProperties(regionalData))}
             </div>
             <p className="text-xs text-muted-foreground">
               Properties with coverage
@@ -215,7 +261,7 @@ export function RegionalTab() {
           <div className="space-y-2">
             {filteredRegions.map(region => {
               const markets = regionalData[region];
-              const regionProperties = Object.values(markets).flat();
+              const regionProperties = getAllProperties({ [region]: markets });
               const regionTotal = regionProperties.length;
               const regionBudget = getTotalBudget(regionProperties);
               const regionSqFt = getTotalSqFt(regionProperties);
@@ -258,26 +304,37 @@ export function RegionalTab() {
                   {/* Market Level */}
                   {isExpanded && (
                     <div className="bg-gray-50">
-                      {Object.entries(markets).map(([market, properties]) => {
-                        const marketBudget = getTotalBudget(properties);
-                        const marketSqFt = getTotalSqFt(properties);
-                        const marketWarranties = getActiveWarranties(properties);
+                      {Object.entries(markets).map(([market, groups]) => {
+                        const marketProperties = Object.values(groups).flat();
+                        const marketBudget = getTotalBudget(marketProperties);
+                        const marketSqFt = getTotalSqFt(marketProperties);
+                        const marketWarranties = getActiveWarranties(marketProperties);
+                        const marketKey = `${region}-${market}`;
+                        const isMarketExpanded = expandedMarkets.has(marketKey);
 
                         return (
                           <div key={market} className="border-t">
-                            <div className="flex items-center justify-between p-4 pl-12">
+                            <div 
+                              className="flex items-center justify-between p-4 pl-12 hover:bg-gray-100 cursor-pointer"
+                              onClick={() => toggleMarket(marketKey)}
+                            >
                               <div className="flex items-center gap-3">
+                                {isMarketExpanded ? (
+                                  <ChevronDown className="h-4 w-4" />
+                                ) : (
+                                  <ChevronRight className="h-4 w-4" />
+                                )}
                                 <Building className="h-4 w-4 text-green-600" />
                                 <div>
                                   <div className="font-medium">{market}</div>
                                   <div className="text-sm text-gray-500">
-                                    {properties.length} properties
+                                    {Object.keys(groups).length} groups, {marketProperties.length} properties
                                   </div>
                                 </div>
                               </div>
                               <div className="flex items-center gap-6 text-sm">
                                 <div className="text-right">
-                                  <div className="font-medium">{properties.length} properties</div>
+                                  <div className="font-medium">{marketProperties.length} properties</div>
                                   <div className="text-gray-500">{marketSqFt.toLocaleString()} sq ft</div>
                                 </div>
                                 <div className="text-right">
@@ -286,6 +343,85 @@ export function RegionalTab() {
                                 </div>
                               </div>
                             </div>
+
+                            {/* Group Level */}
+                            {isMarketExpanded && (
+                              <div className="bg-gray-100">
+                                {Object.entries(groups).map(([group, properties]) => {
+                                  const groupBudget = getTotalBudget(properties);
+                                  const groupSqFt = getTotalSqFt(properties);
+                                  const groupWarranties = getActiveWarranties(properties);
+                                  const groupKey = `${region}-${market}-${group}`;
+                                  const isGroupExpanded = expandedGroups.has(groupKey);
+
+                                  return (
+                                    <div key={group} className="border-t border-gray-200">
+                                      <div 
+                                        className="flex items-center justify-between p-4 pl-20 hover:bg-gray-200 cursor-pointer"
+                                        onClick={() => toggleGroup(groupKey)}
+                                      >
+                                        <div className="flex items-center gap-3">
+                                          {isGroupExpanded ? (
+                                            <ChevronDown className="h-3 w-3" />
+                                          ) : (
+                                            <ChevronRight className="h-3 w-3" />
+                                          )}
+                                          <Users className="h-3 w-3 text-purple-600" />
+                                          <div>
+                                            <div className="font-medium text-sm">{group}</div>
+                                            <div className="text-xs text-gray-500">
+                                              {properties.length} properties
+                                            </div>
+                                          </div>
+                                        </div>
+                                        <div className="flex items-center gap-6 text-xs">
+                                          <div className="text-right">
+                                            <div className="font-medium">{properties.length}</div>
+                                            <div className="text-gray-500">{groupSqFt.toLocaleString()} sq ft</div>
+                                          </div>
+                                          <div className="text-right">
+                                            <div className="font-medium">${groupBudget.toLocaleString()}</div>
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      {/* Individual Properties */}
+                                      {isGroupExpanded && (
+                                        <div className="bg-white border-t border-gray-200">
+                                          <div className="px-6 py-2 bg-gray-50 border-b text-xs font-medium text-gray-600">
+                                            <div className="grid grid-cols-4 gap-4">
+                                              <div>Property</div>
+                                              <div>Location</div>
+                                              <div>Type</div>
+                                              <div className="text-right">Budget</div>
+                                            </div>
+                                          </div>
+                                          {properties.map((property: any, index: number) => (
+                                            <div key={property.id} className="px-6 py-3 border-b border-gray-100 hover:bg-gray-50">
+                                              <div className="grid grid-cols-4 gap-4 text-sm">
+                                                <div className="flex items-center gap-2">
+                                                  <Home className="h-3 w-3 text-blue-500" />
+                                                  <span className="font-medium">{property.property_name}</span>
+                                                </div>
+                                                <div className="text-gray-600">
+                                                  {property.city}, {property.state}
+                                                </div>
+                                                <div className="text-gray-600">
+                                                  {property.roof_type || 'N/A'}
+                                                </div>
+                                                <div className="text-right font-medium">
+                                                  ${((property.capital_budget_estimated || 0) + (property.preventative_budget_estimated || 0)).toLocaleString()}
+                                                </div>
+                                              </div>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            )}
                           </div>
                         );
                       })}
