@@ -27,7 +27,7 @@ export function PropertyManagerPerformance() {
         const { data: roofs, error } = await supabase
           .from('roofs')
           .select(`
-            property_manager_name,
+            site_contact,
             roof_area,
             capital_budget_estimated,
             preventative_budget_estimated,
@@ -37,7 +37,7 @@ export function PropertyManagerPerformance() {
             capital_budget_actual,
             preventative_budget_actual
           `)
-          .not('property_manager_name', 'is', null);
+          .not('site_contact', 'is', null);
 
         if (error) throw error;
 
@@ -52,7 +52,7 @@ export function PropertyManagerPerformance() {
         }>();
 
         roofs?.forEach(roof => {
-          const manager = roof.property_manager_name || 'Unknown';
+          const manager = roof.site_contact || 'Unknown';
           const roofArea = roof.roof_area || 0;
           const estimatedBudget = (roof.capital_budget_estimated || 0) + (roof.preventative_budget_estimated || 0);
           const actualBudget = parseFloat(roof.capital_budget_actual?.replace(/[^0-9.-]+/g, '') || '0') + 
