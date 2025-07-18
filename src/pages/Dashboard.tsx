@@ -15,6 +15,7 @@ import { AccountsTab } from "@/components/dashboard/AccountsTab";
 import { WarrantiesTab } from "@/components/dashboard/WarrantiesTab";
 import { BudgetsTab } from "@/components/dashboard/BudgetsTab";
 import { RegionalTab } from "@/components/dashboard/RegionalTab";
+import { MaintenanceTab } from "@/components/dashboard/MaintenanceTab";
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("summary");
@@ -59,7 +60,7 @@ export default function Dashboard() {
         <Card className="shadow-sm">
           <CardContent className="p-0">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-11 h-12 bg-gray-100 rounded-none border-b">
+              <TabsList className="grid w-full grid-cols-12 h-12 bg-gray-100 rounded-none border-b">
                 <TabsTrigger value="summary" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-500">
                   Summary
                 </TabsTrigger>
@@ -77,6 +78,9 @@ export default function Dashboard() {
                 </TabsTrigger>
                 <TabsTrigger value="regional" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-500">
                   Regional
+                </TabsTrigger>
+                <TabsTrigger value="maintenance" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-500">
+                  Maintenance
                 </TabsTrigger>
                 <TabsTrigger value="inspections" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-500">
                   Inspections
@@ -119,6 +123,10 @@ export default function Dashboard() {
               
               <TabsContent value="regional" className="mt-0">
                 <RegionalTab />
+              </TabsContent>
+              
+              <TabsContent value="maintenance" className="mt-0">
+                <MaintenanceTab />
               </TabsContent>
               
               <TabsContent value="inspections" className="mt-0">
