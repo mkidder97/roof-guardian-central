@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -7,14 +7,84 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Search, Calendar, FileDown } from "lucide-react";
+import { Progress } from "@/components/ui/progress";
+import { Search, Calendar, FileDown, CheckCircle, AlertCircle, X } from "lucide-react";
 import { format, addMonths } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { z } from "zod";
 
 interface InspectionSchedulingModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+}
+
+// Webhook configuration with environment variables
+const webhookConfig = {
+  url: import.meta.env.VITE_N8N_WEBHOOK_URL || "https://mkidder97.app.n8n.cloud/webhook-test/start-annual-inspections",
+  apiKey: import.meta.env.VITE_N8N_API_KEY,
+  timeout: parseInt(import.meta.env.VITE_N8N_TIMEOUT) || 30000,
+  retryAttempts: 3
+};
+
+// Zod schemas for validation
+const webhookResponseSchema = z.object({
+  success: z.boolean(),
+  message: z.string(),
+  campaign: z.object({
+    id: z.string().optional(),
+    market: z.string(),
+    propertyManager: z.string(),
+    propertyCount: z.number(),
+    pmEmail: z.string(),
+    estimatedCompletion: z.string().optional(),
+  }).optional(),
+});
+
+const webhookPayloadSchema = z.object({
+  selectedProperties: z.array(z.object({
+    id: z.string(),
+    property_name: z.string(),
+    address: z.string(),
+    city: z.string(),
+    state: z.string(),
+    zip: z.string().optional(),
+    market: z.string().optional(),
+    property_manager_name: z.string().optional(),
+    property_manager_email: z.string().optional(),
+    property_manager_phone: z.string().optional(),
+    site_contact_name: z.string().optional(),
+    site_contact_phone: z.string().optional(),
+    roof_access: z.string().optional(),
+    roof_area: z.number().optional(),
+    roof_type: z.string().optional(),
+    last_inspection_date: z.string().optional(),
+    warranty_status: z.string().optional(),
+  })),
+  filters: z.object({
+    clientId: z.string().optional(),
+    region: z.string().optional(),
+    market: z.string().optional(),
+    inspectionType: z.string(),
+  }),
+});
+
+enum WorkflowSteps {
+  PREPARING = "preparing",
+  VALIDATING = "validating",
+  SENDING = "sending",
+  PROCESSING = "processing",
+  COMPLETE = "complete",
+  ERROR = "error"
+}
+
+interface CampaignResult {
+  id?: string;
+  market: string;
+  propertyManager: string;
+  propertyCount: number;
+  pmEmail: string;
+  estimatedCompletion?: string;
 }
 
 interface SchedulingFilters {
@@ -43,13 +113,44 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [workflowLoading, setWorkflowLoading] = useState(false);
-  const [webhookUrl, setWebhookUrl] = useState("https://mkidder97.app.n8n.cloud/webhook-test/start-annual-inspections");
+  const [currentStep, setCurrentStep] = useState<WorkflowSteps>(WorkflowSteps.PREPARING);
+  const [progress, setProgress] = useState(0);
+  const [campaignResult, setCampaignResult] = useState<CampaignResult | null>(null);
+  const [retryAttempt, setRetryAttempt] = useState(0);
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const abortControllerRef = useRef<AbortController | null>(null);
 
   useEffect(() => {
     if (open) {
       fetchClients();
+      resetWorkflowState();
     }
   }, [open]);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  const resetWorkflowState = () => {
+    setCurrentStep(WorkflowSteps.PREPARING);
+    setProgress(0);
+    setCampaignResult(null);
+    setRetryAttempt(0);
+    setWorkflowLoading(false);
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+  };
 
   const fetchClients = async () => {
     try {
@@ -170,7 +271,115 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     });
   };
 
+  const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
+  const validateWebhookUrl = (url: string): boolean => {
+    try {
+      const urlObj = new URL(url);
+      return urlObj.protocol === 'https:' && urlObj.hostname.length > 0;
+    } catch {
+      return false;
+    }
+  };
+
+  const isPayloadValid = (payload: any): boolean => {
+    try {
+      webhookPayloadSchema.parse(payload);
+      return true;
+    } catch (error) {
+      console.error('Payload validation failed:', error);
+      return false;
+    }
+  };
+
+  const updateProgress = (step: WorkflowSteps, progressValue: number) => {
+    setCurrentStep(step);
+    setProgress(progressValue);
+  };
+
+  const cancelWorkflow = () => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    resetWorkflowState();
+    toast({
+      title: "Workflow Cancelled",
+      description: "The inspection workflow has been cancelled.",
+    });
+  };
+
+  const scheduleAnotherCampaign = () => {
+    resetWorkflowState();
+    setSelectedProperties([]);
+    setCampaignResult(null);
+  };
+
+  const viewCampaignStatus = () => {
+    if (campaignResult?.id) {
+      // This would typically open a new page or modal to view campaign details
+      window.open(`/campaigns/${campaignResult.id}`, '_blank');
+    }
+  };
+
+  const makeWebhookRequest = async (payload: any, attempt: number = 0): Promise<any> => {
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
+
+    try {
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+
+      if (webhookConfig.apiKey) {
+        headers["Authorization"] = `Bearer ${webhookConfig.apiKey}`;
+      }
+
+      // Set up timeout
+      const timeoutId = setTimeout(() => {
+        controller.abort();
+      }, webhookConfig.timeout);
+
+      const response = await fetch(webhookConfig.url, {
+        method: "POST",
+        headers,
+        body: JSON.stringify(payload),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      const result = await response.json();
+      
+      // Validate response schema
+      try {
+        return webhookResponseSchema.parse(result);
+      } catch (validationError) {
+        console.warn('Response validation failed, using raw response:', validationError);
+        return result;
+      }
+
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        throw new Error('Request was cancelled');
+      }
+      
+      if (attempt < webhookConfig.retryAttempts - 1) {
+        const backoffDelay = Math.pow(2, attempt) * 1000; // Exponential backoff
+        console.log(`Attempt ${attempt + 1} failed, retrying in ${backoffDelay}ms...`);
+        await sleep(backoffDelay);
+        return makeWebhookRequest(payload, attempt + 1);
+      }
+      
+      throw error;
+    }
+  };
+
   const initiateInspectionWorkflow = async () => {
+    // Pre-validation checks
     if (selectedProperties.length === 0) {
       toast({
         title: "No Properties Selected",
@@ -180,19 +389,35 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
       return;
     }
 
-    if (!webhookUrl || webhookUrl === "YOUR_WEBHOOK_URL_HERE") {
+    if (!isOnline) {
       toast({
-        title: "Webhook URL Required",
-        description: "Please configure your n8n webhook URL first.",
+        title: "Network Unavailable",
+        description: "Please check your internet connection and try again.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!validateWebhookUrl(webhookConfig.url)) {
+      toast({
+        title: "Invalid Webhook URL",
+        description: "Please configure a valid HTTPS webhook URL.",
         variant: "destructive",
       });
       return;
     }
 
     setWorkflowLoading(true);
+    setRetryAttempt(0);
 
     try {
-      // Prepare webhook payload
+      // Step 1: Preparing campaign
+      updateProgress(WorkflowSteps.PREPARING, 10);
+      await sleep(500); // Simulate preparation time
+
+      // Step 2: Validating payload
+      updateProgress(WorkflowSteps.VALIDATING, 25);
+      
       const payload = {
         selectedProperties: selectedProperties.map(property => ({
           id: property.id,
@@ -221,64 +446,92 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
         },
       };
 
-      console.log("Sending payload to n8n webhook:", payload);
-
-      // Call n8n webhook
-      const response = await fetch(webhookUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
+      // Validate payload size (max 10MB)
+      const payloadSize = new Blob([JSON.stringify(payload)]).size;
+      if (payloadSize > 10 * 1024 * 1024) {
+        throw new Error('Payload too large. Please select fewer properties.');
       }
 
-      const result = await response.json();
+      if (!isPayloadValid(payload)) {
+        throw new Error('Invalid payload data. Please check your selections.');
+      }
+
+      console.log("Sending payload to n8n webhook:", payload);
+
+      // Step 3: Sending to n8n
+      updateProgress(WorkflowSteps.SENDING, 50);
+
+      // Step 4: Processing
+      updateProgress(WorkflowSteps.PROCESSING, 75);
+      
+      const result = await makeWebhookRequest(payload);
       console.log("n8n workflow response:", result);
 
-      // Handle successful response
+      // Step 5: Complete
+      updateProgress(WorkflowSteps.COMPLETE, 100);
+
       if (result.success) {
+        const campaign: CampaignResult = {
+          id: result.campaign?.id,
+          market: result.campaign?.market || filters.market || 'Unknown',
+          propertyManager: result.campaign?.propertyManager || 'Multiple',
+          propertyCount: result.campaign?.propertyCount || selectedProperties.length,
+          pmEmail: result.campaign?.pmEmail || '',
+          estimatedCompletion: result.campaign?.estimatedCompletion,
+        };
+
+        setCampaignResult(campaign);
+
         toast({
-          title: "Campaign Started!",
-          description: `${result.campaign?.propertyCount || selectedProperties.length} properties processed for ${result.campaign?.market || filters.market} market`,
+          title: "Campaign Started Successfully!",
+          description: `${campaign.propertyCount} properties processed for ${campaign.market} market. ${campaign.estimatedCompletion ? `Estimated completion: ${campaign.estimatedCompletion}` : ''}`,
+          duration: 6000,
         });
 
-        // Close modal and reset state on success
-        onOpenChange(false);
-        setSelectedProperties([]);
-        setFilteredProperties([]);
+        // Don't close modal immediately - show success state
+        await sleep(2000);
+        
       } else {
-        throw new Error(result.message || "Workflow failed");
+        throw new Error(result.message || "Workflow failed without specific error");
       }
 
     } catch (error) {
       console.error("Error initiating workflow:", error);
+      updateProgress(WorkflowSteps.ERROR, 0);
       
-      // Handle different error types
-      if (error instanceof TypeError && error.message.includes('fetch')) {
-        toast({
-          title: "Network Error",
-          description: "Unable to connect to automation server. Please check your connection.",
-          variant: "destructive",
-        });
-      } else if (error instanceof Error) {
-        toast({
-          title: "Workflow Failed",
-          description: error.message || "Failed to start inspection workflow",
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          title: "Unexpected Error",
-          description: "An unexpected error occurred. Please try again.",
-          variant: "destructive",
-        });
+      let errorTitle = "Workflow Failed";
+      let errorDescription = "An unexpected error occurred. Please try again.";
+
+      if (error instanceof Error) {
+        if (error.message.includes('fetch') || error.message.includes('network')) {
+          errorTitle = "Network Error";
+          errorDescription = "Unable to connect to automation server. Please check your connection and try again.";
+        } else if (error.message.includes('timeout')) {
+          errorTitle = "Request Timeout";
+          errorDescription = "The request took too long to complete. Please try again with fewer properties.";
+        } else if (error.message.includes('Payload too large')) {
+          errorTitle = "Payload Too Large";
+          errorDescription = error.message;
+        } else if (error.message.includes('cancelled')) {
+          errorTitle = "Request Cancelled";
+          errorDescription = "The workflow was cancelled by the user.";
+        } else {
+          errorDescription = error.message;
+        }
       }
+
+      toast({
+        title: errorTitle,
+        description: errorDescription,
+        variant: "destructive",
+        duration: 8000,
+      });
+      
     } finally {
       setWorkflowLoading(false);
+      if (abortControllerRef.current) {
+        abortControllerRef.current = null;
+      }
     }
   };
 
@@ -404,16 +657,35 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                 </div>
               </div>
 
-              {/* Webhook URL Configuration */}
-              <div>
-                <label className="text-sm font-medium">n8n Webhook URL</label>
-                <Input
-                  type="url"
-                  value={webhookUrl}
-                  onChange={(e) => setWebhookUrl(e.target.value)}
-                  placeholder="https://your-n8n-instance.com/webhook/..."
-                  className="text-xs"
-                />
+              {/* Environment Configuration Status */}
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Configuration Status</label>
+                <div className="space-y-1">
+                  <div className="flex items-center space-x-2">
+                    {validateWebhookUrl(webhookConfig.url) ? (
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <AlertCircle className="h-4 w-4 text-red-500" />
+                    )}
+                    <span className="text-xs">Webhook URL</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {webhookConfig.apiKey ? (
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <AlertCircle className="h-4 w-4 text-yellow-500" />
+                    )}
+                    <span className="text-xs">API Key (optional)</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {isOnline ? (
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                    ) : (
+                      <AlertCircle className="h-4 w-4 text-red-500" />
+                    )}
+                    <span className="text-xs">Network Status</span>
+                  </div>
+                </div>
               </div>
 
               <Button 
@@ -490,6 +762,77 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
           </Card>
         </div>
 
+        {/* Workflow Progress Section */}
+        {workflowLoading && (
+          <Card className="p-4 bg-blue-50 border-blue-200">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">
+                  {currentStep === WorkflowSteps.PREPARING && "Preparing campaign..."}
+                  {currentStep === WorkflowSteps.VALIDATING && "Validating data..."}
+                  {currentStep === WorkflowSteps.SENDING && "Sending to n8n..."}
+                  {currentStep === WorkflowSteps.PROCESSING && "Processing workflow..."}
+                  {currentStep === WorkflowSteps.COMPLETE && "Campaign started successfully!"}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={cancelWorkflow}
+                  className="text-red-600 hover:text-red-700"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+              <Progress value={progress} className="w-full" />
+              {retryAttempt > 0 && (
+                <div className="text-xs text-gray-600">
+                  Retry attempt {retryAttempt}/{webhookConfig.retryAttempts}
+                </div>
+              )}
+            </div>
+          </Card>
+        )}
+
+        {/* Success State */}
+        {campaignResult && currentStep === WorkflowSteps.COMPLETE && (
+          <Card className="p-4 bg-green-50 border-green-200">
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                <span className="font-medium text-green-800">Campaign Created Successfully!</span>
+              </div>
+              <div className="text-sm text-green-700 space-y-1">
+                <div>Market: {campaignResult.market}</div>
+                <div>Properties: {campaignResult.propertyCount}</div>
+                <div>Property Manager: {campaignResult.propertyManager}</div>
+                {campaignResult.estimatedCompletion && (
+                  <div>Estimated Completion: {campaignResult.estimatedCompletion}</div>
+                )}
+              </div>
+              <div className="flex space-x-2">
+                {campaignResult.id && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={viewCampaignStatus}
+                    className="text-green-700 border-green-300"
+                  >
+                    View Campaign Status
+                  </Button>
+                )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={scheduleAnotherCampaign}
+                  className="text-green-700 border-green-300"
+                >
+                  Schedule Another Campaign
+                </Button>
+              </div>
+            </div>
+          </Card>
+        )}
+
         <DialogFooter className="flex justify-between">
           <div className="flex items-center space-x-2">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
@@ -502,13 +845,27 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
           </div>
           <Button 
             onClick={initiateInspectionWorkflow}
-            disabled={selectedProperties.length === 0 || workflowLoading}
-            className="bg-blue-600 hover:bg-blue-700"
+            disabled={
+              selectedProperties.length === 0 || 
+              workflowLoading || 
+              !isOnline ||
+              !validateWebhookUrl(webhookConfig.url) ||
+              currentStep === WorkflowSteps.COMPLETE
+            }
+            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
           >
             {workflowLoading ? (
               <>
                 <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full" />
-                Processing...
+                {currentStep === WorkflowSteps.PREPARING && "Preparing..."}
+                {currentStep === WorkflowSteps.VALIDATING && "Validating..."}
+                {currentStep === WorkflowSteps.SENDING && "Sending..."}
+                {currentStep === WorkflowSteps.PROCESSING && "Processing..."}
+              </>
+            ) : currentStep === WorkflowSteps.COMPLETE ? (
+              <>
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Campaign Started
               </>
             ) : (
               <>
