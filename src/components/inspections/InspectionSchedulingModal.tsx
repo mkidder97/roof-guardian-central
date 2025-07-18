@@ -896,11 +896,13 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
           <TabsContent value="properties" className="flex-1 min-h-0">
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-full">
               {/* Left Panel - Filters */}
-              <Card className="p-4">
-                <CardHeader className="p-0 pb-4">
+              <Card className="p-4 flex flex-col max-h-[600px]">
+                <CardHeader className="p-0 pb-4 flex-shrink-0">
                   <CardTitle className="text-base">Filters</CardTitle>
                 </CardHeader>
-                <CardContent className="p-0 space-y-4">
+                <CardContent className="p-0 flex-1 min-h-0">
+                  <ScrollArea className="h-full">
+                    <div className="space-y-4 pr-4 pb-4">
                   {/* Client Selection */}
                   <div>
                     <label className="text-sm font-medium">Client</label>
@@ -961,6 +963,16 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                          ))}
                        </SelectContent>
                     </Select>
+                  </div>
+
+                  {/* Zip Code Filter - moved to main filters */}
+                  <div>
+                    <label className="text-sm font-medium">Zip Code</label>
+                    <Input
+                      placeholder="Filter by zip code..."
+                      value={filters.zipCode || ''}
+                      onChange={(e) => setFilters(prev => ({ ...prev, zipCode: e.target.value }))}
+                    />
                   </div>
 
                   {/* Inspection Type */}
@@ -1103,16 +1115,6 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                           onChange={(e) => setFilters(prev => ({ ...prev, propertyManager: e.target.value }))}
                         />
                       </div>
-
-                      {/* Zip Code Filter */}
-                      <div>
-                        <label className="text-sm font-medium">Zip Code</label>
-                        <Input
-                          placeholder="Filter by zip code..."
-                          value={filters.zipCode || ''}
-                          onChange={(e) => setFilters(prev => ({ ...prev, zipCode: e.target.value }))}
-                        />
-                      </div>
                     </div>
                   )}
 
@@ -1133,6 +1135,8 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                     )}
                     Refresh Properties
                   </Button>
+                    </div>
+                  </ScrollArea>
                 </CardContent>
               </Card>
 
