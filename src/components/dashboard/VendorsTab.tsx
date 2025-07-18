@@ -95,12 +95,13 @@ export function ContractorsTab() {
 
       if (roofsError) throw roofsError;
 
-      // Process building contractors
+      // Process building contractors - repair contractors are subset of installing contractors
       const contractorMap = new Map<string, ContractorFromBuildings>();
       
       (roofsData || []).forEach(roof => {
+        // Installing contractors
         if (roof.installing_contractor) {
-          const key = `${roof.installing_contractor}-installer`;
+          const key = roof.installing_contractor;
           if (!contractorMap.has(key)) {
             contractorMap.set(key, {
               name: roof.installing_contractor,
@@ -111,12 +112,16 @@ export function ContractorsTab() {
           }
           const contractor = contractorMap.get(key)!;
           contractor.count++;
-          contractor.properties.push(roof.property_name);
+          if (!contractor.properties.includes(roof.property_name)) {
+            contractor.properties.push(roof.property_name);
+          }
         }
 
+        // Repair contractors (subset of installing contractors, assumed registered)
         if (roof.repair_contractor) {
-          const key = `${roof.repair_contractor}-repair`;
+          const key = roof.repair_contractor;
           if (!contractorMap.has(key)) {
+            // Add as repair contractor if not found
             contractorMap.set(key, {
               name: roof.repair_contractor,
               type: 'repair',
@@ -125,8 +130,11 @@ export function ContractorsTab() {
             });
           }
           const contractor = contractorMap.get(key)!;
-          contractor.count++;
-          contractor.properties.push(roof.property_name);
+          // Mark as repair type (subset of installing contractors)
+          contractor.type = 'repair';
+          if (!contractor.properties.includes(roof.property_name)) {
+            contractor.properties.push(roof.property_name);
+          }
         }
       });
 
