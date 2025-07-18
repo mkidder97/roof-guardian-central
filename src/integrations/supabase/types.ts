@@ -14,6 +14,69 @@ export type Database = {
   }
   public: {
     Tables: {
+      campaign_properties: {
+        Row: {
+          automation_data: Json | null
+          campaign_id: string | null
+          completed_date: string | null
+          created_at: string | null
+          error_message: string | null
+          id: string
+          inspector_id: string | null
+          n8n_property_id: string | null
+          risk_assessment: Json | null
+          roof_id: string | null
+          scheduled_date: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          automation_data?: Json | null
+          campaign_id?: string | null
+          completed_date?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          inspector_id?: string | null
+          n8n_property_id?: string | null
+          risk_assessment?: Json | null
+          roof_id?: string | null
+          scheduled_date?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          automation_data?: Json | null
+          campaign_id?: string | null
+          completed_date?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          inspector_id?: string | null
+          n8n_property_id?: string | null
+          risk_assessment?: Json | null
+          roof_id?: string | null
+          scheduled_date?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_properties_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "inspection_campaigns"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campaign_properties_roof_id_fkey"
+            columns: ["roof_id"]
+            isOneToOne: false
+            referencedRelation: "roofs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       client_contacts: {
         Row: {
           client_id: string | null
@@ -147,6 +210,95 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      inspection_campaigns: {
+        Row: {
+          actual_completion: string | null
+          automation_settings: Json | null
+          client_id: string | null
+          completed_at: string | null
+          completed_properties: number | null
+          contact_preferences: Json | null
+          created_at: string | null
+          created_by: string | null
+          error_message: string | null
+          estimated_completion: string | null
+          failed_properties: number | null
+          id: string
+          inspection_type: string
+          market: string | null
+          metadata: Json | null
+          n8n_execution_id: string | null
+          n8n_workflow_id: string | null
+          name: string
+          progress_percentage: number | null
+          region: string | null
+          status: string | null
+          total_properties: number
+          updated_at: string | null
+          updated_by: string | null
+        }
+        Insert: {
+          actual_completion?: string | null
+          automation_settings?: Json | null
+          client_id?: string | null
+          completed_at?: string | null
+          completed_properties?: number | null
+          contact_preferences?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          error_message?: string | null
+          estimated_completion?: string | null
+          failed_properties?: number | null
+          id?: string
+          inspection_type: string
+          market?: string | null
+          metadata?: Json | null
+          n8n_execution_id?: string | null
+          n8n_workflow_id?: string | null
+          name: string
+          progress_percentage?: number | null
+          region?: string | null
+          status?: string | null
+          total_properties: number
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Update: {
+          actual_completion?: string | null
+          automation_settings?: Json | null
+          client_id?: string | null
+          completed_at?: string | null
+          completed_properties?: number | null
+          contact_preferences?: Json | null
+          created_at?: string | null
+          created_by?: string | null
+          error_message?: string | null
+          estimated_completion?: string | null
+          failed_properties?: number | null
+          id?: string
+          inspection_type?: string
+          market?: string | null
+          metadata?: Json | null
+          n8n_execution_id?: string | null
+          n8n_workflow_id?: string | null
+          name?: string
+          progress_percentage?: number | null
+          region?: string | null
+          status?: string | null
+          total_properties?: number
+          updated_at?: string | null
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inspection_campaigns_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       inspection_reports: {
         Row: {
@@ -907,6 +1059,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      generate_campaign_name: {
+        Args: {
+          p_market: string
+          p_inspection_type: string
+          p_total_properties: number
+        }
+        Returns: string
+      }
       get_current_user_role: {
         Args: Record<PropertyKey, never>
         Returns: Database["public"]["Enums"]["app_role"]

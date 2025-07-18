@@ -314,10 +314,27 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     setCampaignResult(null);
   };
 
+  const generateCampaignName = async (): Promise<string> => {
+    try {
+      const { data, error } = await supabase
+        .rpc('generate_campaign_name', {
+          p_market: filters.market || 'Multi-Market',
+          p_inspection_type: filters.inspectionType,
+          p_total_properties: selectedProperties.length
+        });
+      
+      if (error) throw error;
+      return data;
+    } catch (error) {
+      console.error('Error generating campaign name:', error);
+      return `${filters.market || 'Multi-Market'} ${filters.inspectionType} Campaign - ${selectedProperties.length} Properties (${format(new Date(), 'MM/dd/yyyy')})`;
+    }
+  };
+
   const viewCampaignStatus = () => {
     if (campaignResult?.id) {
-      // This would typically open a new page or modal to view campaign details
-      window.open(`/campaigns/${campaignResult.id}`, '_blank');
+      // Navigate to campaign detail view
+      window.open(`/dashboard?tab=campaigns&campaign=${campaignResult.id}`, '_blank');
     }
   };
 
@@ -467,36 +484,123 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
       const result = await makeWebhookRequest(payload);
       console.log("n8n workflow response:", result);
 
-      // Step 5: Complete
-      updateProgress(WorkflowSteps.COMPLETE, 100);
+        // Step 5: Complete
+        updateProgress(WorkflowSteps.COMPLETE, 100);
 
-      if (result.success) {
-        const campaign: CampaignResult = {
-          id: result.campaign?.id,
-          market: result.campaign?.market || filters.market || 'Unknown',
-          propertyManager: result.campaign?.propertyManager || 'Multiple',
-          propertyCount: result.campaign?.propertyCount || selectedProperties.length,
-          pmEmail: result.campaign?.pmEmail || '',
-          estimatedCompletion: result.campaign?.estimatedCompletion,
-        };
+        if (result.success) {
+          // Create campaign record in database
+          const campaignName = await generateCampaignName();
+          
+          const { data: campaignData, error: campaignError } = await supabase
+            .from('inspection_campaigns')
+            .insert({
+              name: campaignName,
+              client_id: filters.clientId !== 'all' ? filters.clientId : null,
+              region: filters.region,
+              market: filters.market,
+              inspection_type: filters.inspectionType,
+              status: 'processing',
+              total_properties: selectedProperties.length,
+              n8n_workflow_id: result.campaign?.id,
+              n8n_execution_id: result.executionId,
+              estimated_completion: result.campaign?.estimatedCompletion ? result.campaign.estimatedCompletion : null,
+              created_by: (await supabase.auth.getUser()).data.user?.id,
+              metadata: {
+                webhook_response: result,
+                automation_settings: {
+                  webhook_url: webhookConfig.url,
+                  retry_attempts: webhookConfig.retryAttempts,
+                  timeout: webhookConfig.timeout
+                }
+              },
+              automation_settings: {
+                notification_preferences: {
+                  email_on_completion: true,
+                  email_on_failure: true
+                },
+                scheduling_preferences: {
+                  preferred_time_slots: ['09:00-12:00', '13:00-17:00'],
+                  avoid_weekends: true
+                }
+              },
+              contact_preferences: {
+                primary_contact_method: 'email',
+                backup_contact_method: 'phone',
+                notification_frequency: 'daily'
+              }
+            })
+            .select()
+            .single();
 
-        setCampaignResult(campaign);
+          if (campaignError) {
+            console.error('Error creating campaign:', campaignError);
+            throw new Error('Failed to create campaign record');
+          }
 
-        toast({
-          title: "Campaign Started Successfully!",
-          description: `${campaign.propertyCount} properties processed for ${campaign.market} market. ${campaign.estimatedCompletion ? `Estimated completion: ${campaign.estimatedCompletion}` : ''}`,
-          duration: 6000,
-        });
+          // Create campaign_properties records
+          const campaignProperties = selectedProperties.map(property => ({
+            campaign_id: campaignData.id,
+            roof_id: property.id,
+            status: 'pending' as const,
+            automation_data: {
+              property_payload: {
+                property_name: property.property_name,
+                address: property.address,
+                city: property.city,
+                state: property.state,
+                zip: property.zip,
+                market: property.market,
+                property_manager: {
+                  name: property.property_manager_name,
+                  email: property.property_manager_email,
+                  phone: property.property_manager_phone
+                }
+              }
+            },
+            risk_assessment: {
+              safety_concerns: property.safety_concerns || false,
+              roof_access_difficulty: property.roof_access || 'standard',
+              last_inspection_age: property.last_inspection_date ? 
+                Math.floor((new Date().getTime() - new Date(property.last_inspection_date).getTime()) / (1000 * 3600 * 24)) : null,
+              warranty_status: property.warranty_status
+            }
+          }));
 
-        // Don't close modal immediately - show success state
-        await sleep(2000);
-        
-      } else {
-        throw new Error(result.message || "Workflow failed without specific error");
-      }
+          const { error: propertiesError } = await supabase
+            .from('campaign_properties')
+            .insert(campaignProperties);
 
-    } catch (error) {
-      console.error("Error initiating workflow:", error);
+          if (propertiesError) {
+            console.error('Error creating campaign properties:', propertiesError);
+            // Don't throw here as campaign is created, just log the issue
+          }
+
+          const campaign: CampaignResult = {
+            id: campaignData.id,
+            market: result.campaign?.market || filters.market || 'Unknown',
+            propertyManager: result.campaign?.propertyManager || 'Multiple',
+            propertyCount: result.campaign?.propertyCount || selectedProperties.length,
+            pmEmail: result.campaign?.pmEmail || '',
+            estimatedCompletion: result.campaign?.estimatedCompletion,
+          };
+
+          setCampaignResult(campaign);
+
+          toast({
+            title: "Campaign Started Successfully!",
+            description: `${campaign.propertyCount} properties processed for ${campaign.market} market. Campaign ID: ${campaignData.id.slice(0, 8)}...`,
+            duration: 6000,
+          });
+
+          // Don't close modal immediately - show success state
+          await sleep(2000);
+          
+        } else {
+          throw new Error(result.message || "Workflow failed without specific error");
+        }
+
+      } catch (error) {
+        console.error("Error initiating workflow:", error);
       updateProgress(WorkflowSteps.ERROR, 0);
       
       let errorTitle = "Workflow Failed";
