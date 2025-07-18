@@ -104,6 +104,7 @@ interface SchedulingFilters {
   warrantyStatus?: 'active' | 'expired' | 'all';
   roofType?: string;
   propertyManager?: string;
+  zipCode?: string;
 }
 
 export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSchedulingModalProps) {
@@ -265,6 +266,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
         warrantyStatus: currentFilters.warrantyStatus,
         roofType: currentFilters.roofType,
         propertyManager: currentFilters.propertyManager,
+        zipCode: currentFilters.zipCode,
       }));
     } catch (error) {
       console.warn('Failed to save filters to localStorage:', error);
@@ -336,6 +338,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
         warrantyStatus: currentFilters.warrantyStatus,
         roofType: currentFilters.roofType,
         propertyManager: currentFilters.propertyManager,
+        zipCode: currentFilters.zipCode,
       });
       
       if (propertyCache.has(cacheKey)) {
@@ -372,6 +375,10 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
 
       if (currentFilters.propertyManager) {
         query = query.ilike('property_manager_name', `%${currentFilters.propertyManager}%`);
+      }
+
+      if (currentFilters.zipCode) {
+        query = query.eq('zip', currentFilters.zipCode);
       }
 
       const { data, error } = await query.order('property_name');
@@ -1096,6 +1103,16 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                           onChange={(e) => setFilters(prev => ({ ...prev, propertyManager: e.target.value }))}
                         />
                       </div>
+
+                      {/* Zip Code Filter */}
+                      <div>
+                        <label className="text-sm font-medium">Zip Code</label>
+                        <Input
+                          placeholder="Filter by zip code..."
+                          value={filters.zipCode || ''}
+                          onChange={(e) => setFilters(prev => ({ ...prev, zipCode: e.target.value }))}
+                        />
+                      </div>
                     </div>
                   )}
 
@@ -1176,9 +1193,9 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                     </div>
                   )}
                 </CardHeader>
-                <CardContent className="p-0 flex-1 min-h-0">
-                  <ScrollArea className="h-full">
-                    <div className="space-y-2 pr-4">
+                <CardContent className="p-0 flex-1 min-h-0 overflow-hidden">
+                  <ScrollArea className="h-full max-h-[400px]">
+                    <div className="space-y-2 pr-4 pb-4">
                       {propertiesLoading ? (
                         <div className="text-center py-8 flex items-center justify-center space-x-2">
                           <Loader2 className="h-5 w-5 animate-spin" />
