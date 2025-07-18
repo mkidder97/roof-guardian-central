@@ -2,285 +2,288 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Eye, Calendar, User, FileText, Plus, CloudRain, CheckCircle, AlertTriangle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
+import { Calendar, Eye, Edit, FileText, User } from "lucide-react";
 
-interface InspectionHistoryTabProps {
-  roof: any;
-}
-
-export function InspectionHistoryTab({ roof }: InspectionHistoryTabProps) {
+export function InspectionHistoryTab({ roof }: { roof: any }) {
   const [inspections, setInspections] = useState<any[]>([]);
+  const [reports, setReports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchInspections();
+    const fetchInspectionData = async () => {
+      try {
+        // Fetch inspections
+        const { data: inspectionData, error: inspectionError } = await supabase
+          .from('inspections')
+          .select(`
+            *,
+            users(first_name, last_name)
+          `)
+          .eq('roof_id', roof.id)
+          .order('scheduled_date', { ascending: false });
+
+        if (inspectionError) throw inspectionError;
+
+        // Fetch inspection reports
+        const { data: reportData, error: reportError } = await supabase
+          .from('inspection_reports')
+          .select('*')
+          .in('inspection_id', inspectionData?.map(i => i.id) || []);
+
+        if (reportError) throw reportError;
+
+        setInspections(inspectionData || []);
+        setReports(reportData || []);
+      } catch (error) {
+        console.error('Error fetching inspection data:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchInspectionData();
   }, [roof.id]);
-
-  const fetchInspections = async () => {
-    try {
-      setLoading(true);
-      const { data, error } = await supabase
-        .from('inspections')
-        .select(`
-          *,
-          users!inspections_inspector_id_fkey(first_name, last_name),
-          inspection_reports(*)
-        `)
-        .eq('roof_id', roof.id)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setInspections(data || []);
-    } catch (error) {
-      console.error('Error fetching inspections:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const getStatusColor = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case 'completed': return 'default';
-      case 'in-progress': return 'secondary';
-      case 'scheduled': return 'outline';
-      case 'cancelled': return 'destructive';
-      default: return 'outline';
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status?.toLowerCase()) {
-      case 'completed': return <CheckCircle className="h-4 w-4" />;
-      case 'in-progress': return <Eye className="h-4 w-4" />;
-      case 'scheduled': return <Calendar className="h-4 w-4" />;
-      default: return <AlertTriangle className="h-4 w-4" />;
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
 
   return (
     <div className="space-y-6">
-      {/* Inspection Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-blue-600">{inspections.length}</div>
-            <p className="text-sm text-gray-600">Total Inspections</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-green-600">
-              {inspections.filter(i => i.status === 'completed').length}
-            </div>
-            <p className="text-sm text-gray-600">Completed</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-yellow-600">
-              {inspections.filter(i => i.status === 'scheduled').length}
-            </div>
-            <p className="text-sm text-gray-600">Scheduled</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-purple-600">
-              {roof.last_inspection_date 
-                ? new Date(roof.last_inspection_date).toLocaleDateString()
-                : 'Never'
-              }
-            </div>
-            <p className="text-sm text-gray-600">Last Inspection</p>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Schedule Inspection Button */}
-      <div className="flex justify-between items-center">
-        <h3 className="text-lg font-medium">Inspection History</h3>
+      {/* Inspection Timeline */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">Inspection History</h3>
         <Button>
-          <Plus className="h-4 w-4 mr-2" />
+          <Calendar className="h-4 w-4 mr-2" />
           Schedule Inspection
         </Button>
       </div>
 
-      {/* Inspections List */}
-      {inspections.length === 0 ? (
+      {/* Inspection Findings - Recent Report */}
+      {inspections.length > 0 && (
         <Card>
-          <CardContent className="p-12 text-center">
-            <Eye className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No Inspections</h3>
-            <p className="text-gray-600 mb-4">
-              No inspections have been scheduled for this property yet.
-            </p>
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Schedule First Inspection
-            </Button>
+          <CardHeader>
+            <CardTitle className="flex items-center justify-between">
+              Inspection Findings
+              <Badge variant="outline">Latest Report</Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Latest Inspection Date */}
+              <div className="space-y-4">
+                <div className="flex items-center space-x-4">
+                  <div className="bg-primary/10 text-primary px-3 py-1 rounded-lg font-medium">
+                    April 27, 2025
+                  </div>
+                  <div className="text-muted-foreground">February 12, 2025</div>
+                </div>
+
+                {/* Inspection Findings */}
+                <div className="prose prose-sm max-w-none text-sm">
+                  <p>
+                    <strong>2025:</strong> The roof composition consists of a mechanically attached, 45 mil TPO single ply membrane, over 
+                    mechanically attached, 1.25" polyisocyanurate insulation, on a metal deck. The roof system was installed in 
+                    2017 and is under warranty until 2032. No significant membrane failure was observed in the roof system.
+                  </p>
+                  
+                  <p>
+                    Primary drainage is provided by two-way slope in the steel deck towards external gutter systems installed 
+                    along the building's east and west elevations, where it is collected and discharged at grade via recessed 
+                    downspouts directly onto the building's concrete loading dock aprons. Secondary drainage is provided by 
+                    internal roof drains and leaders sited in the building corners that also discharge onto the loading dock 
+                    aprons. No standing water was observed along the gutter lines. SRC noted expansion joints are not installed 
+                    in the gutter troughs.
+                  </p>
+
+                  <p>
+                    The perimeter details of the roof consist of low and intermediate height tilt wall parapets on the north and 
+                    south elevations and corners and the gutter systems on the east and west elevations. The parapets are 
+                    membrane flashed to approximately 18-inches and are completed using exposed term bar.
+                  </p>
+
+                  <p>
+                    Penetrations throughout the field of roof are comprised of, but not limited to, curb mounted HVAC units, curb 
+                    mounted exhaust fans, soil stacks, and power vents. Five low profile, membrane wrapped expansion joints 
+                    are installed east to west and north to south across the roof.
+                  </p>
+                </div>
+              </div>
+
+              {/* Inspector Image */}
+              <div className="flex justify-center">
+                <div className="w-32 h-40 bg-muted rounded-lg flex items-center justify-center">
+                  <User className="h-16 w-16 text-muted-foreground" />
+                </div>
+              </div>
+            </div>
           </CardContent>
         </Card>
-      ) : (
-        <div className="space-y-4">
-          {inspections.map((inspection) => (
-            <Card key={inspection.id} className="hover:shadow-md transition-shadow">
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex-1">
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      {getStatusIcon(inspection.status)}
-                      {inspection.inspection_type || 'Routine Inspection'}
-                    </CardTitle>
-                    <p className="text-sm text-gray-600 mt-1">
-                      Created {new Date(inspection.created_at).toLocaleDateString()}
-                    </p>
-                  </div>
-                  <Badge variant={getStatusColor(inspection.status)}>
-                    {inspection.status || 'Scheduled'}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  {/* Main Information */}
-                  <div className="md:col-span-2">
-                    {/* Dates */}
-                    <div className="grid grid-cols-2 gap-4 mb-4">
-                      {inspection.scheduled_date && (
-                        <div>
-                          <label className="text-sm font-medium text-gray-600 flex items-center gap-1">
-                            <Calendar className="h-3 w-3" />
-                            Scheduled Date
-                          </label>
-                          <p className="text-sm">{new Date(inspection.scheduled_date).toLocaleDateString()}</p>
-                        </div>
+      )}
+
+      {/* Inspection List */}
+      <div className="space-y-4">
+        {loading ? (
+          <div className="text-center py-8">Loading inspections...</div>
+        ) : inspections.length === 0 ? (
+          <Card>
+            <CardContent className="text-center py-12">
+              <Calendar className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h4 className="text-lg font-medium text-foreground mb-2">No Inspections</h4>
+              <p className="text-muted-foreground mb-4">No inspections have been scheduled for this property yet.</p>
+              <Button>
+                <Calendar className="h-4 w-4 mr-2" />
+                Schedule First Inspection
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          inspections.map((inspection) => {
+            const associatedReport = reports.find(r => r.inspection_id === inspection.id);
+            
+            return (
+              <Card key={inspection.id}>
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <CardTitle className="text-lg">
+                        {inspection.inspection_type || 'Routine Inspection'}
+                      </CardTitle>
+                      <p className="text-sm text-muted-foreground">
+                        Scheduled: {new Date(inspection.scheduled_date).toLocaleDateString()}
+                        {inspection.completed_date && (
+                          <span> • Completed: {new Date(inspection.completed_date).toLocaleDateString()}</span>
+                        )}
+                      </p>
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Badge 
+                        variant={
+                          inspection.status === 'completed' ? 'default' :
+                          inspection.status === 'in_progress' ? 'secondary' :
+                          inspection.status === 'scheduled' ? 'outline' :
+                          'destructive'
+                        }
+                      >
+                        {inspection.status.replace('_', ' ').toUpperCase()}
+                      </Badge>
+                      {associatedReport && (
+                        <Badge 
+                          variant={
+                            associatedReport.priority_level === 'critical' ? 'destructive' :
+                            associatedReport.priority_level === 'high' ? 'secondary' :
+                            'outline'
+                          }
+                        >
+                          {associatedReport.priority_level?.toUpperCase() || 'LOW'}
+                        </Badge>
                       )}
-                      {inspection.completed_date && (
-                        <div>
-                          <label className="text-sm font-medium text-gray-600 flex items-center gap-1">
-                            <CheckCircle className="h-3 w-3" />
-                            Completed Date
-                          </label>
-                          <p className="text-sm">{new Date(inspection.completed_date).toLocaleDateString()}</p>
-                        </div>
-                      )}
                     </div>
-
-                    {/* Weather Conditions */}
-                    {inspection.weather_conditions && (
-                      <div className="mb-4">
-                        <label className="text-sm font-medium text-gray-600 flex items-center gap-1">
-                          <CloudRain className="h-3 w-3" />
-                          Weather Conditions
-                        </label>
-                        <p className="text-sm mt-1">{inspection.weather_conditions}</p>
-                      </div>
-                    )}
-
-                    {/* Notes */}
-                    {inspection.notes && (
-                      <div className="mb-4">
-                        <label className="text-sm font-medium text-gray-600">Notes</label>
-                        <p className="text-sm mt-1 p-2 bg-gray-50 rounded">{inspection.notes}</p>
-                      </div>
-                    )}
-
-                    {/* Reports */}
-                    {inspection.inspection_reports && inspection.inspection_reports.length > 0 && (
-                      <div>
-                        <label className="text-sm font-medium text-gray-600 flex items-center gap-1 mb-2">
-                          <FileText className="h-3 w-3" />
-                          Inspection Reports ({inspection.inspection_reports.length})
-                        </label>
-                        <div className="space-y-2">
-                          {inspection.inspection_reports.map((report: any) => (
-                            <div key={report.id} className="p-2 bg-gray-50 rounded text-sm">
-                              <div className="flex items-center justify-between">
-                                <span>{report.status || 'Draft'}</span>
-                                <Badge variant="outline">
-                                  {report.priority_level || 'Low'}
-                                </Badge>
-                              </div>
-                              {report.findings && (
-                                <p className="text-gray-600 mt-1 text-xs">{report.findings}</p>
-                              )}
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                   </div>
-
-                  {/* Sidebar Info */}
-                  <div className="space-y-4">
-                    {/* Inspector */}
-                    {inspection.users && (
-                      <div>
-                        <label className="text-sm font-medium text-gray-600 flex items-center gap-1">
-                          <User className="h-3 w-3" />
-                          Inspector
-                        </label>
-                        <p className="text-sm mt-1">
-                          {inspection.users.first_name} {inspection.users.last_name}
-                        </p>
-                      </div>
-                    )}
-
-                    {/* Inspection Type */}
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
                     <div>
-                      <label className="text-sm font-medium text-gray-600">Type</label>
-                      <p className="text-sm mt-1">{inspection.inspection_type || 'Routine'}</p>
+                      <label className="text-sm text-muted-foreground">Inspector</label>
+                      <p className="font-medium">
+                        {inspection.users ? 
+                          `${inspection.users.first_name} ${inspection.users.last_name}` : 
+                          'Not assigned'
+                        }
+                      </p>
                     </div>
-
-                    {/* Status Details */}
                     <div>
-                      <label className="text-sm font-medium text-gray-600">Status</label>
-                      <div className="mt-1 flex items-center gap-2">
-                        {getStatusIcon(inspection.status)}
-                        <span className="text-sm">{inspection.status || 'Scheduled'}</span>
-                      </div>
+                      <label className="text-sm text-muted-foreground">Weather Conditions</label>
+                      <p className="font-medium">{inspection.weather_conditions || 'Not recorded'}</p>
                     </div>
-
-                    {/* Report Count */}
                     <div>
-                      <label className="text-sm font-medium text-gray-600">Reports</label>
-                      <p className="text-sm mt-1">
-                        {inspection.inspection_reports?.length || 0} report(s)
+                      <label className="text-sm text-muted-foreground">Estimated Cost</label>
+                      <p className="font-medium">
+                        {associatedReport?.estimated_cost ? 
+                          `$${associatedReport.estimated_cost.toLocaleString()}` : 
+                          'No issues found'
+                        }
                       </p>
                     </div>
                   </div>
-                </div>
 
-                {/* Actions */}
-                <div className="flex items-center justify-end gap-2 mt-4 pt-4 border-t">
-                  <Button variant="outline" size="sm">
-                    View Details
-                  </Button>
-                  {inspection.status !== 'completed' && (
+                  {inspection.notes && (
+                    <div className="mb-4">
+                      <label className="text-sm text-muted-foreground">Notes</label>
+                      <p className="text-sm mt-1">{inspection.notes}</p>
+                    </div>
+                  )}
+
+                  {associatedReport && (
+                    <div className="mb-4 p-4 bg-muted/50 rounded-lg">
+                      <h5 className="font-medium mb-2">Inspection Findings</h5>
+                      <p className="text-sm text-foreground mb-2">{associatedReport.findings}</p>
+                      {associatedReport.recommendations && (
+                        <div>
+                          <h6 className="font-medium text-sm mb-1">Recommendations</h6>
+                          <p className="text-sm text-foreground">{associatedReport.recommendations}</p>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="flex justify-end space-x-2">
+                    {associatedReport && (
+                      <Button variant="outline" size="sm">
+                        <FileText className="h-4 w-4 mr-2" />
+                        View Report
+                      </Button>
+                    )}
                     <Button variant="outline" size="sm">
+                      <Eye className="h-4 w-4 mr-2" />
+                      View Details
+                    </Button>
+                    <Button variant="outline" size="sm">
+                      <Edit className="h-4 w-4 mr-2" />
                       Edit
                     </Button>
-                  )}
-                  {inspection.inspection_reports && inspection.inspection_reports.length > 0 && (
-                    <Button size="sm">
-                      View Reports
-                    </Button>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })
+        )}
+      </div>
+
+      {/* Inspection Summary */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Inspection Summary</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div className="text-center">
+              <div className="text-2xl font-bold text-accent">
+                {inspections.filter(i => i.status === 'completed').length}
+              </div>
+              <p className="text-sm text-muted-foreground">Completed</p>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-primary">
+                {inspections.filter(i => i.status === 'scheduled').length}
+              </div>
+              <p className="text-sm text-muted-foreground">Scheduled</p>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-destructive">
+                {reports.filter(r => r.priority_level === 'high' || r.priority_level === 'critical').length}
+              </div>
+              <p className="text-sm text-muted-foreground">High Priority Issues</p>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-foreground">
+                {inspections.length > 0 ? 
+                  Math.round((new Date().getTime() - new Date(inspections[0].completed_date || inspections[0].scheduled_date).getTime()) / (1000 * 60 * 60 * 24)) : 
+                  0
+                } days
+              </div>
+              <p className="text-sm text-muted-foreground">Since Last Inspection</p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

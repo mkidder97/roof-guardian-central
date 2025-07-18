@@ -1,228 +1,315 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Image, Download, Upload, Plus, FolderOpen, File } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { supabase } from "@/integrations/supabase/client";
+import { Upload, Download, Plus, FileText, FileImage, Shield, Camera, File, Archive } from "lucide-react";
+import { uploadRoofFile } from "@/lib/fileStorage";
+import { useToast } from "@/hooks/use-toast";
 
-interface FilesTabProps {
-  roof: any;
-}
+export function FilesTab({ roof }: { roof: any }) {
+  const [files, setFiles] = useState<any[]>([]);
+  const [fileCategories, setFileCategories] = useState<any[]>([]);
+  const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
-export function FilesTab({ roof }: FilesTabProps) {
-  const [selectedCategory, setSelectedCategory] = useState('all');
+  // Form state
+  const [fileName, setFileName] = useState("");
+  const [fileType, setFileType] = useState("");
+  const [isPublic, setIsPublic] = useState(true);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
-  // Mock file data - in a real app, this would come from Supabase Storage
-  const mockFiles = [
-    {
-      id: 1,
-      name: "Property_Survey_2023.pdf",
-      type: "pdf",
-      category: "survey",
-      size: "2.4 MB",
-      uploadedAt: "2023-03-15",
-      uploadedBy: "John Smith"
-    },
-    {
-      id: 2,
-      name: "Aerial_Photo_Main.jpg",
-      type: "image",
-      category: "photos",
-      size: "5.2 MB",
-      uploadedAt: "2023-03-10",
-      uploadedBy: "Jane Doe"
-    },
-    {
-      id: 3,
-      name: "Warranty_Documentation.pdf",
-      type: "pdf",
-      category: "warranty",
-      size: "892 KB",
-      uploadedAt: "2023-02-28",
-      uploadedBy: "Mike Johnson"
-    },
-    {
-      id: 4,
-      name: "Inspection_Report_Q1_2023.pdf",
-      type: "pdf",
-      category: "inspection",
-      size: "1.8 MB",
-      uploadedAt: "2023-03-31",
-      uploadedBy: "Sarah Wilson"
-    },
-    {
-      id: 5,
-      name: "Building_Plans.dwg",
-      type: "cad",
-      category: "plans",
-      size: "12.5 MB",
-      uploadedAt: "2023-01-15",
-      uploadedBy: "Tom Brown"
-    }
-  ];
+  useEffect(() => {
+    const fetchFiles = async () => {
+      try {
+        // Fetch files for this roof
+        const { data: filesData, error: filesError } = await supabase
+          .from('roof_files')
+          .select('*')
+          .eq('roof_id', roof.id)
+          .order('created_at', { ascending: false });
 
-  const categories = [
-    { value: 'all', label: 'All Files', count: mockFiles.length },
-    { value: 'photos', label: 'Photos', count: mockFiles.filter(f => f.category === 'photos').length },
-    { value: 'inspection', label: 'Inspections', count: mockFiles.filter(f => f.category === 'inspection').length },
-    { value: 'warranty', label: 'Warranties', count: mockFiles.filter(f => f.category === 'warranty').length },
-    { value: 'survey', label: 'Surveys', count: mockFiles.filter(f => f.category === 'survey').length },
-    { value: 'plans', label: 'Plans', count: mockFiles.filter(f => f.category === 'plans').length }
-  ];
+        if (filesError) throw filesError;
 
-  const getFileIcon = (type: string) => {
-    switch (type) {
-      case 'image': return <Image className="h-8 w-8 text-blue-500" />;
-      case 'pdf': return <FileText className="h-8 w-8 text-red-500" />;
-      case 'cad': return <File className="h-8 w-8 text-green-500" />;
-      default: return <File className="h-8 w-8 text-gray-500" />;
+        // Fetch file categories
+        const { data: categoriesData, error: categoriesError } = await supabase
+          .from('file_categories')
+          .select('*')
+          .order('name');
+
+        if (categoriesError) throw categoriesError;
+
+        setFiles(filesData || []);
+        setFileCategories(categoriesData || []);
+      } catch (error) {
+        console.error('Error fetching files:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load files",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchFiles();
+  }, [roof.id, toast]);
+
+  const getFileTypeColor = (fileType: string) => {
+    const category = fileCategories.find(c => c.name === fileType);
+    if (!category) return 'bg-muted text-muted-foreground';
+    
+    switch (category.color) {
+      case 'blue': return 'bg-primary/10 text-primary';
+      case 'green': return 'bg-accent/10 text-accent';
+      case 'orange': return 'bg-destructive/10 text-destructive';
+      case 'purple': return 'bg-secondary/10 text-secondary';
+      default: return 'bg-muted text-muted-foreground';
     }
   };
 
-  const getFileTypeColor = (type: string) => {
-    switch (type) {
-      case 'image': return 'default';
-      case 'pdf': return 'destructive';
-      case 'cad': return 'secondary';
-      default: return 'outline';
+  const getFileIcon = (fileType: string) => {
+    const category = fileCategories.find(c => c.name === fileType);
+    if (!category) return <File className="h-5 w-5" />;
+    
+    switch (category.icon) {
+      case 'file-image': return <FileImage className="h-5 w-5" />;
+      case 'file-text': return <FileText className="h-5 w-5" />;
+      case 'shield': return <Shield className="h-5 w-5" />;
+      case 'camera': return <Camera className="h-5 w-5" />;
+      default: return <File className="h-5 w-5" />;
     }
   };
 
-  const filteredFiles = selectedCategory === 'all' 
-    ? mockFiles 
-    : mockFiles.filter(file => file.category === selectedCategory);
+  const handleFileUpload = async () => {
+    if (!selectedFile || !fileName || !fileType) {
+      toast({
+        title: "Error",
+        description: "Please fill in all required fields and select a file",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setUploading(true);
+    try {
+      const { data, error } = await uploadRoofFile(roof.id, selectedFile, {
+        file_type: fileType,
+        is_public: isPublic
+      });
+
+      if (error) throw error;
+
+      // Update local state
+      setFiles(prev => [data, ...prev]);
+      
+      // Reset form
+      setFileName("");
+      setFileType("");
+      setSelectedFile(null);
+      setUploadDialogOpen(false);
+
+      toast({
+        title: "Success",
+        description: "File uploaded successfully"
+      });
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      toast({
+        title: "Error",
+        description: "Failed to upload file",
+        variant: "destructive"
+      });
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  if (loading) {
+    return <div className="text-center py-8">Loading files...</div>;
+  }
 
   return (
     <div className="space-y-6">
-      {/* File Categories */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        {categories.map((category) => (
-          <Card 
-            key={category.value}
-            className={`cursor-pointer transition-all hover:shadow-md ${
-              selectedCategory === category.value ? 'ring-2 ring-primary' : ''
-            }`}
-            onClick={() => setSelectedCategory(category.value)}
-          >
-            <CardContent className="p-4 text-center">
-              <div className="text-2xl font-bold text-blue-600">{category.count}</div>
-              <p className="text-sm text-gray-600">{category.label}</p>
-            </CardContent>
-          </Card>
-        ))}
+      {/* Files Header */}
+      <div className="flex items-center justify-between">
+        <h3 className="text-lg font-semibold">Roof Files</h3>
+        <Button onClick={() => setUploadDialogOpen(true)}>
+          <Upload className="h-4 w-4 mr-2" />
+          Add File
+        </Button>
       </div>
 
-      {/* Upload Section */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <FolderOpen className="h-5 w-5" />
-              File Management
-            </CardTitle>
-            <Button>
-              <Upload className="h-4 w-4 mr-2" />
-              Upload Files
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center">
-            <Upload className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">Upload Property Files</h3>
-            <p className="text-gray-600 mb-4">
-              Drag and drop files here, or click to browse
-            </p>
-            <Button variant="outline">
-              <Plus className="h-4 w-4 mr-2" />
-              Choose Files
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
-
       {/* Files List */}
-      <Card>
-        <CardHeader>
-          <CardTitle>
-            {selectedCategory === 'all' ? 'All Files' : categories.find(c => c.value === selectedCategory)?.label}
-            <span className="text-sm font-normal text-gray-500 ml-2">
-              ({filteredFiles.length} files)
-            </span>
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {filteredFiles.length === 0 ? (
-            <div className="text-center py-12">
-              <FileText className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">No Files Found</h3>
-              <p className="text-gray-600 mb-4">
-                No files have been uploaded in this category yet.
-              </p>
-              <Button>
+      <div className="space-y-3">
+        {files.length === 0 ? (
+          <Card>
+            <CardContent className="text-center py-12">
+              <Archive className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h4 className="text-lg font-medium text-foreground mb-2">No Files</h4>
+              <p className="text-muted-foreground mb-4">No files have been uploaded for this property yet.</p>
+              <Button onClick={() => setUploadDialogOpen(true)}>
                 <Upload className="h-4 w-4 mr-2" />
                 Upload First File
               </Button>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {filteredFiles.map((file) => (
-                <div key={file.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center gap-4">
-                    {getFileIcon(file.type)}
-                    <div className="flex-1">
-                      <h4 className="font-medium">{file.name}</h4>
-                      <div className="flex items-center gap-4 text-sm text-gray-600">
-                        <span>{file.size}</span>
-                        <span>•</span>
-                        <span>Uploaded {new Date(file.uploadedAt).toLocaleDateString()}</span>
-                        <span>•</span>
-                        <span>by {file.uploadedBy}</span>
+            </CardContent>
+          </Card>
+        ) : (
+          files.map((file) => (
+            <Card key={file.id} className="hover:shadow-md transition-shadow">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center space-x-4">
+                    <div className="flex items-center justify-center w-12 h-12 bg-muted rounded-lg">
+                      {getFileIcon(file.file_type)}
+                    </div>
+                    
+                    <div>
+                      <h4 className="font-medium text-lg">{file.file_name}</h4>
+                      <div className="flex items-center space-x-4 text-sm text-muted-foreground">
+                        <span>Date Added: {new Date(file.created_at).toLocaleDateString()}</span>
+                        <Badge className={getFileTypeColor(file.file_type)}>
+                          {file.file_type}
+                        </Badge>
+                        <span>Public: {file.is_public ? 'Yes' : 'No'}</span>
+                        {file.file_size && (
+                          <span>Size: {(file.file_size / 1024 / 1024).toFixed(2)} MB</span>
+                        )}
                       </div>
                     </div>
                   </div>
-                  
-                  <div className="flex items-center gap-3">
-                    <Badge variant={getFileTypeColor(file.type) as any}>
-                      {file.type.toUpperCase()}
-                    </Badge>
-                    <Button variant="outline" size="sm">
-                      <Download className="h-4 w-4" />
+
+                  <div className="flex items-center space-x-2">
+                    <Button variant="outline" size="sm" asChild>
+                      <a href={file.file_url} target="_blank" rel="noopener noreferrer">
+                        <Download className="h-4 w-4 mr-2" />
+                        Download
+                      </a>
                     </Button>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              </CardContent>
+            </Card>
+          ))
+        )}
+      </div>
 
-      {/* File Statistics */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      {/* File Categories */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {fileCategories.map((category) => (
+          <Card key={category.id}>
+            <CardHeader>
+              <CardTitle className="text-base flex items-center">
+                {getFileIcon(category.name)}
+                <span className="ml-2">{category.name}</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center">
+                <div className="text-2xl font-bold text-primary">
+                  {files.filter(f => f.file_type === category.name).length}
+                </div>
+                <p className="text-sm text-muted-foreground">Files</p>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+
         <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-green-600">
-              {(mockFiles.reduce((sum, file) => sum + parseFloat(file.size.replace(/[^\d.]/g, '')), 0)).toFixed(1)} MB
+          <CardHeader>
+            <CardTitle className="text-base flex items-center">
+              <Archive className="h-5 w-5 mr-2" />
+              Total Files
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-accent">{files.length}</div>
+              <p className="text-sm text-muted-foreground">Files</p>
             </div>
-            <p className="text-sm text-gray-600">Total Storage Used</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-blue-600">
-              {mockFiles.filter(f => f.uploadedAt >= '2023-03-01').length}
-            </div>
-            <p className="text-sm text-gray-600">Files This Month</p>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4 text-center">
-            <div className="text-2xl font-bold text-purple-600">
-              {new Set(mockFiles.map(f => f.uploadedBy)).size}
-            </div>
-            <p className="text-sm text-gray-600">Contributors</p>
           </CardContent>
         </Card>
       </div>
+
+      {/* File Upload Dialog */}
+      <Dialog open={uploadDialogOpen} onOpenChange={setUploadDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Upload File</DialogTitle>
+            <DialogDescription>
+              Add a new file to this roof's document library
+            </DialogDescription>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium">File Name</label>
+              <Input 
+                placeholder="Enter file name" 
+                value={fileName}
+                onChange={(e) => setFileName(e.target.value)}
+              />
+            </div>
+            
+            <div>
+              <label className="text-sm font-medium">File Type</label>
+              <Select value={fileType} onValueChange={setFileType}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select file type" />
+                </SelectTrigger>
+                <SelectContent>
+                  {fileCategories.map((category) => (
+                    <SelectItem key={category.id} value={category.name}>
+                      {category.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="flex items-center space-x-2">
+              <input 
+                type="checkbox" 
+                id="public" 
+                checked={isPublic}
+                onChange={(e) => setIsPublic(e.target.checked)}
+              />
+              <label htmlFor="public" className="text-sm">Make file public</label>
+            </div>
+            
+            <div className="border-2 border-dashed border-border rounded-lg p-6 text-center">
+              <Upload className="h-8 w-8 text-muted-foreground mx-auto mb-2" />
+              <input
+                type="file"
+                onChange={(e) => setSelectedFile(e.target.files?.[0] || null)}
+                className="mb-2"
+                accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.gif"
+              />
+              <p className="text-sm text-muted-foreground">
+                Select a file to upload
+              </p>
+              <p className="text-xs text-muted-foreground">
+                PDF, DOC, JPG, PNG up to 10MB
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setUploadDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleFileUpload} disabled={uploading}>
+              {uploading ? "Uploading..." : "Upload File"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

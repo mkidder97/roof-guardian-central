@@ -121,6 +121,33 @@ export type Database = {
         }
         Relationships: []
       }
+      file_categories: {
+        Row: {
+          color: string | null
+          created_at: string | null
+          description: string | null
+          icon: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          color?: string | null
+          created_at?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       inspection_reports: {
         Row: {
           created_at: string
@@ -324,6 +351,66 @@ export type Database = {
             columns: ["roof_id"]
             isOneToOne: false
             referencedRelation: "roofs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      roof_files: {
+        Row: {
+          created_at: string | null
+          file_name: string
+          file_size: number | null
+          file_type: string | null
+          file_url: string | null
+          id: string
+          is_public: boolean | null
+          mime_type: string | null
+          roof_id: string | null
+          storage_path: string | null
+          updated_at: string | null
+          uploaded_by: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          file_name: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          is_public?: boolean | null
+          mime_type?: string | null
+          roof_id?: string | null
+          storage_path?: string | null
+          updated_at?: string | null
+          uploaded_by?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          file_name?: string
+          file_size?: number | null
+          file_type?: string | null
+          file_url?: string | null
+          id?: string
+          is_public?: boolean | null
+          mime_type?: string | null
+          roof_id?: string | null
+          storage_path?: string | null
+          updated_at?: string | null
+          uploaded_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "roof_files_roof_id_fkey"
+            columns: ["roof_id"]
+            isOneToOne: false
+            referencedRelation: "roofs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "roof_files_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "users"
             referencedColumns: ["id"]
           },
         ]
