@@ -1,0 +1,26 @@
+-- Add additional columns to roofs table for detailed specifications
+ALTER TABLE roofs ADD COLUMN IF NOT EXISTS latitude DECIMAL(10, 8);
+ALTER TABLE roofs ADD COLUMN IF NOT EXISTS longitude DECIMAL(11, 8);
+ALTER TABLE roofs ADD COLUMN IF NOT EXISTS time_zone VARCHAR(50) DEFAULT 'UTC';
+ALTER TABLE roofs ADD COLUMN IF NOT EXISTS roof_rating INTEGER;
+ALTER TABLE roofs ADD COLUMN IF NOT EXISTS estimated_lttr_value DECIMAL(3, 1);
+ALTER TABLE roofs ADD COLUMN IF NOT EXISTS perimeter_detail TEXT;
+ALTER TABLE roofs ADD COLUMN IF NOT EXISTS flashing_detail TEXT;
+ALTER TABLE roofs ADD COLUMN IF NOT EXISTS drainage_system TEXT;
+ALTER TABLE roofs ADD COLUMN IF NOT EXISTS occupant_concern VARCHAR(20) DEFAULT 'Low';
+ALTER TABLE roofs ADD COLUMN IF NOT EXISTS access_requirements TEXT;
+ALTER TABLE roofs ADD COLUMN IF NOT EXISTS safety_concerns BOOLEAN DEFAULT FALSE;
+ALTER TABLE roofs ADD COLUMN IF NOT EXISTS access_location TEXT;
+ALTER TABLE roofs ADD COLUMN IF NOT EXISTS has_solar BOOLEAN DEFAULT FALSE;
+ALTER TABLE roofs ADD COLUMN IF NOT EXISTS has_daylighting BOOLEAN DEFAULT FALSE;
+
+-- Add contact information columns
+ALTER TABLE roofs ADD COLUMN IF NOT EXISTS property_manager_name VARCHAR(100);
+ALTER TABLE roofs ADD COLUMN IF NOT EXISTS property_manager_email VARCHAR(100);
+ALTER TABLE roofs ADD COLUMN IF NOT EXISTS property_manager_phone VARCHAR(20);
+ALTER TABLE roofs ADD COLUMN IF NOT EXISTS property_manager_mobile VARCHAR(20);
+ALTER TABLE roofs ADD COLUMN IF NOT EXISTS asset_manager_name VARCHAR(100);
+ALTER TABLE roofs ADD COLUMN IF NOT EXISTS asset_manager_email VARCHAR(100);
+ALTER TABLE roofs ADD COLUMN IF NOT EXISTS asset_manager_phone VARCHAR(20);
+ALTER TABLE roofs ADD COLUMN IF NOT EXISTS maintenance_contact_name VARCHAR(100);
+ALTER TABLE roofs ADD COLUMN IF NOT EXISTS maintenance_contact_phone VARCHAR(20);

@@ -330,7 +330,12 @@ export type Database = {
       }
       roofs: {
         Row: {
+          access_location: string | null
+          access_requirements: string | null
           address: string
+          asset_manager_email: string | null
+          asset_manager_name: string | null
+          asset_manager_phone: string | null
           capital_budget_actual: string | null
           capital_budget_category: string | null
           capital_budget_completed: string | null
@@ -342,6 +347,11 @@ export type Database = {
           created_at: string
           customer: string | null
           customer_sensitivity: string | null
+          drainage_system: string | null
+          estimated_lttr_value: number | null
+          flashing_detail: string | null
+          has_daylighting: boolean | null
+          has_solar: boolean | null
           id: string
           install_date: string | null
           install_year: number | null
@@ -352,6 +362,10 @@ export type Database = {
           installing_contractor: string | null
           is_deleted: boolean | null
           last_inspection_date: string | null
+          latitude: number | null
+          longitude: number | null
+          maintenance_contact_name: string | null
+          maintenance_contact_phone: string | null
           manufacturer: string | null
           manufacturer_has_warranty: boolean | null
           manufacturer_warranty_expiration: string | null
@@ -360,6 +374,8 @@ export type Database = {
           market: string | null
           next_inspection_due: string | null
           notes: string | null
+          occupant_concern: string | null
+          perimeter_detail: string | null
           preventative_budget_actual: string | null
           preventative_budget_category: string | null
           preventative_budget_completed: string | null
@@ -367,6 +383,10 @@ export type Database = {
           preventative_budget_scope_of_work: string | null
           preventative_budget_year: number | null
           property_code: string | null
+          property_manager_email: string | null
+          property_manager_mobile: string | null
+          property_manager_name: string | null
+          property_manager_phone: string | null
           property_name: string
           region: string | null
           repair_contractor: string | null
@@ -378,16 +398,19 @@ export type Database = {
           roof_area_unit: string | null
           roof_category: string | null
           roof_group: string | null
+          roof_rating: number | null
           roof_section: string | null
           roof_system: string | null
           roof_system_description: string | null
           roof_type: string | null
+          safety_concerns: boolean | null
           site_contact: string | null
           site_contact_email: string | null
           site_contact_mobile_phone: string | null
           site_contact_office_phone: string | null
           state: string
           status: string | null
+          time_zone: string | null
           total_leak_expense_12mo: string | null
           total_leaks_12mo: string | null
           updated_at: string
@@ -395,7 +418,12 @@ export type Database = {
           zip: string
         }
         Insert: {
+          access_location?: string | null
+          access_requirements?: string | null
           address: string
+          asset_manager_email?: string | null
+          asset_manager_name?: string | null
+          asset_manager_phone?: string | null
           capital_budget_actual?: string | null
           capital_budget_category?: string | null
           capital_budget_completed?: string | null
@@ -407,6 +435,11 @@ export type Database = {
           created_at?: string
           customer?: string | null
           customer_sensitivity?: string | null
+          drainage_system?: string | null
+          estimated_lttr_value?: number | null
+          flashing_detail?: string | null
+          has_daylighting?: boolean | null
+          has_solar?: boolean | null
           id?: string
           install_date?: string | null
           install_year?: number | null
@@ -417,6 +450,10 @@ export type Database = {
           installing_contractor?: string | null
           is_deleted?: boolean | null
           last_inspection_date?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          maintenance_contact_name?: string | null
+          maintenance_contact_phone?: string | null
           manufacturer?: string | null
           manufacturer_has_warranty?: boolean | null
           manufacturer_warranty_expiration?: string | null
@@ -425,6 +462,8 @@ export type Database = {
           market?: string | null
           next_inspection_due?: string | null
           notes?: string | null
+          occupant_concern?: string | null
+          perimeter_detail?: string | null
           preventative_budget_actual?: string | null
           preventative_budget_category?: string | null
           preventative_budget_completed?: string | null
@@ -432,6 +471,10 @@ export type Database = {
           preventative_budget_scope_of_work?: string | null
           preventative_budget_year?: number | null
           property_code?: string | null
+          property_manager_email?: string | null
+          property_manager_mobile?: string | null
+          property_manager_name?: string | null
+          property_manager_phone?: string | null
           property_name: string
           region?: string | null
           repair_contractor?: string | null
@@ -443,16 +486,19 @@ export type Database = {
           roof_area_unit?: string | null
           roof_category?: string | null
           roof_group?: string | null
+          roof_rating?: number | null
           roof_section?: string | null
           roof_system?: string | null
           roof_system_description?: string | null
           roof_type?: string | null
+          safety_concerns?: boolean | null
           site_contact?: string | null
           site_contact_email?: string | null
           site_contact_mobile_phone?: string | null
           site_contact_office_phone?: string | null
           state: string
           status?: string | null
+          time_zone?: string | null
           total_leak_expense_12mo?: string | null
           total_leaks_12mo?: string | null
           updated_at?: string
@@ -460,7 +506,12 @@ export type Database = {
           zip: string
         }
         Update: {
+          access_location?: string | null
+          access_requirements?: string | null
           address?: string
+          asset_manager_email?: string | null
+          asset_manager_name?: string | null
+          asset_manager_phone?: string | null
           capital_budget_actual?: string | null
           capital_budget_category?: string | null
           capital_budget_completed?: string | null
@@ -472,6 +523,11 @@ export type Database = {
           created_at?: string
           customer?: string | null
           customer_sensitivity?: string | null
+          drainage_system?: string | null
+          estimated_lttr_value?: number | null
+          flashing_detail?: string | null
+          has_daylighting?: boolean | null
+          has_solar?: boolean | null
           id?: string
           install_date?: string | null
           install_year?: number | null
@@ -482,6 +538,10 @@ export type Database = {
           installing_contractor?: string | null
           is_deleted?: boolean | null
           last_inspection_date?: string | null
+          latitude?: number | null
+          longitude?: number | null
+          maintenance_contact_name?: string | null
+          maintenance_contact_phone?: string | null
           manufacturer?: string | null
           manufacturer_has_warranty?: boolean | null
           manufacturer_warranty_expiration?: string | null
@@ -490,6 +550,8 @@ export type Database = {
           market?: string | null
           next_inspection_due?: string | null
           notes?: string | null
+          occupant_concern?: string | null
+          perimeter_detail?: string | null
           preventative_budget_actual?: string | null
           preventative_budget_category?: string | null
           preventative_budget_completed?: string | null
@@ -497,6 +559,10 @@ export type Database = {
           preventative_budget_scope_of_work?: string | null
           preventative_budget_year?: number | null
           property_code?: string | null
+          property_manager_email?: string | null
+          property_manager_mobile?: string | null
+          property_manager_name?: string | null
+          property_manager_phone?: string | null
           property_name?: string
           region?: string | null
           repair_contractor?: string | null
@@ -508,16 +574,19 @@ export type Database = {
           roof_area_unit?: string | null
           roof_category?: string | null
           roof_group?: string | null
+          roof_rating?: number | null
           roof_section?: string | null
           roof_system?: string | null
           roof_system_description?: string | null
           roof_type?: string | null
+          safety_concerns?: boolean | null
           site_contact?: string | null
           site_contact_email?: string | null
           site_contact_mobile_phone?: string | null
           site_contact_office_phone?: string | null
           state?: string
           status?: string | null
+          time_zone?: string | null
           total_leak_expense_12mo?: string | null
           total_leaks_12mo?: string | null
           updated_at?: string

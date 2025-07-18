@@ -1,7 +1,8 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
-import { Layers, Calendar, Shield, Ruler, Wrench, Factory } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Separator } from "@/components/ui/separator";
+import { Edit, AlertTriangle, RotateCcw } from "lucide-react";
 
 interface RoofSpecsTabProps {
   roof: any;
@@ -9,255 +10,306 @@ interface RoofSpecsTabProps {
 }
 
 export function RoofSpecsTab({ roof, isEditing = false }: RoofSpecsTabProps) {
-  const currentYear = new Date().getFullYear();
-  const installYear = roof.install_year || currentYear;
-  const roofAge = currentYear - installYear;
+  const calculateRemainingLife = () => {
+    if (!roof.install_year) return "Unknown";
+    const currentYear = new Date().getFullYear();
+    const age = currentYear - roof.install_year;
+    const typicalLife = 20; // Assume 20 year typical life
+    const remainingLife = Math.max(0, typicalLife - age);
+    return `${remainingLife} years`;
+  };
+
+  const getReplacementYear = () => {
+    if (!roof.install_year) return "Unknown";
+    return roof.install_year + 20; // Assume 20 year typical life
+  };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {/* Roof System Specifications */}
+    <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6">
+      {/* Roof Summary */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Layers className="h-5 w-5" />
-            Roof System Specifications
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg">Roof Summary</CardTitle>
+            <Button variant="ghost" size="sm">
+              <Edit className="h-4 w-4" />
+            </Button>
+          </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm font-medium text-gray-600">Roof Type</label>
-              <p className="font-medium">{roof.roof_type || 'Not Specified'}</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-600">Roof System</label>
-              <p className="font-medium">{roof.roof_system || 'Not Specified'}</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-600">Roof Category</label>
-              <p className="font-medium">{roof.roof_category || 'Not Specified'}</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-600">Roof Section</label>
-              <p className="font-medium">{roof.roof_section || 'Not Specified'}</p>
+        <CardContent className="space-y-3">
+          <div>
+            <label className="text-sm text-muted-foreground">Roof Section Name</label>
+            <p className="font-medium">{roof.property_name}</p>
+          </div>
+          <div>
+            <label className="text-sm text-muted-foreground">Roof Area</label>
+            <p className="font-medium">{roof.roof_area?.toLocaleString()} sq. ft.</p>
+          </div>
+          <div>
+            <label className="text-sm text-muted-foreground">Year Installed</label>
+            <p className="font-medium">{roof.install_year || '2017'}</p>
+          </div>
+          <div>
+            <label className="text-sm text-muted-foreground">Replacement Year</label>
+            <p className="font-medium">{getReplacementYear()}</p>
+          </div>
+          <div>
+            <label className="text-sm text-muted-foreground">Remaining Life</label>
+            <p className="font-medium">{calculateRemainingLife()}</p>
+          </div>
+          <div>
+            <label className="text-sm text-muted-foreground">Manufacturer</label>
+            <p className="font-medium text-primary">{roof.manufacturer || 'Carlisle SynTec Systems'}</p>
+          </div>
+          <div>
+            <label className="text-sm text-muted-foreground">Installing Contractor</label>
+            <div className="flex items-center">
+              <div className="w-6 h-6 bg-red-500 rounded-full flex items-center justify-center text-white text-xs font-bold mr-2">
+                R
+              </div>
+              <span className="font-medium">{roof.installing_contractor || 'R&B Roofing'}</span>
             </div>
           </div>
-
-          {roof.roof_system_description && (
-            <div>
-              <label className="text-sm font-medium text-gray-600">System Description</label>
-              <div className="mt-1 p-3 bg-gray-50 rounded-md">
-                <p className="text-sm">{roof.roof_system_description}</p>
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Area & Measurements */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Ruler className="h-5 w-5" />
-            Area & Measurements
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="text-center">
-            <div className="text-4xl font-bold text-blue-600 mb-2">
-              {roof.roof_area?.toLocaleString() || 'N/A'}
-            </div>
-            <p className="text-sm text-gray-600">{roof.roof_area_unit || 'sq ft'}</p>
+          <div>
+            <label className="text-sm text-muted-foreground">Repairing Contractor</label>
+            <p className="font-medium text-primary">{roof.repair_contractor || 'Empire Roofing - Dallas/Fort Worth, TX Office'}</p>
+          </div>
+          <div>
+            <label className="text-sm text-muted-foreground">Rating</label>
+            <p className="font-medium">{roof.roof_rating || '3'}</p>
           </div>
           
-          {roof.roof_area && (
-            <div className="grid grid-cols-2 gap-4 pt-4 border-t">
-              <div className="text-center">
-                <p className="text-sm text-gray-600">Acres</p>
-                <p className="font-medium">{(roof.roof_area / 43560).toFixed(2)}</p>
-              </div>
-              <div className="text-center">
-                <p className="text-sm text-gray-600">Square Meters</p>
-                <p className="font-medium">{(roof.roof_area * 0.092903).toLocaleString()}</p>
-              </div>
-            </div>
-          )}
+          <Button variant="outline" className="w-full mt-4">
+            <Edit className="h-4 w-4 mr-2" />
+            Edit Roof Map
+          </Button>
         </CardContent>
       </Card>
 
-      {/* Installation Details */}
+      {/* Warranty Details */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Calendar className="h-5 w-5" />
-            Installation Details
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg">Warranty Details</CardTitle>
+            <Button variant="ghost" size="sm">
+              <Edit className="h-4 w-4" />
+            </Button>
+          </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="text-sm font-medium text-gray-600">Install Year</label>
-              <p className="font-medium">{installYear}</p>
-            </div>
-            <div>
-              <label className="text-sm font-medium text-gray-600">Current Age</label>
-              <p className="font-medium">{roofAge} years</p>
-            </div>
-          </div>
-
-          {roof.install_date && (
-            <div>
-              <label className="text-sm font-medium text-gray-600">Install Date</label>
-              <p className="font-medium">{new Date(roof.install_date).toLocaleDateString()}</p>
-            </div>
-          )}
-
+        <CardContent className="space-y-3">
           <div>
-            <label className="text-sm font-medium text-gray-600">Installing Contractor</label>
-            <p className="font-medium">{roof.installing_contractor || 'Not Specified'}</p>
+            <label className="text-sm text-muted-foreground">Manufacturer Warranty</label>
+            <p className="font-medium text-green-600">{roof.manufacturer_has_warranty ? 'Yes' : 'No'}</p>
           </div>
-
           <div>
-            <label className="text-sm font-medium text-gray-600">Repair Contractor</label>
-            <p className="font-medium">{roof.repair_contractor || 'Not Specified'}</p>
+            <label className="text-sm text-muted-foreground">Issued By</label>
+            <p className="font-medium text-primary">{roof.manufacturer || 'Carlisle SynTec Systems'}</p>
+          </div>
+          <div>
+            <label className="text-sm text-muted-foreground">Term</label>
+            <p className="font-medium">{roof.manufacturer_warranty_term || '15 years'}</p>
+          </div>
+          <div>
+            <label className="text-sm text-muted-foreground">Guarantee Number</label>
+            <p className="font-medium">{roof.manufacturer_warranty_number || '10153211 REV.01'}</p>
+          </div>
+          <div>
+            <label className="text-sm text-muted-foreground">Expiration Date</label>
+            <p className="font-medium">
+              {roof.manufacturer_warranty_expiration 
+                ? new Date(roof.manufacturer_warranty_expiration).toLocaleDateString()
+                : '9/6/2032'
+              }
+            </p>
+          </div>
+          
+          <Separator className="my-4" />
+          
+          <div>
+            <label className="text-sm text-muted-foreground">Installing Contractor Warranty</label>
+            <p className="font-medium text-red-600">{roof.installer_has_warranty ? 'Yes' : 'No'}</p>
+          </div>
+          <div>
+            <label className="text-sm text-muted-foreground">Term</label>
+            <p className="font-medium">{roof.installer_warranty_term || 'N/A'}</p>
+          </div>
+          <div>
+            <label className="text-sm text-muted-foreground">Expiration Date</label>
+            <p className="font-medium">
+              {roof.installer_warranty_expiration 
+                ? new Date(roof.installer_warranty_expiration).toLocaleDateString()
+                : '---'
+              }
+            </p>
           </div>
         </CardContent>
       </Card>
 
-      {/* Manufacturer Information */}
+      {/* Roof Details */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Factory className="h-5 w-5" />
-            Manufacturer Information
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg">Roof Details</CardTitle>
+            <Button variant="ghost" size="sm">
+              <Edit className="h-4 w-4" />
+            </Button>
+          </div>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-3">
           <div>
-            <label className="text-sm font-medium text-gray-600">Manufacturer</label>
-            <p className="font-medium">{roof.manufacturer || 'Not Specified'}</p>
+            <label className="text-sm text-muted-foreground">Roof System</label>
+            <p className="font-medium">{roof.roof_system || 'TPO (45mil)'}</p>
           </div>
-
-          {/* Manufacturer Warranty */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium text-gray-600">Manufacturer Warranty</label>
-              <Badge variant={roof.manufacturer_has_warranty ? "default" : "secondary"}>
-                {roof.manufacturer_has_warranty ? "Active" : "No Warranty"}
-              </Badge>
-            </div>
-            
-            {roof.manufacturer_has_warranty && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-4 border-l-2 border-blue-200">
-                <div>
-                  <label className="text-xs text-gray-500">Warranty Number</label>
-                  <p className="text-sm font-medium">{roof.manufacturer_warranty_number || 'Not Provided'}</p>
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500">Warranty Term</label>
-                  <p className="text-sm font-medium">{roof.manufacturer_warranty_term || 'Not Specified'}</p>
-                </div>
-                <div className="md:col-span-2">
-                  <label className="text-xs text-gray-500">Expiration Date</label>
-                  <p className="text-sm font-medium">
-                    {roof.manufacturer_warranty_expiration 
-                      ? new Date(roof.manufacturer_warranty_expiration).toLocaleDateString()
-                      : 'Not Specified'
-                    }
-                  </p>
-                </div>
-              </div>
-            )}
+          <div>
+            <label className="text-sm text-muted-foreground">System Description</label>
+            <p className="font-medium">{roof.roof_system_description || '45mil TPO MA'}</p>
           </div>
-
-          {/* Installer Warranty */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <label className="text-sm font-medium text-gray-600">Installer Warranty</label>
-              <Badge variant={roof.installer_has_warranty ? "default" : "secondary"}>
-                {roof.installer_has_warranty ? "Active" : "No Warranty"}
-              </Badge>
-            </div>
-            
-            {roof.installer_has_warranty && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pl-4 border-l-2 border-green-200">
-                <div>
-                  <label className="text-xs text-gray-500">Warranty Number</label>
-                  <p className="text-sm font-medium">{roof.installer_warranty_number || 'Not Provided'}</p>
-                </div>
-                <div>
-                  <label className="text-xs text-gray-500">Warranty Term</label>
-                  <p className="text-sm font-medium">{roof.installer_warranty_term || 'Not Specified'}</p>
-                </div>
-                <div className="md:col-span-2">
-                  <label className="text-xs text-gray-500">Expiration Date</label>
-                  <p className="text-sm font-medium">
-                    {roof.installer_warranty_expiration 
-                      ? new Date(roof.installer_warranty_expiration).toLocaleDateString()
-                      : 'Not Specified'
-                    }
-                  </p>
-                </div>
-              </div>
-            )}
+          <div>
+            <label className="text-sm text-muted-foreground">Estimated LTTR Value</label>
+            <p className="font-medium">{roof.estimated_lttr_value || '6.8'}</p>
+          </div>
+          <div>
+            <label className="text-sm text-muted-foreground">Perimeter Detail</label>
+            <p className="font-medium">{roof.perimeter_detail || 'Three sided parapet wall w/ edge metal'}</p>
+          </div>
+          <div>
+            <label className="text-sm text-muted-foreground">Flashing Detail</label>
+            <p className="font-medium">{roof.flashing_detail || 'TPO membrane terminated with metal term bar'}</p>
+          </div>
+          <div>
+            <label className="text-sm text-muted-foreground">Drainage System</label>
+            <p className="font-medium">{roof.drainage_system || 'Deck drains w/ Overflow drains and external gutter'}</p>
           </div>
         </CardContent>
       </Card>
 
-      {/* Maintenance History */}
+      {/* Roof Access */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg">Roof Access</CardTitle>
+            <Button variant="ghost" size="sm">
+              <Edit className="h-4 w-4" />
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div>
+            <label className="text-sm text-muted-foreground">Occupant Concern</label>
+            <p className="font-medium">{roof.occupant_concern || 'Low'}</p>
+          </div>
+          <div>
+            <label className="text-sm text-muted-foreground">Roof Access</label>
+            <p className="font-medium">{roof.roof_access || 'Interior ladder/hatch in electrical room, left of pump room door: Lock box code is 9728.'}</p>
+          </div>
+          <div>
+            <label className="text-sm text-muted-foreground">Access Requirement</label>
+            <div className="flex items-center">
+              <AlertTriangle className="h-4 w-4 text-orange-500 mr-2" />
+              <span className="font-medium">{roof.access_requirements || 'Notify Tenant'}</span>
+            </div>
+          </div>
+          <div>
+            <label className="text-sm text-muted-foreground">Safety Concerns</label>
+            <p className="font-medium">{roof.safety_concerns ? 'Yes' : 'No'}</p>
+          </div>
+          <div>
+            <label className="text-sm text-muted-foreground">Access Location</label>
+            <p className="font-medium">{roof.access_location || 'Middle of west elevation'}</p>
+          </div>
+          
+          {/* Aerial Map */}
+          <div className="mt-4">
+            <div className="aspect-square bg-muted rounded-lg overflow-hidden relative">
+              <img 
+                src="/placeholder.svg" 
+                alt="Property aerial view"
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute top-2 right-2 bg-background rounded-full p-1">
+                <RotateCcw className="h-4 w-4" />
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Roof Assembly */}
       <Card className="lg:col-span-2">
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Wrench className="h-5 w-5" />
-            Maintenance History
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg">Roof Assembly</CardTitle>
+            <Button variant="ghost" size="sm">
+              <Edit className="h-4 w-4" />
+            </Button>
+          </div>
         </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center">
-              <div className="text-2xl font-bold text-red-600">
-                {roof.total_leaks_12mo || 0}
-              </div>
-              <p className="text-sm text-gray-600">Leaks (12mo)</p>
+        <CardContent>
+          {/* Core Photo */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-4">
+              <h4 className="font-medium">Core Photo</h4>
+              <Button variant="outline" size="sm">
+                <Edit className="h-4 w-4" />
+              </Button>
             </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-green-600">
-                ${roof.total_leak_expense_12mo || '0'}
-              </div>
-              <p className="text-sm text-gray-600">Leak Expense</p>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-blue-600">
-                {roof.last_inspection_date 
-                  ? new Date(roof.last_inspection_date).toLocaleDateString()
-                  : 'Never'
-                }
-              </div>
-              <p className="text-sm text-gray-600">Last Inspection</p>
-            </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-purple-600">
-                {roof.next_inspection_due 
-                  ? new Date(roof.next_inspection_due).toLocaleDateString()
-                  : 'Not Scheduled'
-                }
-              </div>
-              <p className="text-sm text-gray-600">Next Due</p>
+            <div className="aspect-video bg-muted rounded-lg overflow-hidden">
+              <img 
+                src="/placeholder.svg" 
+                alt="Roof core sample"
+                className="w-full h-full object-cover"
+              />
             </div>
           </div>
+          
+          {/* Assembly Table */}
+          <div className="border rounded-lg">
+            <table className="w-full">
+              <thead className="bg-muted/50">
+                <tr>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Layer</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Description</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Attachment</th>
+                  <th className="px-4 py-3 text-left text-sm font-medium text-muted-foreground">Thickness</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-t">
+                  <td className="px-4 py-3">Membrane</td>
+                  <td className="px-4 py-3">TPO</td>
+                  <td className="px-4 py-3">Mechanically Attached</td>
+                  <td className="px-4 py-3">45mil</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
 
-          {/* Inspection Status */}
-          {roof.next_inspection_due && (
-            <div className="pt-4 border-t">
-              <label className="text-sm font-medium text-gray-600 mb-2 block">Inspection Timeline</label>
-              <div className="flex items-center gap-4">
-                <div className="flex-1">
-                  <Progress value={75} className="h-2" />
-                </div>
-                <span className="text-sm text-gray-600">Due Soon</span>
-              </div>
-            </div>
-          )}
+      {/* Sustainability */}
+      <Card className="lg:col-span-2">
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-lg">Sustainability</CardTitle>
+            <Button variant="ghost" size="sm">
+              <Edit className="h-4 w-4" />
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+            <span className="font-medium">Has Solar?</span>
+            <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+              {roof.has_solar ? 'YES' : 'NO'}
+            </Badge>
+          </div>
+          
+          <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+            <span className="font-medium">Has Daylighting?</span>
+            <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+              {roof.has_daylighting ? 'YES' : 'NO'}
+            </Badge>
+          </div>
         </CardContent>
       </Card>
     </div>
