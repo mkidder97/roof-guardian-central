@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Calendar, FileDown, CheckCircle, AlertCircle, X, Brain, Loader2 } from "lucide-react";
+import { Search, Calendar, FileDown, CheckCircle, AlertCircle, X, Brain, Loader2, Filter, Settings } from "lucide-react";
 import { format, addMonths } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -100,6 +100,10 @@ interface SchedulingFilters {
     start: Date;
     end: Date;
   };
+  searchTerm?: string;
+  warrantyStatus?: 'active' | 'expired' | 'all';
+  roofType?: string;
+  propertyManager?: string;
 }
 
 export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSchedulingModalProps) {
@@ -126,13 +130,21 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  // Enhanced filtering state
+  const [propertyCache, setPropertyCache] = useState<Map<string, any[]>>(new Map());
+  const [currentPage, setCurrentPage] = useState(1);
+  const [itemsPerPage] = useState(50);
+  const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
+
   // Debounce timer for auto-fetching properties
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     if (open) {
       fetchClients();
       resetWorkflowState();
+      loadFiltersFromStorage();
       // Auto-fetch properties with default filters when modal opens
       debouncedFetchProperties(filters);
     }
@@ -142,8 +154,16 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
   useEffect(() => {
     if (open && (filters.clientId || filters.region || filters.market)) {
       debouncedFetchProperties(filters);
+      saveFiltersToStorage(filters);
     }
   }, [filters.clientId, filters.region, filters.market, open]);
+
+  // Search term effect with debouncing
+  useEffect(() => {
+    if (open && filters.searchTerm !== undefined) {
+      debouncedSearch(filters.searchTerm);
+    }
+  }, [filters.searchTerm, open]);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -187,6 +207,41 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     }
   };
 
+  // Filter persistence
+  const saveFiltersToStorage = (currentFilters: SchedulingFilters) => {
+    try {
+      localStorage.setItem('inspection_filters', JSON.stringify({
+        clientId: currentFilters.clientId,
+        region: currentFilters.region,
+        market: currentFilters.market,
+        inspectionType: currentFilters.inspectionType,
+        warrantyStatus: currentFilters.warrantyStatus,
+        roofType: currentFilters.roofType,
+        propertyManager: currentFilters.propertyManager,
+      }));
+    } catch (error) {
+      console.warn('Failed to save filters to localStorage:', error);
+    }
+  };
+
+  const loadFiltersFromStorage = () => {
+    try {
+      const saved = localStorage.getItem('inspection_filters');
+      if (saved) {
+        const savedFilters = JSON.parse(saved);
+        setFilters(prev => ({
+          ...prev,
+          ...savedFilters,
+          // Keep current date range and search term
+          scheduledDateRange: prev.scheduledDateRange,
+          searchTerm: prev.searchTerm,
+        }));
+      }
+    } catch (error) {
+      console.warn('Failed to load filters from localStorage:', error);
+    }
+  };
+
   const debouncedFetchProperties = useCallback((currentFilters: SchedulingFilters) => {
     // Clear existing timeout
     if (fetchTimeoutRef.current) {
@@ -199,9 +254,50 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     }, 300); // 300ms debounce
   }, []);
 
+  const debouncedSearch = useCallback((searchTerm: string) => {
+    // Clear existing timeout
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+
+    // Set new timeout for debounced search
+    searchTimeoutRef.current = setTimeout(() => {
+      if (searchTerm) {
+        const filtered = filteredProperties.filter(property => 
+          property.property_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          property.address?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          property.city?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          property.property_manager_name?.toLowerCase().includes(searchTerm.toLowerCase())
+        );
+        setFilteredProperties(filtered);
+      } else {
+        // Re-fetch without search filter
+        fetchFilteredProperties(filters);
+      }
+    }, 200); // 200ms debounce for search
+  }, [filteredProperties, filters]);
+
   const fetchFilteredProperties = async (currentFilters: SchedulingFilters) => {
     try {
       setPropertiesLoading(true);
+      
+      // Check cache first
+      const cacheKey = JSON.stringify({
+        clientId: currentFilters.clientId,
+        region: currentFilters.region,
+        market: currentFilters.market,
+        warrantyStatus: currentFilters.warrantyStatus,
+        roofType: currentFilters.roofType,
+        propertyManager: currentFilters.propertyManager,
+      });
+      
+      if (propertyCache.has(cacheKey)) {
+        const cachedData = propertyCache.get(cacheKey)!;
+        setFilteredProperties(cachedData);
+        setPropertiesLoading(false);
+        return;
+      }
+
       let query = supabase
         .from('roofs')
         .select(`
@@ -223,12 +319,20 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
         query = query.eq('market', currentFilters.market);
       }
 
+      if (currentFilters.roofType) {
+        query = query.eq('roof_type', currentFilters.roofType);
+      }
+
+      if (currentFilters.propertyManager) {
+        query = query.ilike('property_manager_name', `%${currentFilters.propertyManager}%`);
+      }
+
       const { data, error } = await query.order('property_name');
 
       if (error) throw error;
 
-      // Add warranty status to each property
-      const propertiesWithStatus = (data || []).map(property => {
+      // Add warranty status and apply warranty filter
+      let propertiesWithStatus = (data || []).map(property => {
         const now = new Date();
         const manufacturerExpiry = property.manufacturer_warranty_expiration ? new Date(property.manufacturer_warranty_expiration) : null;
         const installerExpiry = property.installer_warranty_expiration ? new Date(property.installer_warranty_expiration) : null;
@@ -239,7 +343,18 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
         return { ...property, warranty_status };
       });
 
+      // Apply warranty status filter
+      if (currentFilters.warrantyStatus && currentFilters.warrantyStatus !== 'all') {
+        propertiesWithStatus = propertiesWithStatus.filter(property => 
+          property.warranty_status === currentFilters.warrantyStatus
+        );
+      }
+
+      // Cache the results
+      setPropertyCache(prev => new Map(prev.set(cacheKey, propertiesWithStatus)));
+      
       setFilteredProperties(propertiesWithStatus);
+      setCurrentPage(1); // Reset to first page
       
       // Show success message for property count
       if (propertiesWithStatus.length > 0) {
@@ -256,6 +371,31 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
       setPropertiesLoading(false);
     }
   };
+
+  // Memoized filtered and paginated properties for performance
+  const filteredAndPaginatedProperties = useMemo(() => {
+    let properties = [...filteredProperties];
+
+    // Apply search filter
+    if (filters.searchTerm) {
+      properties = properties.filter(property => 
+        property.property_name?.toLowerCase().includes(filters.searchTerm!.toLowerCase()) ||
+        property.address?.toLowerCase().includes(filters.searchTerm!.toLowerCase()) ||
+        property.city?.toLowerCase().includes(filters.searchTerm!.toLowerCase()) ||
+        property.property_manager_name?.toLowerCase().includes(filters.searchTerm!.toLowerCase())
+      );
+    }
+
+    // Apply pagination
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    
+    return {
+      properties: properties.slice(startIndex, endIndex),
+      totalCount: properties.length,
+      totalPages: Math.ceil(properties.length / itemsPerPage)
+    };
+  }, [filteredProperties, filters.searchTerm, currentPage, itemsPerPage]);
 
   const selectAllProperties = () => {
     setSelectedProperties([...filteredProperties]);
@@ -847,9 +987,78 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                     </div>
                   </div>
 
+                  {/* Real-time search */}
+                  <div>
+                    <label className="text-sm font-medium">Search Properties</label>
+                    <Input
+                      placeholder="Search by name, address, or manager..."
+                      value={filters.searchTerm || ''}
+                      onChange={(e) => setFilters(prev => ({ ...prev, searchTerm: e.target.value }))}
+                    />
+                  </div>
+
+                  {/* Advanced filters toggle */}
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
+                    className="w-full"
+                  >
+                    <Settings className="h-4 w-4 mr-2" />
+                    {showAdvancedFilters ? 'Hide' : 'Show'} Advanced Filters
+                  </Button>
+
+                  {/* Advanced filters */}
+                  {showAdvancedFilters && (
+                    <div className="space-y-4 border-t pt-4">
+                      {/* Warranty Status Filter */}
+                      <div>
+                        <label className="text-sm font-medium">Warranty Status</label>
+                        <Select 
+                          value={filters.warrantyStatus || 'all'} 
+                          onValueChange={(value) => 
+                            setFilters(prev => ({ ...prev, warrantyStatus: value as any }))
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder="All warranties" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Warranties</SelectItem>
+                            <SelectItem value="active">Active Warranty</SelectItem>
+                            <SelectItem value="expired">Expired Warranty</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Roof Type Filter */}
+                      <div>
+                        <label className="text-sm font-medium">Roof Type</label>
+                        <Input
+                          placeholder="Filter by roof type..."
+                          value={filters.roofType || ''}
+                          onChange={(e) => setFilters(prev => ({ ...prev, roofType: e.target.value }))}
+                        />
+                      </div>
+
+                      {/* Property Manager Filter */}
+                      <div>
+                        <label className="text-sm font-medium">Property Manager</label>
+                        <Input
+                          placeholder="Filter by property manager..."
+                          value={filters.propertyManager || ''}
+                          onChange={(e) => setFilters(prev => ({ ...prev, propertyManager: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+                  )}
+
                   {/* Manual Refresh Button - now optional since auto-fetch is enabled */}
                   <Button 
-                    onClick={() => fetchFilteredProperties(filters)}
+                    onClick={() => {
+                      setPropertyCache(new Map()); // Clear cache
+                      fetchFilteredProperties(filters);
+                    }}
                     variant="outline"
                     className="w-full"
                     disabled={propertiesLoading}
@@ -869,7 +1078,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                 <CardHeader className="p-0 pb-4 flex-shrink-0">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-base flex items-center gap-2">
-                      Properties ({selectedProperties.length} selected)
+                      Properties ({selectedProperties.length} selected of {filteredAndPaginatedProperties.totalCount})
                       {propertiesLoading && (
                         <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
                       )}
@@ -881,7 +1090,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                         onClick={selectAllProperties}
                         disabled={filteredProperties.length === 0 || propertiesLoading}
                       >
-                        Select All
+                        Select All ({filteredAndPaginatedProperties.totalCount})
                       </Button>
                       <Button 
                         variant="outline" 
@@ -893,6 +1102,33 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                       </Button>
                     </div>
                   </div>
+
+                  {/* Pagination controls */}
+                  {filteredAndPaginatedProperties.totalPages > 1 && (
+                    <div className="flex items-center justify-between text-sm text-gray-600 mt-2">
+                      <span>
+                        Page {currentPage} of {filteredAndPaginatedProperties.totalPages}
+                      </span>
+                      <div className="flex space-x-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                          disabled={currentPage === 1}
+                        >
+                          Previous
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setCurrentPage(p => Math.min(filteredAndPaginatedProperties.totalPages, p + 1))}
+                          disabled={currentPage === filteredAndPaginatedProperties.totalPages}
+                        >
+                          Next
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </CardHeader>
                 <CardContent className="p-0 flex-1 min-h-0">
                   <ScrollArea className="h-full">
@@ -902,20 +1138,33 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                           <Loader2 className="h-5 w-5 animate-spin" />
                           <span>Loading properties...</span>
                         </div>
-                      ) : filteredProperties.length === 0 ? (
+                      ) : filteredAndPaginatedProperties.totalCount === 0 ? (
                         <div className="text-center py-8 text-gray-500">
-                          {filters.clientId || filters.region || filters.market ? (
+                          {filters.clientId || filters.region || filters.market || filters.searchTerm ? (
                             <>
                               No properties found with current filters.
                               <br />
                               <span className="text-sm">Try adjusting your filter selection above.</span>
                             </>
-                          ) : (
-                            "Select filters to find properties."
-                          )}
-                        </div>
-                      ) : (
-                        filteredProperties.map((property) => (
+                           ) : (
+                             <div>
+                               <p>Select filters to find properties for inspection scheduling.</p>
+                               <p className="text-xs mt-1">Use the filters on the left to search by client, region, or market.</p>
+                               {propertyCache.size > 0 && (
+                                 <Button
+                                   variant="link"
+                                   size="sm"
+                                   onClick={() => setPropertyCache(new Map())}
+                                   className="mt-2"
+                                 >
+                                   Clear cached results
+                                 </Button>
+                               )}
+                             </div>
+                           )}
+                         </div>
+                       ) : (
+                         filteredAndPaginatedProperties.properties.map((property) => (
                           <div key={property.id} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
                             <Checkbox
                               checked={selectedProperties.some(p => p.id === property.id)}
