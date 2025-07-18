@@ -777,7 +777,9 @@ export type Database = {
           site_contact: string | null
           site_contact_email: string | null
           site_contact_mobile_phone: string | null
+          site_contact_name: string | null
           site_contact_office_phone: string | null
+          site_contact_phone: string | null
           state: string
           status: string | null
           time_zone: string | null
@@ -865,7 +867,9 @@ export type Database = {
           site_contact?: string | null
           site_contact_email?: string | null
           site_contact_mobile_phone?: string | null
+          site_contact_name?: string | null
           site_contact_office_phone?: string | null
+          site_contact_phone?: string | null
           state: string
           status?: string | null
           time_zone?: string | null
@@ -953,7 +957,9 @@ export type Database = {
           site_contact?: string | null
           site_contact_email?: string | null
           site_contact_mobile_phone?: string | null
+          site_contact_name?: string | null
           site_contact_office_phone?: string | null
+          site_contact_phone?: string | null
           state?: string
           status?: string | null
           time_zone?: string | null
