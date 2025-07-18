@@ -80,12 +80,18 @@ export function AnalysisTab() {
         .from('roofs')
         .select(`
           *,
-          clients(company_name),
-          property_contact_assignments(
-            client_contacts(first_name, last_name, role)
-          )
+          clients(company_name)
         `)
         .eq('is_deleted', false);
+
+      // Fetch property contact assignments separately
+      const { data: assignments } = await supabase
+        .from('property_contact_assignments')
+        .select(`
+          roof_id,
+          client_contacts(first_name, last_name, role, email)
+        `)
+        .eq('is_active', true);
 
       if (roofTypeFilter !== 'all') {
         query = query.eq('roof_type', roofTypeFilter);
@@ -100,16 +106,30 @@ export function AnalysisTab() {
 
       const roofsData = roofs || [];
       
+      // Add assignments to roof data
+      const assignmentsMap = new Map();
+      (assignments || []).forEach(assignment => {
+        if (!assignmentsMap.has(assignment.roof_id)) {
+          assignmentsMap.set(assignment.roof_id, []);
+        }
+        assignmentsMap.get(assignment.roof_id).push(assignment);
+      });
+
+      const enrichedRoofs = roofsData.map(roof => ({
+        ...roof,
+        property_contact_assignments: assignmentsMap.get(roof.id) || []
+      }));
+      
       // Extract unique regions
-      const uniqueRegions = [...new Set(roofsData.map(r => r.region).filter(Boolean))];
+      const uniqueRegions = [...new Set(enrichedRoofs.map(r => r.region).filter(Boolean))];
       setRegions(uniqueRegions);
 
       // Process analytics data
-      const processedData = processAnalyticsData(roofsData);
+      const processedData = processAnalyticsData(enrichedRoofs);
       setAnalytics(processedData);
 
       // Process regional metrics
-      const regionalData = processRegionalMetrics(roofsData);
+      const regionalData = processRegionalMetrics(enrichedRoofs);
       setRegionalMetrics(regionalData.metrics);
       setPropertyManagerData(regionalData.managers);
     } catch (error) {
