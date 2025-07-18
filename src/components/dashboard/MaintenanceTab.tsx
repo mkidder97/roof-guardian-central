@@ -50,9 +50,9 @@ export function MaintenanceTab() {
   });
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [regionFilter, setRegionFilter] = useState<string>("");
-  const [contractorFilter, setContractorFilter] = useState<string>("");
-  const [leakFilter, setLeakFilter] = useState<string>("");
+  const [regionFilter, setRegionFilter] = useState<string>("all");
+  const [contractorFilter, setContractorFilter] = useState<string>("all");
+  const [leakFilter, setLeakFilter] = useState<string>("all");
 
   const [regions, setRegions] = useState<string[]>([]);
   const [contractors, setContractors] = useState<string[]>([]);
@@ -166,15 +166,15 @@ export function MaintenanceTab() {
       );
     }
 
-    if (regionFilter) {
+    if (regionFilter && regionFilter !== "all") {
       filtered = filtered.filter(record => record.region === regionFilter);
     }
 
-    if (contractorFilter) {
+    if (contractorFilter && contractorFilter !== "all") {
       filtered = filtered.filter(record => record.repair_contractor === contractorFilter);
     }
 
-    if (leakFilter) {
+    if (leakFilter && leakFilter !== "all") {
       switch (leakFilter) {
         case 'with-leaks':
           filtered = filtered.filter(record => parseInt(record.total_leaks_12mo || '0') > 0);
@@ -366,7 +366,7 @@ export function MaintenanceTab() {
                 <SelectValue placeholder="All Regions" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Regions</SelectItem>
+                <SelectItem value="all">All Regions</SelectItem>
                 {regions.map(region => (
                   <SelectItem key={region} value={region}>{region}</SelectItem>
                 ))}
@@ -378,7 +378,7 @@ export function MaintenanceTab() {
                 <SelectValue placeholder="All Contractors" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Contractors</SelectItem>
+                <SelectItem value="all">All Contractors</SelectItem>
                 {contractors.map(contractor => (
                   <SelectItem key={contractor} value={contractor}>{contractor}</SelectItem>
                 ))}
@@ -390,7 +390,7 @@ export function MaintenanceTab() {
                 <SelectValue placeholder="Leak Status" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Properties</SelectItem>
+                <SelectItem value="all">All Properties</SelectItem>
                 <SelectItem value="with-leaks">With Leaks</SelectItem>
                 <SelectItem value="no-leaks">No Leaks</SelectItem>
                 <SelectItem value="high-cost">High Cost (&gt;$5K)</SelectItem>
@@ -400,9 +400,9 @@ export function MaintenanceTab() {
             <Button 
               onClick={() => {
                 setSearchTerm("");
-                setRegionFilter("");
-                setContractorFilter("");
-                setLeakFilter("");
+                setRegionFilter("all");
+                setContractorFilter("all");
+                setLeakFilter("all");
               }}
               variant="outline"
               size="sm"

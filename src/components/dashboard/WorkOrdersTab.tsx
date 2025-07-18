@@ -68,9 +68,9 @@ export function WorkOrdersTab() {
   });
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [priorityFilter, setPriorityFilter] = useState("");
-  const [vendorFilter, setVendorFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("all");
+  const [priorityFilter, setPriorityFilter] = useState("all");
+  const [vendorFilter, setVendorFilter] = useState("all");
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
 
   const [vendors, setVendors] = useState<{ id: string; company_name: string }[]>([]);
@@ -202,15 +202,15 @@ export function WorkOrdersTab() {
       );
     }
 
-    if (statusFilter) {
+    if (statusFilter && statusFilter !== "all") {
       filtered = filtered.filter(order => order.status === statusFilter);
     }
 
-    if (priorityFilter) {
+    if (priorityFilter && priorityFilter !== "all") {
       filtered = filtered.filter(order => order.priority === priorityFilter);
     }
 
-    if (vendorFilter) {
+    if (vendorFilter && vendorFilter !== "all") {
       filtered = filtered.filter(order => order.vendor_id === vendorFilter);
     }
 
@@ -482,7 +482,7 @@ export function WorkOrdersTab() {
                 <SelectValue placeholder="All Statuses" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Statuses</SelectItem>
+                <SelectItem value="all">All Statuses</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
                 <SelectItem value="in-progress">In Progress</SelectItem>
                 <SelectItem value="completed">Completed</SelectItem>
@@ -495,7 +495,7 @@ export function WorkOrdersTab() {
                 <SelectValue placeholder="All Priorities" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Priorities</SelectItem>
+                <SelectItem value="all">All Priorities</SelectItem>
                 <SelectItem value="low">Low</SelectItem>
                 <SelectItem value="medium">Medium</SelectItem>
                 <SelectItem value="high">High</SelectItem>
@@ -508,7 +508,7 @@ export function WorkOrdersTab() {
                 <SelectValue placeholder="All Contractors" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Contractors</SelectItem>
+                <SelectItem value="all">All Contractors</SelectItem>
                 {vendors.map(vendor => (
                   <SelectItem key={vendor.id} value={vendor.id}>
                     {vendor.company_name}
@@ -520,9 +520,9 @@ export function WorkOrdersTab() {
             <Button 
               onClick={() => {
                 setSearchTerm("");
-                setStatusFilter("");
-                setPriorityFilter("");
-                setVendorFilter("");
+                setStatusFilter("all");
+                setPriorityFilter("all");
+                setVendorFilter("all");
               }}
               variant="outline"
               size="sm"
