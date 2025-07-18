@@ -43,7 +43,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [workflowLoading, setWorkflowLoading] = useState(false);
-  const [webhookUrl, setWebhookUrl] = useState("YOUR_WEBHOOK_URL_HERE");
+  const [webhookUrl, setWebhookUrl] = useState("https://mkidder97.app.n8n.cloud/webhook-test/start-annual-inspections");
 
   useEffect(() => {
     if (open) {
