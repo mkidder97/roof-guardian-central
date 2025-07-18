@@ -12,6 +12,8 @@ import { ClientsTab } from "@/components/dashboard/ClientsTab";
 import { VendorsTab } from "@/components/dashboard/VendorsTab";
 import { AnalysisTab } from "@/components/dashboard/AnalysisTab";
 import { AccountsTab } from "@/components/dashboard/AccountsTab";
+import { WarrantiesTab } from "@/components/dashboard/WarrantiesTab";
+import { BudgetsTab } from "@/components/dashboard/BudgetsTab";
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("summary");
@@ -56,15 +58,27 @@ export default function Dashboard() {
         <Card className="shadow-sm">
           <CardContent className="p-0">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-8 h-12 bg-gray-100 rounded-none border-b">
+              <TabsList className="grid w-full grid-cols-10 h-12 bg-gray-100 rounded-none border-b">
                 <TabsTrigger value="summary" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-500">
                   Summary
                 </TabsTrigger>
                 <TabsTrigger value="roofs" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-500">
                   Roofs
                 </TabsTrigger>
+                <TabsTrigger value="warranties" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-500">
+                  Warranties
+                </TabsTrigger>
+                <TabsTrigger value="budgets" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-500">
+                  Budgets
+                </TabsTrigger>
                 <TabsTrigger value="analysis" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-500">
                   Analysis
+                </TabsTrigger>
+                <TabsTrigger value="inspections" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-500">
+                  Inspections
+                </TabsTrigger>
+                <TabsTrigger value="work-orders" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-500">
+                  Work Orders
                 </TabsTrigger>
                 <TabsTrigger value="clients" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-500">
                   Clients
@@ -77,12 +91,6 @@ export default function Dashboard() {
                     Accounts
                   </TabsTrigger>
                 )}
-                <TabsTrigger value="inspections" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-500">
-                  Inspections
-                </TabsTrigger>
-                <TabsTrigger value="work-orders" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-500">
-                  Work Orders
-                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="summary" className="mt-0">
@@ -93,8 +101,24 @@ export default function Dashboard() {
                 <RoofsTab />
               </TabsContent>
               
+              <TabsContent value="warranties" className="mt-0">
+                <WarrantiesTab />
+              </TabsContent>
+              
+              <TabsContent value="budgets" className="mt-0">
+                <BudgetsTab />
+              </TabsContent>
+              
               <TabsContent value="analysis" className="mt-0">
                 <AnalysisTab />
+              </TabsContent>
+              
+              <TabsContent value="inspections" className="mt-0">
+                <InspectionsTab />
+              </TabsContent>
+              
+              <TabsContent value="work-orders" className="mt-0">
+                <WorkOrdersTab />
               </TabsContent>
               
               <TabsContent value="clients" className="mt-0">
@@ -110,14 +134,6 @@ export default function Dashboard() {
                   <AccountsTab />
                 </TabsContent>
               )}
-              
-              <TabsContent value="inspections" className="mt-0">
-                <InspectionsTab />
-              </TabsContent>
-              
-              <TabsContent value="work-orders" className="mt-0">
-                <WorkOrdersTab />
-              </TabsContent>
             </Tabs>
           </CardContent>
         </Card>
