@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
@@ -9,7 +9,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Search, Calendar, FileDown, CheckCircle, AlertCircle, X, Brain } from "lucide-react";
+import { Search, Calendar, FileDown, CheckCircle, AlertCircle, X, Brain, Loader2 } from "lucide-react";
 import { format, addMonths } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -117,6 +117,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
   const [activeTab, setActiveTab] = useState<'properties' | 'grouping'>('properties');
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [propertiesLoading, setPropertiesLoading] = useState(false);
   const [workflowLoading, setWorkflowLoading] = useState(false);
   const [currentStep, setCurrentStep] = useState<WorkflowSteps>(WorkflowSteps.PREPARING);
   const [progress, setProgress] = useState(0);
@@ -125,12 +126,24 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const abortControllerRef = useRef<AbortController | null>(null);
 
+  // Debounce timer for auto-fetching properties
+  const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     if (open) {
       fetchClients();
       resetWorkflowState();
+      // Auto-fetch properties with default filters when modal opens
+      debouncedFetchProperties(filters);
     }
   }, [open]);
+
+  // Auto-fetch properties when filters change
+  useEffect(() => {
+    if (open && (filters.clientId || filters.region || filters.market)) {
+      debouncedFetchProperties(filters);
+    }
+  }, [filters.clientId, filters.region, filters.market, open]);
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -159,6 +172,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
 
   const fetchClients = async () => {
     try {
+      setLoading(true);
       const { data, error } = await supabase
         .from('clients')
         .select('id, company_name')
@@ -168,12 +182,26 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
       setClients(data || []);
     } catch (error) {
       console.error('Error fetching clients:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
+  const debouncedFetchProperties = useCallback((currentFilters: SchedulingFilters) => {
+    // Clear existing timeout
+    if (fetchTimeoutRef.current) {
+      clearTimeout(fetchTimeoutRef.current);
+    }
+
+    // Set new timeout for debounced fetching
+    fetchTimeoutRef.current = setTimeout(() => {
+      fetchFilteredProperties(currentFilters);
+    }, 300); // 300ms debounce
+  }, []);
+
   const fetchFilteredProperties = async (currentFilters: SchedulingFilters) => {
     try {
-      setLoading(true);
+      setPropertiesLoading(true);
       let query = supabase
         .from('roofs')
         .select(`
@@ -212,6 +240,11 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
       });
 
       setFilteredProperties(propertiesWithStatus);
+      
+      // Show success message for property count
+      if (propertiesWithStatus.length > 0) {
+        console.log(`Found ${propertiesWithStatus.length} properties matching filters`);
+      }
     } catch (error) {
       console.error('Error fetching properties:', error);
       toast({
@@ -220,7 +253,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
         variant: "destructive",
       });
     } finally {
-      setLoading(false);
+      setPropertiesLoading(false);
     }
   };
 
@@ -384,7 +417,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
         return result;
       }
 
-    } catch (error) {
+    } catch (error: any) {
       if (error.name === 'AbortError') {
         throw new Error('Request was cancelled');
       }
@@ -604,7 +637,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
           throw new Error(result.message || "Workflow failed without specific error");
         }
 
-      } catch (error) {
+      } catch (error: any) {
         console.error("Error initiating workflow:", error);
       updateProgress(WorkflowSteps.ERROR, 0);
       
@@ -669,219 +702,253 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
           <TabsContent value="properties" className="flex-1 min-h-0">
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-full">
               {/* Left Panel - Filters */}
-              <Card className="p-4">{/* ... keep existing filter content ... */}
-            <CardHeader className="p-0 pb-4">
-              <CardTitle className="text-base">Filters</CardTitle>
-            </CardHeader>
-            <CardContent className="p-0 space-y-4">
-              {/* Client Selection */}
-              <div>
-                <label className="text-sm font-medium">Client</label>
-                <Select value={filters.clientId} onValueChange={(value) => 
-                  setFilters(prev => ({ ...prev, clientId: value }))
-                }>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select client" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Clients</SelectItem>
-                    {clients.map(client => (
-                      <SelectItem key={client.id} value={client.id}>
-                        {client.company_name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Region Selection */}
-              <div>
-                <label className="text-sm font-medium">Region</label>
-                <Select value={filters.region} onValueChange={(value) => 
-                  setFilters(prev => ({ ...prev, region: value }))
-                }>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select region" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="central">Central</SelectItem>
-                    <SelectItem value="southwest">Southwest</SelectItem>
-                    <SelectItem value="southeast">Southeast</SelectItem>
-                    <SelectItem value="northeast">Northeast</SelectItem>
-                    <SelectItem value="northwest">Northwest</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Market Selection */}
-              <div>
-                <label className="text-sm font-medium">Market</label>
-                <Select value={filters.market} onValueChange={(value) => 
-                  setFilters(prev => ({ ...prev, market: value }))
-                }>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select market" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="dallas">Dallas</SelectItem>
-                    <SelectItem value="houston">Houston</SelectItem>
-                    <SelectItem value="austin">Austin</SelectItem>
-                    <SelectItem value="san-antonio">San Antonio</SelectItem>
-                    <SelectItem value="atlanta">Atlanta</SelectItem>
-                    <SelectItem value="charlotte">Charlotte</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Inspection Type */}
-              <div>
-                <label className="text-sm font-medium">Inspection Type</label>
-                <Select value={filters.inspectionType} onValueChange={(value: any) => 
-                  setFilters(prev => ({ ...prev, inspectionType: value }))
-                }>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="annual">Annual Preventative</SelectItem>
-                    <SelectItem value="preventative">Routine Preventative</SelectItem>
-                    <SelectItem value="emergency">Emergency</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              {/* Date Range */}
-              <div>
-                <label className="text-sm font-medium">Inspection Window</label>
-                <div className="grid grid-cols-1 gap-2">
-                  <Input
-                    type="date"
-                    value={format(filters.scheduledDateRange.start, 'yyyy-MM-dd')}
-                    onChange={(e) => setFilters(prev => ({
-                      ...prev,
-                      scheduledDateRange: {
-                        ...prev.scheduledDateRange,
-                        start: new Date(e.target.value)
+              <Card className="p-4">
+                <CardHeader className="p-0 pb-4">
+                  <CardTitle className="text-base">Filters</CardTitle>
+                </CardHeader>
+                <CardContent className="p-0 space-y-4">
+                  {/* Client Selection */}
+                  <div>
+                    <label className="text-sm font-medium">Client</label>
+                    <Select 
+                      value={filters.clientId} 
+                      onValueChange={(value) => 
+                        setFilters(prev => ({ ...prev, clientId: value }))
                       }
-                    }))}
-                  />
-                  <Input
-                    type="date"
-                    value={format(filters.scheduledDateRange.end, 'yyyy-MM-dd')}
-                    onChange={(e) => setFilters(prev => ({
-                      ...prev,
-                      scheduledDateRange: {
-                        ...prev.scheduledDateRange,
-                        end: new Date(e.target.value)
-                      }
-                    }))}
-                  />
-                </div>
-              </div>
-
-              {/* Environment Configuration Status */}
-              <div className="space-y-2">
-                <label className="text-sm font-medium">Configuration Status</label>
-                <div className="space-y-1">
-                  <div className="flex items-center space-x-2">
-                    {validateWebhookUrl(webhookConfig.url) ? (
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                    ) : (
-                      <AlertCircle className="h-4 w-4 text-red-500" />
-                    )}
-                    <span className="text-xs">Webhook URL</span>
+                      disabled={loading}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select client" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Clients</SelectItem>
+                        {clients.map(client => (
+                          <SelectItem key={client.id} value={client.id}>
+                            {client.company_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    {webhookConfig.apiKey ? (
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                    ) : (
-                      <AlertCircle className="h-4 w-4 text-yellow-500" />
-                    )}
-                    <span className="text-xs">API Key (optional)</span>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    {isOnline ? (
-                      <CheckCircle className="h-4 w-4 text-green-500" />
-                    ) : (
-                      <AlertCircle className="h-4 w-4 text-red-500" />
-                    )}
-                    <span className="text-xs">Network Status</span>
-                  </div>
-                </div>
-              </div>
 
-              <Button 
-                onClick={() => fetchFilteredProperties(filters)}
-                className="w-full"
-                disabled={loading}
-              >
-                <Search className="h-4 w-4 mr-2" />
-                Find Properties
-              </Button>
-            </CardContent>
-          </Card>
+                  {/* Region Selection */}
+                  <div>
+                    <label className="text-sm font-medium">Region</label>
+                    <Select value={filters.region} onValueChange={(value) => 
+                      setFilters(prev => ({ ...prev, region: value }))
+                    }>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select region" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="central">Central</SelectItem>
+                        <SelectItem value="southwest">Southwest</SelectItem>
+                        <SelectItem value="southeast">Southeast</SelectItem>
+                        <SelectItem value="northeast">Northeast</SelectItem>
+                        <SelectItem value="northwest">Northwest</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
 
-          {/* Center Panel - Property List */}
-          <Card className="lg:col-span-3 p-4 flex flex-col">
-            <CardHeader className="p-0 pb-4 flex-shrink-0">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-base">
-                  Properties ({selectedProperties.length} selected)
-                </CardTitle>
-                <div className="flex space-x-2">
-                  <Button variant="outline" size="sm" onClick={selectAllProperties}>
-                    Select All
-                  </Button>
-                  <Button variant="outline" size="sm" onClick={clearSelection}>
-                    Clear
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="p-0 flex-1 min-h-0">
-              <ScrollArea className="h-full">
-                <div className="space-y-2 pr-4">
-                  {loading ? (
-                    <div className="text-center py-8">Loading properties...</div>
-                  ) : filteredProperties.length === 0 ? (
-                    <div className="text-center py-8 text-gray-500">
-                      No properties found. Adjust your filters and try again.
+                  {/* Market Selection */}
+                  <div>
+                    <label className="text-sm font-medium">Market</label>
+                    <Select value={filters.market} onValueChange={(value) => 
+                      setFilters(prev => ({ ...prev, market: value }))
+                    }>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select market" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="dallas">Dallas</SelectItem>
+                        <SelectItem value="houston">Houston</SelectItem>
+                        <SelectItem value="austin">Austin</SelectItem>
+                        <SelectItem value="san-antonio">San Antonio</SelectItem>
+                        <SelectItem value="atlanta">Atlanta</SelectItem>
+                        <SelectItem value="charlotte">Charlotte</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Inspection Type */}
+                  <div>
+                    <label className="text-sm font-medium">Inspection Type</label>
+                    <Select value={filters.inspectionType} onValueChange={(value: any) => 
+                      setFilters(prev => ({ ...prev, inspectionType: value }))
+                    }>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="annual">Annual Preventative</SelectItem>
+                        <SelectItem value="preventative">Routine Preventative</SelectItem>
+                        <SelectItem value="emergency">Emergency</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {/* Date Range */}
+                  <div>
+                    <label className="text-sm font-medium">Inspection Window</label>
+                    <div className="grid grid-cols-1 gap-2">
+                      <Input
+                        type="date"
+                        value={format(filters.scheduledDateRange.start, 'yyyy-MM-dd')}
+                        onChange={(e) => setFilters(prev => ({
+                          ...prev,
+                          scheduledDateRange: {
+                            ...prev.scheduledDateRange,
+                            start: new Date(e.target.value)
+                          }
+                        }))}
+                      />
+                      <Input
+                        type="date"
+                        value={format(filters.scheduledDateRange.end, 'yyyy-MM-dd')}
+                        onChange={(e) => setFilters(prev => ({
+                          ...prev,
+                          scheduledDateRange: {
+                            ...prev.scheduledDateRange,
+                            end: new Date(e.target.value)
+                          }
+                        }))}
+                      />
                     </div>
-                  ) : (
-                    filteredProperties.map((property) => (
-                      <div key={property.id} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
-                        <Checkbox
-                          checked={selectedProperties.some(p => p.id === property.id)}
-                          onCheckedChange={(checked) => {
-                            if (checked) {
-                              setSelectedProperties(prev => [...prev, property]);
-                            } else {
-                              setSelectedProperties(prev => prev.filter(p => p.id !== property.id));
-                            }
-                          }}
-                        />
-                        <div className="flex-1">
-                          <div className="font-medium">{property.property_name}</div>
-                          <div className="text-sm text-gray-600">
-                            {property.address}, {property.city}, {property.state}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            PM: {property.property_manager_name || 'Not assigned'} • Last Inspection: {property.last_inspection_date || 'Never'}
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-sm font-medium">{property.roof_area?.toLocaleString() || 'N/A'} sq ft</div>
-                          <Badge variant={property.warranty_status === 'active' ? 'default' : 'destructive'}>
-                            {property.warranty_status}
-                          </Badge>
-                        </div>
+                  </div>
+
+                  {/* Environment Configuration Status */}
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium">Configuration Status</label>
+                    <div className="space-y-1">
+                      <div className="flex items-center space-x-2">
+                        {validateWebhookUrl(webhookConfig.url) ? (
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                        ) : (
+                          <AlertCircle className="h-4 w-4 text-red-500" />
+                        )}
+                        <span className="text-xs">Webhook URL</span>
                       </div>
-                    ))
-                  )}
-                </div>
-              </ScrollArea>
-            </CardContent>
-          </Card>
+                      <div className="flex items-center space-x-2">
+                        {webhookConfig.apiKey ? (
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                        ) : (
+                          <AlertCircle className="h-4 w-4 text-yellow-500" />
+                        )}
+                        <span className="text-xs">API Key (optional)</span>
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        {isOnline ? (
+                          <CheckCircle className="h-4 w-4 text-green-500" />
+                        ) : (
+                          <AlertCircle className="h-4 w-4 text-red-500" />
+                        )}
+                        <span className="text-xs">Network Status</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Manual Refresh Button - now optional since auto-fetch is enabled */}
+                  <Button 
+                    onClick={() => fetchFilteredProperties(filters)}
+                    variant="outline"
+                    className="w-full"
+                    disabled={propertiesLoading}
+                  >
+                    {propertiesLoading ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Search className="h-4 w-4 mr-2" />
+                    )}
+                    Refresh Properties
+                  </Button>
+                </CardContent>
+              </Card>
+
+              {/* Center Panel - Property List */}
+              <Card className="lg:col-span-3 p-4 flex flex-col">
+                <CardHeader className="p-0 pb-4 flex-shrink-0">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base flex items-center gap-2">
+                      Properties ({selectedProperties.length} selected)
+                      {propertiesLoading && (
+                        <Loader2 className="h-4 w-4 animate-spin text-blue-500" />
+                      )}
+                    </CardTitle>
+                    <div className="flex space-x-2">
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={selectAllProperties}
+                        disabled={filteredProperties.length === 0 || propertiesLoading}
+                      >
+                        Select All
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        onClick={clearSelection}
+                        disabled={selectedProperties.length === 0}
+                      >
+                        Clear
+                      </Button>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-0 flex-1 min-h-0">
+                  <ScrollArea className="h-full">
+                    <div className="space-y-2 pr-4">
+                      {propertiesLoading ? (
+                        <div className="text-center py-8 flex items-center justify-center space-x-2">
+                          <Loader2 className="h-5 w-5 animate-spin" />
+                          <span>Loading properties...</span>
+                        </div>
+                      ) : filteredProperties.length === 0 ? (
+                        <div className="text-center py-8 text-gray-500">
+                          {filters.clientId || filters.region || filters.market ? (
+                            <>
+                              No properties found with current filters.
+                              <br />
+                              <span className="text-sm">Try adjusting your filter selection above.</span>
+                            </>
+                          ) : (
+                            "Select filters to find properties."
+                          )}
+                        </div>
+                      ) : (
+                        filteredProperties.map((property) => (
+                          <div key={property.id} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
+                            <Checkbox
+                              checked={selectedProperties.some(p => p.id === property.id)}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setSelectedProperties(prev => [...prev, property]);
+                                } else {
+                                  setSelectedProperties(prev => prev.filter(p => p.id !== property.id));
+                                }
+                              }}
+                            />
+                            <div className="flex-1">
+                              <div className="font-medium">{property.property_name}</div>
+                              <div className="text-sm text-gray-600">
+                                {property.address}, {property.city}, {property.state}
+                              </div>
+                              <div className="text-xs text-gray-500">
+                                PM: {property.property_manager_name || 'Not assigned'} • Last Inspection: {property.last_inspection_date || 'Never'}
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <div className="text-sm font-medium">{property.roof_area?.toLocaleString() || 'N/A'} sq ft</div>
+                              <Badge variant={property.warranty_status === 'active' ? 'default' : 'destructive'}>
+                                {property.warranty_status}
+                              </Badge>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </ScrollArea>
+                </CardContent>
+              </Card>
             </div>
           </TabsContent>
 
