@@ -9,7 +9,7 @@ import { RoofsTab } from "@/components/dashboard/RoofsTab";
 import { InspectionsTab } from "@/components/dashboard/InspectionsTab";
 import { WorkOrdersTab } from "@/components/dashboard/WorkOrdersTab";
 import { ClientsTab } from "@/components/dashboard/ClientsTab";
-import { VendorsTab } from "@/components/dashboard/VendorsTab";
+import { ContractorsTab } from "@/components/dashboard/VendorsTab";
 import { AnalysisTab } from "@/components/dashboard/AnalysisTab";
 import { AccountsTab } from "@/components/dashboard/AccountsTab";
 import { WarrantiesTab } from "@/components/dashboard/WarrantiesTab";
@@ -87,8 +87,8 @@ export default function Dashboard() {
                 <TabsTrigger value="clients" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-500">
                   Clients
                 </TabsTrigger>
-                <TabsTrigger value="vendors" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-500">
-                  Vendors
+                <TabsTrigger value="contractors" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-500">
+                  Contractors
                 </TabsTrigger>
                 {(userRole === 'super_admin' || userRole === 'manager') && (
                   <TabsTrigger value="accounts" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-500">
@@ -133,8 +133,8 @@ export default function Dashboard() {
                 <ClientsTab />
               </TabsContent>
               
-              <TabsContent value="vendors" className="mt-0">
-                <VendorsTab />
+              <TabsContent value="contractors" className="mt-0">
+                <ContractorsTab />
               </TabsContent>
               
               {(userRole === 'super_admin' || userRole === 'manager') && (
