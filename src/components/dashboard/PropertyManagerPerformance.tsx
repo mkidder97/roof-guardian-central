@@ -55,8 +55,17 @@ export function PropertyManagerPerformance() {
           const manager = roof.site_contact || 'Unknown';
           const roofArea = roof.roof_area || 0;
           const estimatedBudget = (roof.capital_budget_estimated || 0) + (roof.preventative_budget_estimated || 0);
-          const actualBudget = parseFloat(roof.capital_budget_actual?.replace(/[^0-9.-]+/g, '') || '0') + 
-                              parseFloat(roof.preventative_budget_actual?.replace(/[^0-9.-]+/g, '') || '0');
+          
+          // Parse actual budget values more carefully
+          const parseActualValue = (value: string | null): number => {
+            if (!value) return 0;
+            // Remove currency symbols, commas, and other non-numeric characters except decimal points and minus signs
+            const cleaned = value.replace(/[^\d.-]/g, '');
+            const parsed = parseFloat(cleaned);
+            return isNaN(parsed) ? 0 : parsed;
+          };
+          
+          const actualBudget = parseActualValue(roof.capital_budget_actual) + parseActualValue(roof.preventative_budget_actual);
           const hasWarranty = roof.manufacturer_has_warranty || roof.installer_has_warranty;
           const leaks = parseInt(roof.total_leaks_12mo || '0', 10);
 
@@ -88,7 +97,7 @@ export function PropertyManagerPerformance() {
           costPerSqFt: stats.totalSqFt > 0 ? stats.totalBudget / stats.totalSqFt : 0,
           warrantyRate: stats.properties > 0 ? (stats.warrantyCount / stats.properties) * 100 : 0,
           leakRate: stats.totalSqFt > 0 ? (stats.totalLeaks / stats.totalSqFt) * 100 : 0,
-          budgetVariance: stats.totalBudget > 0 ? ((stats.totalActual - stats.totalBudget) / stats.totalBudget) * 100 : 0
+          budgetVariance: stats.totalBudget > 0 ? ((stats.totalActual - stats.totalBudget) / stats.totalBudget) * 100 : (stats.totalActual > 0 ? 100 : 0)
         }));
 
         // Sort by total square footage descending
