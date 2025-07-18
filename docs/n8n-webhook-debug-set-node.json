@@ -1,0 +1,54 @@
+{
+  "name": "Debug Webhook Data",
+  "type": "n8n-nodes-base.set",
+  "typeVersion": 3.4,
+  "position": [
+    500,
+    200
+  ],
+  "parameters": {
+    "mode": "manual",
+    "includeOtherFields": true,
+    "assignments": {
+      "assignments": [
+        {
+          "id": "webhook-data",
+          "name": "webhookData", 
+          "value": "={{ $input.item.json }}",
+          "type": "object"
+        },
+        {
+          "id": "all-nodes",
+          "name": "allNodes",
+          "value": "={{ Object.keys($node) }}",
+          "type": "object"
+        },
+        {
+          "id": "webhook-specific",
+          "name": "webhookSpecific",
+          "value": "={{ $node['Webhook']?.json || 'Webhook node not found' }}",
+          "type": "object"
+        },
+        {
+          "id": "webhook-items",
+          "name": "webhookItems", 
+          "value": "={{ $items('Webhook')?.[0]?.json || 'No webhook items found' }}",
+          "type": "object"
+        },
+        {
+          "id": "current-json",
+          "name": "currentJson",
+          "value": "={{ $json }}",
+          "type": "object"
+        },
+        {
+          "id": "debug-info",
+          "name": "debugInfo",
+          "value": "={{ { timestamp: $now.toISO(), nodeCount: Object.keys($node).length, dataKeys: Object.keys($input.item.json || {}) } }}",
+          "type": "object"
+        }
+      ]
+    },
+    "options": {}
+  }
+}
