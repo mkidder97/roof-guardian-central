@@ -82,7 +82,7 @@ export function RegionalTab() {
 
       // Calculate regional metrics
       const regionGroups = groupBy(roofs, 'region');
-      const metrics: RegionalMetrics[] = Object.entries(regionGroups).map(([region, properties]) => {
+      const metrics: RegionalMetrics[] = Object.entries(regionGroups).map(([region, properties]: [string, any[]]) => {
         const currentYear = new Date().getFullYear();
         const totalSqFt = properties.reduce((sum, p) => sum + (p.roof_area || 0), 0);
         const propertiesWithAge = properties.filter(p => p.install_year);
