@@ -6,12 +6,15 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Plus, FileDown, Calendar, MapPin, Upload } from "lucide-react";
 import { ExcelImportDialog } from "@/components/excel/ExcelImportDialog";
+import { RoofDetailModal } from "./RoofDetailModal";
 import { supabase } from "@/integrations/supabase/client";
 
 export function RoofsTab() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [selectedRoof, setSelectedRoof] = useState<any>(null);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [roofs, setRoofs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -197,7 +200,16 @@ export function RoofsTab() {
                   <TableCell>{getWarrantyBadge(getWarrantyStatus(roof))}</TableCell>
                   <TableCell>
                     <div className="flex space-x-2">
-                      <Button variant="outline" size="sm">View</Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={() => {
+                          setSelectedRoof(roof);
+                          setDetailModalOpen(true);
+                        }}
+                      >
+                        View
+                      </Button>
                       <Button variant="outline" size="sm">Edit</Button>
                     </div>
                   </TableCell>
@@ -227,6 +239,17 @@ export function RoofsTab() {
           fetchRoofs(); // Refresh the roofs data after import
         }}
       />
+
+      {selectedRoof && (
+        <RoofDetailModal
+          roof={selectedRoof}
+          open={detailModalOpen}
+          onOpenChange={setDetailModalOpen}
+          onSave={(updatedRoof) => {
+            fetchRoofs();
+          }}
+        />
+      )}
     </div>
   );
 }
