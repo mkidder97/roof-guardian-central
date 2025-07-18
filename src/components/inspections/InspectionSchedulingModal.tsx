@@ -899,14 +899,14 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                       <SelectTrigger>
                         <SelectValue placeholder="Select market" />
                       </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="dallas">Dallas</SelectItem>
-                        <SelectItem value="houston">Houston</SelectItem>
-                        <SelectItem value="austin">Austin</SelectItem>
-                        <SelectItem value="san-antonio">San Antonio</SelectItem>
-                        <SelectItem value="atlanta">Atlanta</SelectItem>
-                        <SelectItem value="charlotte">Charlotte</SelectItem>
-                      </SelectContent>
+                       <SelectContent>
+                         <SelectItem value="Dallas">Dallas</SelectItem>
+                         <SelectItem value="Houston">Houston</SelectItem>
+                         <SelectItem value="Austin">Austin</SelectItem>
+                         <SelectItem value="San Antonio">San Antonio</SelectItem>
+                         <SelectItem value="Atlanta">Atlanta</SelectItem>
+                         <SelectItem value="Charlotte">Charlotte</SelectItem>
+                       </SelectContent>
                     </Select>
                   </div>
 
