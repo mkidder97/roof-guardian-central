@@ -71,7 +71,7 @@ export function NewDashboard() {
               <SummaryTab />
             </div>
             <div>
-              <CampaignTracker maxCampaigns={5} showCompleted={false} />
+              <CampaignTracker />
             </div>
           </div>
         </TabsContent>
@@ -89,7 +89,7 @@ export function NewDashboard() {
         </TabsContent>
 
         <TabsContent value="campaigns" className="space-y-6">
-          <CampaignTracker refreshInterval={15000} showCompleted={true} />
+          <CampaignTracker />
         </TabsContent>
 
         <TabsContent value="clients" className="space-y-6">
