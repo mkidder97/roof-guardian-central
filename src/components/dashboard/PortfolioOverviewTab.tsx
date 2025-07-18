@@ -30,6 +30,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { format, startOfMonth } from "date-fns";
 import { assessDataQuality, PropertyValidationSchema } from '@/lib/validation';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, AreaChart, Area } from 'recharts';
+import { PropertyManagerPerformance } from './PropertyManagerPerformance';
 
 interface PortfolioMetrics {
   totalRoofs: number;
@@ -923,6 +924,9 @@ export function PortfolioOverviewTab() {
               </CardContent>
             </Card>
           </div>
+
+          {/* Property Manager Performance Table */}
+          <PropertyManagerPerformance />
         </TabsContent>
       </Tabs>
     </div>
