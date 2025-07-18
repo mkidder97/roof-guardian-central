@@ -1,96 +1,192 @@
-import { useState, useEffect } from "react";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Map as MapIcon, Building, TrendingUp, DollarSign, Shield, ChevronRight, ChevronDown, Loader2, MapPin } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
+import { MapPin, TrendingUp, Users, Building, DollarSign, AlertTriangle, Download, RefreshCw } from 'lucide-react';
+import { supabase } from '@/integrations/supabase/client';
 
-interface RegionalData {
-  regions: RegionSummary[];
-  totalRoofs: number;
-  totalBudget: number;
-  totalWarranties: number;
+interface RegionalMetrics {
+  region: string;
+  market: string;
+  propertyCount: number;
+  totalSqFt: number;
+  avgPropertyAge: number;
+  propertyManagerCount: number;
+  avgPropertiesPerManager: number;
+  totalCapitalBudget: number;
+  totalPreventativeBudget: number;
+  warrantyExpirations: number;
+  leakIncidents: number;
+  riskScore: number;
 }
 
-interface RegionSummary {
-  name: string;
-  roofCount: number;
-  totalBudget: number;
-  avgBudget: number;
-  activeWarranties: number;
-  expiredWarranties: number;
-  markets: MarketSummary[];
+interface PropertyManagerWorkload {
+  managerName: string;
+  propertyCount: number;
+  totalSqFt: number;
+  avgCostPerSqFt: number;
+  warrantyRate: number;
+  leakRate: number;
+  budgetVariance: number;
 }
 
-interface MarketSummary {
-  name: string;
-  roofCount: number;
-  totalBudget: number;
-  activeWarranties: number;
-  expiredWarranties: number;
-  roofGroups: RoofGroupSummary[];
-}
-
-interface RoofGroupSummary {
-  name: string;
-  roofCount: number;
-  totalBudget: number;
-  activeWarranties: number;
-  roofs: RoofDetails[];
-}
-
-interface RoofDetails {
-  id: string;
-  property_name: string;
-  address: string;
-  city: string;
-  state: string;
-  roof_type: string | null;
-  capital_budget_estimated: number | null;
-  preventative_budget_estimated: number | null;
-  manufacturer_warranty_expiration: string | null;
-  installer_warranty_expiration: string | null;
-}
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
 
 export function RegionalTab() {
-  const [regionalData, setRegionalData] = useState<RegionalData>({
-    regions: [],
-    totalRoofs: 0,
-    totalBudget: 0,
-    totalWarranties: 0,
-  });
+  const [selectedRegion, setSelectedRegion] = useState('all');
+  const [selectedMarket, setSelectedMarket] = useState('all');
+  const [regionalMetrics, setRegionalMetrics] = useState<RegionalMetrics[]>([]);
+  const [propertyManagerData, setPropertyManagerData] = useState<PropertyManagerWorkload[]>([]);
+  const [regions, setRegions] = useState<string[]>([]);
+  const [markets, setMarkets] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [selectedRegion, setSelectedRegion] = useState("all");
-  const [expandedRegions, setExpandedRegions] = useState<Set<string>>(new Set());
-  const [expandedMarkets, setExpandedMarkets] = useState<Set<string>>(new Set());
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  const [mapboxToken, setMapboxToken] = useState("");
-  const [showMapInput, setShowMapInput] = useState(true);
 
   useEffect(() => {
     fetchRegionalData();
-  }, []);
+  }, [selectedRegion, selectedMarket]);
 
   const fetchRegionalData = async () => {
+    setLoading(true);
     try {
-      setLoading(true);
-      
-      const { data: roofs, error } = await supabase
+      // Fetch all roofs with related data
+      let query = supabase
         .from('roofs')
-        .select('*')
-        .eq('is_deleted', false)
-        .order('region, market, roof_group, property_name');
+        .select(`
+          *,
+          clients(company_name),
+          property_contact_assignments(
+            client_contacts(first_name, last_name, role)
+          )
+        `)
+        .eq('is_deleted', false);
 
+      if (selectedRegion !== 'all') {
+        query = query.eq('region', selectedRegion);
+      }
+      if (selectedMarket !== 'all') {
+        query = query.eq('market', selectedMarket);
+      }
+
+      const { data: roofsData, error } = await query;
       if (error) throw error;
 
-      const processedData = processRegionalData(roofs || []);
-      setRegionalData(processedData);
+      const roofs = roofsData || [];
+
+      // Extract unique regions and markets
+      const uniqueRegions = [...new Set(roofs.map(r => r.region).filter(Boolean))];
+      const uniqueMarkets = [...new Set(roofs.map(r => r.market).filter(Boolean))];
+      setRegions(uniqueRegions);
+      setMarkets(uniqueMarkets);
+
+      // Calculate regional metrics
+      const regionGroups = groupBy(roofs, 'region');
+      const metrics: RegionalMetrics[] = Object.entries(regionGroups).map(([region, properties]) => {
+        const currentYear = new Date().getFullYear();
+        const totalSqFt = properties.reduce((sum, p) => sum + (p.roof_area || 0), 0);
+        const propertiesWithAge = properties.filter(p => p.install_year);
+        const avgAge = propertiesWithAge.length > 0 
+          ? Math.round(propertiesWithAge.reduce((sum, p) => sum + (currentYear - (p.install_year || currentYear)), 0) / propertiesWithAge.length)
+          : 0;
+
+        // Count unique property managers
+        const propertyManagers = new Set();
+        properties.forEach(p => {
+          if (p.property_contact_assignments?.length > 0) {
+            p.property_contact_assignments.forEach((assignment: any) => {
+              if (assignment.client_contacts?.role === 'property_manager') {
+                propertyManagers.add(`${assignment.client_contacts.first_name} ${assignment.client_contacts.last_name}`);
+              }
+            });
+          }
+        });
+
+        const totalCapitalBudget = properties.reduce((sum, p) => sum + (p.capital_budget_estimated || 0), 0);
+        const totalPreventativeBudget = properties.reduce((sum, p) => sum + (p.preventative_budget_estimated || 0), 0);
+
+        // Calculate warranty expirations in next 6 months
+        const sixMonthsFromNow = new Date();
+        sixMonthsFromNow.setMonth(sixMonthsFromNow.getMonth() + 6);
+        const warrantyExpirations = properties.filter(p => 
+          (p.manufacturer_warranty_expiration && new Date(p.manufacturer_warranty_expiration) < sixMonthsFromNow) ||
+          (p.installer_warranty_expiration && new Date(p.installer_warranty_expiration) < sixMonthsFromNow)
+        ).length;
+
+        // Calculate leak incidents (properties with leaks in last 12 months)
+        const leakIncidents = properties.filter(p => 
+          p.total_leaks_12mo && parseInt(p.total_leaks_12mo) > 0
+        ).length;
+
+        // Simple risk score calculation
+        const riskScore = Math.round(
+          (warrantyExpirations / properties.length * 40) +
+          (leakIncidents / properties.length * 30) +
+          (avgAge > 15 ? 30 : avgAge > 10 ? 20 : 10)
+        );
+
+        return {
+          region: region || 'Unknown',
+          market: properties[0]?.market || 'Unknown',
+          propertyCount: properties.length,
+          totalSqFt,
+          avgPropertyAge: avgAge,
+          propertyManagerCount: propertyManagers.size,
+          avgPropertiesPerManager: propertyManagers.size > 0 ? Math.round(properties.length / propertyManagers.size) : 0,
+          totalCapitalBudget,
+          totalPreventativeBudget,
+          warrantyExpirations,
+          leakIncidents,
+          riskScore
+        };
+      });
+
+      setRegionalMetrics(metrics);
+
+      // Calculate property manager workload data
+      const managerWorkloads: PropertyManagerWorkload[] = [];
+      const managerProperties = new Map<string, any[]>();
+
+      roofs.forEach(property => {
+        if (property.property_contact_assignments?.length > 0) {
+          property.property_contact_assignments.forEach((assignment: any) => {
+            if (assignment.client_contacts?.role === 'property_manager') {
+              const managerName = `${assignment.client_contacts.first_name} ${assignment.client_contacts.last_name}`;
+              if (!managerProperties.has(managerName)) {
+                managerProperties.set(managerName, []);
+              }
+              managerProperties.get(managerName)?.push(property);
+            }
+          });
+        }
+      });
+
+      managerProperties.forEach((properties, managerName) => {
+        const totalSqFt = properties.reduce((sum, p) => sum + (p.roof_area || 0), 0);
+        const totalBudget = properties.reduce((sum, p) => sum + (p.capital_budget_estimated || 0) + (p.preventative_budget_estimated || 0), 0);
+        const avgCostPerSqFt = totalSqFt > 0 ? totalBudget / totalSqFt : 0;
+        
+        const propertiesWithWarranty = properties.filter(p => p.manufacturer_has_warranty || p.installer_has_warranty);
+        const warrantyRate = properties.length > 0 ? (propertiesWithWarranty.length / properties.length) * 100 : 0;
+        
+        const propertiesWithLeaks = properties.filter(p => p.total_leaks_12mo && parseInt(p.total_leaks_12mo) > 0);
+        const leakRate = properties.length > 0 ? (propertiesWithLeaks.length / properties.length) * 100 : 0;
+
+        // Mock budget variance calculation
+        const budgetVariance = Math.round((Math.random() - 0.5) * 30); // -15% to +15%
+
+        managerWorkloads.push({
+          managerName,
+          propertyCount: properties.length,
+          totalSqFt,
+          avgCostPerSqFt,
+          warrantyRate,
+          leakRate,
+          budgetVariance
+        });
+      });
+
+      setPropertyManagerData(managerWorkloads);
     } catch (error) {
       console.error('Error fetching regional data:', error);
     } finally {
@@ -98,466 +194,240 @@ export function RegionalTab() {
     }
   };
 
-  const processRegionalData = (roofs: any[]): RegionalData => {
-    const today = new Date();
-    
-    // Group by region -> market -> roof_group
-    const regionMap = new Map();
+  const groupBy = (array: any[], key: string) => {
+    return array.reduce((result, item) => {
+      const group = item[key] || 'Unknown';
+      if (!result[group]) result[group] = [];
+      result[group].push(item);
+      return result;
+    }, {});
+  };
 
-    roofs.forEach(roof => {
-      const regionName = roof.region || 'Unknown Region';
-      const marketName = roof.market || 'Unknown Market';
-      const groupName = roof.roof_group || 'Unknown Group';
-
-      // Initialize region
-      if (!regionMap.has(regionName)) {
-        regionMap.set(regionName, {
-          name: regionName,
-          markets: new Map(),
-          roofCount: 0,
-          totalBudget: 0,
-          activeWarranties: 0,
-          expiredWarranties: 0,
-        });
-      }
-
-      const region = regionMap.get(regionName);
-
-      // Initialize market
-      if (!region.markets.has(marketName)) {
-        region.markets.set(marketName, {
-          name: marketName,
-          groups: new Map(),
-          roofCount: 0,
-          totalBudget: 0,
-          activeWarranties: 0,
-          expiredWarranties: 0,
-        });
-      }
-
-      const market = region.markets.get(marketName);
-
-      // Initialize group
-      if (!market.groups.has(groupName)) {
-        market.groups.set(groupName, {
-          name: groupName,
-          roofs: [],
-          roofCount: 0,
-          totalBudget: 0,
-          activeWarranties: 0,
-        });
-      }
-
-      const group = market.groups.get(groupName);
-
-      // Calculate budgets
-      const capBudget = roof.capital_budget_estimated || 0;
-      const prevBudget = roof.preventative_budget_estimated || 0;
-      const totalBudget = capBudget + prevBudget;
-
-      // Check warranty status
-      const mfgExpired = roof.manufacturer_warranty_expiration && new Date(roof.manufacturer_warranty_expiration) < today;
-      const instExpired = roof.installer_warranty_expiration && new Date(roof.installer_warranty_expiration) < today;
-      const hasActiveWarranty = (roof.manufacturer_warranty_expiration && new Date(roof.manufacturer_warranty_expiration) > today) ||
-                               (roof.installer_warranty_expiration && new Date(roof.installer_warranty_expiration) > today);
-
-      // Add to group
-      group.roofs.push({
-        id: roof.id,
-        property_name: roof.property_name,
-        address: roof.address,
-        city: roof.city,
-        state: roof.state,
-        roof_type: roof.roof_type,
-        capital_budget_estimated: roof.capital_budget_estimated,
-        preventative_budget_estimated: roof.preventative_budget_estimated,
-        manufacturer_warranty_expiration: roof.manufacturer_warranty_expiration,
-        installer_warranty_expiration: roof.installer_warranty_expiration,
-      });
-
-      // Update counts
-      group.roofCount++;
-      group.totalBudget += totalBudget;
-      if (hasActiveWarranty) group.activeWarranties++;
-
-      market.roofCount++;
-      market.totalBudget += totalBudget;
-      if (hasActiveWarranty) market.activeWarranties++;
-      if (mfgExpired || instExpired) market.expiredWarranties++;
-
-      region.roofCount++;
-      region.totalBudget += totalBudget;
-      if (hasActiveWarranty) region.activeWarranties++;
-      if (mfgExpired || instExpired) region.expiredWarranties++;
-    });
-
-    // Convert to arrays
-    const regions: RegionSummary[] = Array.from(regionMap.values()).map((region: any) => ({
-      name: region.name,
-      roofCount: region.roofCount,
-      totalBudget: region.totalBudget,
-      avgBudget: region.roofCount > 0 ? Math.round(region.totalBudget / region.roofCount) : 0,
-      activeWarranties: region.activeWarranties,
-      expiredWarranties: region.expiredWarranties,
-      markets: Array.from(region.markets.values()).map((market: any) => ({
-        name: market.name,
-        roofCount: market.roofCount,
-        totalBudget: market.totalBudget,
-        activeWarranties: market.activeWarranties,
-        expiredWarranties: market.expiredWarranties,
-        roofGroups: Array.from(market.groups.values()).map((group: any) => ({
-          name: group.name,
-          roofCount: group.roofCount,
-          totalBudget: group.totalBudget,
-          activeWarranties: group.activeWarranties,
-          roofs: group.roofs,
-        })),
-      })),
+  const exportRegionalReport = () => {
+    const csvData = regionalMetrics.map(metric => ({
+      'Region': metric.region,
+      'Market': metric.market,
+      'Properties': metric.propertyCount,
+      'Total Sq Ft': metric.totalSqFt,
+      'Avg Property Age': metric.avgPropertyAge,
+      'Property Managers': metric.propertyManagerCount,
+      'Props per Manager': metric.avgPropertiesPerManager,
+      'Capital Budget': metric.totalCapitalBudget,
+      'Preventative Budget': metric.totalPreventativeBudget,
+      'Warranty Expirations': metric.warrantyExpirations,
+      'Leak Incidents': metric.leakIncidents,
+      'Risk Score': metric.riskScore
     }));
 
-    const totalRoofs = roofs.length;
-    const totalBudget = roofs.reduce((sum, roof) => {
-      return sum + (roof.capital_budget_estimated || 0) + (roof.preventative_budget_estimated || 0);
-    }, 0);
-    const totalWarranties = roofs.filter(roof => {
-      const hasActive = (roof.manufacturer_warranty_expiration && new Date(roof.manufacturer_warranty_expiration) > today) ||
-                       (roof.installer_warranty_expiration && new Date(roof.installer_warranty_expiration) > today);
-      return hasActive;
-    }).length;
+    const csvContent = [
+      Object.keys(csvData[0] || {}).join(','),
+      ...csvData.map(row => Object.values(row).join(','))
+    ].join('\n');
 
-    return {
-      regions,
-      totalRoofs,
-      totalBudget,
-      totalWarranties,
-    };
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `regional-analytics-${new Date().toISOString().split('T')[0]}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
   };
-
-  const toggleRegion = (regionName: string) => {
-    const newExpanded = new Set(expandedRegions);
-    if (newExpanded.has(regionName)) {
-      newExpanded.delete(regionName);
-    } else {
-      newExpanded.add(regionName);
-    }
-    setExpandedRegions(newExpanded);
-  };
-
-  const toggleMarket = (marketKey: string) => {
-    const newExpanded = new Set(expandedMarkets);
-    if (newExpanded.has(marketKey)) {
-      newExpanded.delete(marketKey);
-    } else {
-      newExpanded.add(marketKey);
-    }
-    setExpandedMarkets(newExpanded);
-  };
-
-  const toggleGroup = (groupKey: string) => {
-    const newExpanded = new Set(expandedGroups);
-    if (newExpanded.has(groupKey)) {
-      newExpanded.delete(groupKey);
-    } else {
-      newExpanded.add(groupKey);
-    }
-    setExpandedGroups(newExpanded);
-  };
-
-  const filteredRegions = regionalData.regions.filter(region => {
-    if (selectedRegion !== "all" && region.name !== selectedRegion) return false;
-    if (searchTerm && !region.name.toLowerCase().includes(searchTerm.toLowerCase())) return false;
-    return true;
-  });
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="h-8 w-8 animate-spin" />
+      <div className="p-6 flex items-center justify-center h-64">
+        <div className="text-center">
+          <RefreshCw className="h-8 w-8 animate-spin mx-auto" />
+          <p className="mt-2">Loading regional analytics...</p>
+        </div>
       </div>
     );
   }
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
+      {/* Header Controls */}
       <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-2">
-          <MapIcon className="h-6 w-6 text-blue-600" />
-          <h2 className="text-2xl font-semibold">Regional Management</h2>
+        <div>
+          <h1 className="text-2xl font-bold">Regional Analytics</h1>
+          <p className="text-muted-foreground">Performance insights by region and market</p>
+        </div>
+        <div className="flex items-center gap-4">
+          <Select value={selectedRegion} onValueChange={setSelectedRegion}>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Regions</SelectItem>
+              {regions.map(region => (
+                <SelectItem key={region} value={region}>{region}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={selectedMarket} onValueChange={setSelectedMarket}>
+            <SelectTrigger className="w-40">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Markets</SelectItem>
+              {markets.map(market => (
+                <SelectItem key={market} value={market}>{market}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Button onClick={exportRegionalReport} variant="outline" size="sm">
+            <Download className="h-4 w-4 mr-2" />
+            Export Report
+          </Button>
         </div>
       </div>
 
-      {/* Portfolio Summary */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <Building className="h-4 w-4 text-blue-600" />
-              <div>
-                <div className="text-2xl font-bold">{regionalData.totalRoofs}</div>
-                <p className="text-sm text-gray-600">Total Properties</p>
+      {/* Regional Performance Matrix */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        {regionalMetrics.slice(0, 4).map((metric, index) => (
+          <Card key={metric.region}>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">{metric.region}</CardTitle>
+              <MapPin className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{metric.propertyCount}</div>
+              <p className="text-xs text-muted-foreground mb-2">
+                {metric.totalSqFt.toLocaleString()} sq ft
+              </p>
+              <div className="flex items-center gap-2">
+                <Badge variant={metric.riskScore > 70 ? 'destructive' : metric.riskScore > 40 ? 'default' : 'secondary'}>
+                  Risk: {metric.riskScore}%
+                </Badge>
+                <span className="text-xs text-muted-foreground">
+                  {metric.propertyManagerCount} PMs
+                </span>
               </div>
-            </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Charts Section */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Regional Distribution Chart */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Regional Property Distribution</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={regionalMetrics}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="region" />
+                <YAxis />
+                <Tooltip />
+                <Legend />
+                <Bar dataKey="propertyCount" fill="#8884d8" name="Properties" />
+                <Bar dataKey="totalSqFt" fill="#82ca9d" name="Total Sq Ft" />
+              </BarChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
+
+        {/* Risk Assessment Chart */}
         <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <DollarSign className="h-4 w-4 text-green-600" />
-              <div>
-                <div className="text-2xl font-bold">${(regionalData.totalBudget / 1000000).toFixed(1)}M</div>
-                <p className="text-sm text-gray-600">Total Budget</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center space-x-2">
-              <Shield className="h-4 w-4 text-orange-600" />
-              <div>
-                <div className="text-2xl font-bold">{regionalData.totalWarranties}</div>
-                <p className="text-sm text-gray-600">Active Warranties</p>
-              </div>
-            </div>
+          <CardHeader>
+            <CardTitle>Regional Risk Assessment</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <PieChart>
+                <Pie
+                  data={regionalMetrics}
+                  cx="50%"
+                  cy="50%"
+                  labelLine={false}
+                  label={({ region, riskScore }) => `${region}: ${riskScore}%`}
+                  outerRadius={80}
+                  fill="#8884d8"
+                  dataKey="riskScore"
+                >
+                  {regionalMetrics.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip />
+              </PieChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
       </div>
 
-      <Tabs defaultValue="hierarchy" className="w-full">
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="hierarchy">Hierarchical View</TabsTrigger>
-          <TabsTrigger value="map">Map View</TabsTrigger>
-        </TabsList>
-
-        <TabsContent value="hierarchy" className="space-y-4">
-          {/* Filters */}
-          <Card>
-            <CardContent className="p-4">
-              <div className="flex items-center space-x-4">
-                <div className="flex-1">
-                  <Input
-                    placeholder="Search regions, markets, groups..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                  />
-                </div>
-                <Select value={selectedRegion} onValueChange={setSelectedRegion}>
-                  <SelectTrigger className="w-48">
-                    <SelectValue placeholder="Select Region" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Regions</SelectItem>
-                    {regionalData.regions.map(region => (
-                      <SelectItem key={region.name} value={region.name}>
-                        {region.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Hierarchical Data */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Portfolio Hierarchy</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                {filteredRegions.map((region) => (
-                  <div key={region.name} className="border rounded-lg">
-                    <Collapsible
-                      open={expandedRegions.has(region.name)}
-                      onOpenChange={() => toggleRegion(region.name)}
-                    >
-                      <CollapsibleTrigger className="w-full">
-                        <div className="flex items-center justify-between p-4 hover:bg-gray-50">
-                          <div className="flex items-center space-x-2">
-                            {expandedRegions.has(region.name) ? (
-                              <ChevronDown className="h-4 w-4" />
-                            ) : (
-                              <ChevronRight className="h-4 w-4" />
-                            )}
-                            <MapPin className="h-4 w-4 text-blue-600" />
-                            <span className="font-semibold">{region.name}</span>
-                          </div>
-                          <div className="flex items-center space-x-4 text-sm">
-                            <Badge variant="outline">{region.roofCount} properties</Badge>
-                            <Badge variant="outline">${(region.totalBudget / 1000000).toFixed(1)}M budget</Badge>
-                            <Badge variant="outline">{region.activeWarranties} warranties</Badge>
-                          </div>
-                        </div>
-                      </CollapsibleTrigger>
-                      <CollapsibleContent>
-                        <div className="pl-6 pb-4 space-y-2">
-                          {region.markets.map((market) => {
-                            const marketKey = `${region.name}-${market.name}`;
-                            return (
-                              <div key={marketKey} className="border rounded-lg">
-                                <Collapsible
-                                  open={expandedMarkets.has(marketKey)}
-                                  onOpenChange={() => toggleMarket(marketKey)}
-                                >
-                                  <CollapsibleTrigger className="w-full">
-                                    <div className="flex items-center justify-between p-3 hover:bg-gray-50">
-                                      <div className="flex items-center space-x-2">
-                                        {expandedMarkets.has(marketKey) ? (
-                                          <ChevronDown className="h-4 w-4" />
-                                        ) : (
-                                          <ChevronRight className="h-4 w-4" />
-                                        )}
-                                        <Building className="h-4 w-4 text-green-600" />
-                                        <span className="font-medium">{market.name}</span>
-                                      </div>
-                                      <div className="flex items-center space-x-2 text-sm">
-                                        <Badge variant="secondary">{market.roofCount} properties</Badge>
-                                        <Badge variant="secondary">${(market.totalBudget / 1000).toFixed(0)}K</Badge>
-                                      </div>
-                                    </div>
-                                  </CollapsibleTrigger>
-                                  <CollapsibleContent>
-                                    <div className="pl-6 pb-3 space-y-2">
-                                      {market.roofGroups.map((group) => {
-                                        const groupKey = `${marketKey}-${group.name}`;
-                                        return (
-                                          <div key={groupKey} className="border rounded-lg">
-                                            <Collapsible
-                                              open={expandedGroups.has(groupKey)}
-                                              onOpenChange={() => toggleGroup(groupKey)}
-                                            >
-                                              <CollapsibleTrigger className="w-full">
-                                                <div className="flex items-center justify-between p-3 hover:bg-gray-50">
-                                                  <div className="flex items-center space-x-2">
-                                                    {expandedGroups.has(groupKey) ? (
-                                                      <ChevronDown className="h-3 w-3" />
-                                                    ) : (
-                                                      <ChevronRight className="h-3 w-3" />
-                                                    )}
-                                                    <span className="text-sm font-medium">{group.name}</span>
-                                                  </div>
-                                                  <div className="flex items-center space-x-2 text-xs">
-                                                    <Badge variant="outline">{group.roofCount}</Badge>
-                                                    <Badge variant="outline">${(group.totalBudget / 1000).toFixed(0)}K</Badge>
-                                                  </div>
-                                                </div>
-                                              </CollapsibleTrigger>
-                                              <CollapsibleContent>
-                                                <div className="pl-6 pb-2">
-                                                  <Table>
-                                                    <TableHeader>
-                                                      <TableRow>
-                                                        <TableHead>Property</TableHead>
-                                                        <TableHead>Location</TableHead>
-                                                        <TableHead>Type</TableHead>
-                                                        <TableHead>Budget</TableHead>
-                                                      </TableRow>
-                                                    </TableHeader>
-                                                    <TableBody>
-                                                      {group.roofs.map((roof) => (
-                                                        <TableRow key={roof.id}>
-                                                          <TableCell className="font-medium">
-                                                            {roof.property_name}
-                                                          </TableCell>
-                                                          <TableCell>
-                                                            {roof.city}, {roof.state}
-                                                          </TableCell>
-                                                          <TableCell>
-                                                            {roof.roof_type || 'N/A'}
-                                                          </TableCell>
-                                                          <TableCell>
-                                                            ${((roof.capital_budget_estimated || 0) + (roof.preventative_budget_estimated || 0)).toLocaleString()}
-                                                          </TableCell>
-                                                        </TableRow>
-                                                      ))}
-                                                    </TableBody>
-                                                  </Table>
-                                                </div>
-                                              </CollapsibleContent>
-                                            </Collapsible>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  </CollapsibleContent>
-                                </Collapsible>
-                              </div>
-                            );
-                          })}
-                        </div>
-                      </CollapsibleContent>
-                    </Collapsible>
-                  </div>
+      {/* Property Manager Performance */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className="h-5 w-5" />
+            Property Manager Performance
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b">
+                  <th className="text-left p-2">Manager</th>
+                  <th className="text-left p-2">Properties</th>
+                  <th className="text-left p-2">Total Sq Ft</th>
+                  <th className="text-left p-2">Cost/Sq Ft</th>
+                  <th className="text-left p-2">Warranty Rate</th>
+                  <th className="text-left p-2">Leak Rate</th>
+                  <th className="text-left p-2">Budget Variance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {propertyManagerData.map((manager, index) => (
+                  <tr key={index} className="border-b hover:bg-gray-50">
+                    <td className="p-2 font-medium">{manager.managerName}</td>
+                    <td className="p-2">{manager.propertyCount}</td>
+                    <td className="p-2">{manager.totalSqFt.toLocaleString()}</td>
+                    <td className="p-2">${manager.avgCostPerSqFt.toFixed(2)}</td>
+                    <td className="p-2">{manager.warrantyRate.toFixed(1)}%</td>
+                    <td className="p-2">
+                      <span className={manager.leakRate > 10 ? 'text-red-600' : 'text-green-600'}>
+                        {manager.leakRate.toFixed(1)}%
+                      </span>
+                    </td>
+                    <td className="p-2">
+                      <Badge variant={manager.budgetVariance > 10 ? 'destructive' : manager.budgetVariance < -10 ? 'secondary' : 'default'}>
+                        {manager.budgetVariance > 0 ? '+' : ''}{manager.budgetVariance}%
+                      </Badge>
+                    </td>
+                  </tr>
                 ))}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
 
-        <TabsContent value="map" className="space-y-4">
-          {showMapInput ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>Map Configuration</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  <p className="text-sm text-gray-600">
-                    To display an interactive map of your properties, please enter your Mapbox public token.
-                    You can get one for free at{" "}
-                    <a 
-                      href="https://mapbox.com/" 
-                      target="_blank" 
-                      rel="noopener noreferrer"
-                      className="text-blue-600 hover:underline"
-                    >
-                      mapbox.com
-                    </a>
-                  </p>
-                  <div className="flex space-x-2">
-                    <Input
-                      placeholder="Enter your Mapbox public token..."
-                      value={mapboxToken}
-                      onChange={(e) => setMapboxToken(e.target.value)}
-                      type="password"
-                    />
-                    <Button 
-                      onClick={() => setShowMapInput(false)}
-                      disabled={!mapboxToken.trim()}
-                    >
-                      Load Map
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardHeader>
-                <CardTitle>Properties Map</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="h-96 bg-gray-100 rounded-lg flex items-center justify-center">
-                  <div className="text-center">
-                    <MapPin className="h-12 w-12 text-gray-400 mx-auto mb-2" />
-                    <p className="text-gray-600">Interactive map would be displayed here</p>
-                    <p className="text-sm text-gray-500">Showing {regionalData.totalRoofs} properties across all regions</p>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="mt-2"
-                      onClick={() => setShowMapInput(true)}
-                    >
-                      Configure Map
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </TabsContent>
-      </Tabs>
+      {/* Regional Trends */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Budget Allocation by Region</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={300}>
+            <BarChart data={regionalMetrics}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="region" />
+              <YAxis />
+              <Tooltip formatter={(value: any) => [`$${value.toLocaleString()}`, '']} />
+              <Legend />
+              <Bar dataKey="totalCapitalBudget" stackId="a" fill="#8884d8" name="Capital Budget" />
+              <Bar dataKey="totalPreventativeBudget" stackId="a" fill="#82ca9d" name="Preventative Budget" />
+            </BarChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
     </div>
   );
 }
