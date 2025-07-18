@@ -170,18 +170,30 @@ export function CampaignDetailModal({ campaignId, open, onOpenChange }: Campaign
             state,
             property_manager_name,
             roof_area
-          ),
-          profiles!inspector_id(
-            first_name,
-            last_name,
-            email
           )
         `)
         .eq('campaign_id', campaignId)
         .order('created_at');
 
       if (error) throw error;
-      setProperties(data || []);
+
+      // Fetch inspector profiles separately if inspector_id exists
+      const propertiesWithInspectors = await Promise.all(
+        (data || []).map(async (property) => {
+          if (property.inspector_id) {
+            const { data: inspector } = await supabase
+              .from('profiles')
+              .select('first_name, last_name, email')
+              .eq('auth_user_id', property.inspector_id)
+              .single();
+            
+            return { ...property, profiles: inspector };
+          }
+          return { ...property, profiles: null };
+        })
+      );
+
+      setProperties(propertiesWithInspectors);
     } catch (error) {
       console.error('Error fetching campaign properties:', error);
     }
