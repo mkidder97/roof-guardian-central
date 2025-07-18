@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Plus, FileDown, Calendar, User, Building, Loader2 } from "lucide-react";
+import { InspectionSchedulingModal } from "@/components/inspections/InspectionSchedulingModal";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 
@@ -23,7 +24,7 @@ interface Inspection {
   roofs?: {
     property_name: string;
   } | null;
-  profiles?: {
+  users?: {
     first_name: string | null;
     last_name: string | null;
   } | null;
@@ -32,6 +33,7 @@ interface Inspection {
 export function InspectionsTab() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
+  const [schedulingModalOpen, setSchedulingModalOpen] = useState(false);
   const [inspections, setInspections] = useState<Inspection[]>([]);
   const [filteredInspections, setFilteredInspections] = useState<Inspection[]>([]);
   const [loading, setLoading] = useState(true);
@@ -53,7 +55,7 @@ export function InspectionsTab() {
         .select(`
           *,
           roofs!roof_id(property_name),
-          profiles!inspector_id(first_name, last_name)
+          users!inspector_id(first_name, last_name)
         `)
         .order('scheduled_date', { ascending: false });
         
@@ -76,7 +78,7 @@ export function InspectionsTab() {
     if (searchTerm) {
       filtered = filtered.filter(inspection => 
         inspection.roofs?.property_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        `${inspection.profiles?.first_name || ''} ${inspection.profiles?.last_name || ''}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        `${inspection.users?.first_name || ''} ${inspection.users?.last_name || ''}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
         inspection.inspection_type?.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
@@ -89,8 +91,8 @@ export function InspectionsTab() {
   };
 
   const getInspectorName = (inspection: Inspection) => {
-    if (inspection.profiles?.first_name || inspection.profiles?.last_name) {
-      return `${inspection.profiles.first_name || ''} ${inspection.profiles.last_name || ''}`.trim();
+    if (inspection.users?.first_name || inspection.users?.last_name) {
+      return `${inspection.users.first_name || ''} ${inspection.users.last_name || ''}`.trim();
     }
     return 'Unassigned';
   };
@@ -226,7 +228,11 @@ export function InspectionsTab() {
             <FileDown className="h-4 w-4 mr-2" />
             Export
           </Button>
-          <Button variant="outline" size="sm">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setSchedulingModalOpen(true)}
+          >
             <Calendar className="h-4 w-4 mr-2" />
             Schedule Inspection
           </Button>
@@ -268,7 +274,11 @@ export function InspectionsTab() {
                         : "No inspections match your current filters."
                       }
                     </p>
-                    <Button className="mt-4" size="sm">
+                    <Button 
+                      className="mt-4" 
+                      size="sm"
+                      onClick={() => setSchedulingModalOpen(true)}
+                    >
                       <Plus className="h-4 w-4 mr-2" />
                       Schedule Inspection
                     </Button>
@@ -330,6 +340,11 @@ export function InspectionsTab() {
           <span>Past Due: {inspections.filter(i => getInspectionStatus(i) === 'past-due').length}</span>
         </div>
       </div>
+
+      <InspectionSchedulingModal
+        open={schedulingModalOpen}
+        onOpenChange={setSchedulingModalOpen}
+      />
     </div>
   );
 }
