@@ -654,14 +654,14 @@ export function PortfolioOverviewTab() {
                   return (
                     <div key={region} className="border-b last:border-b-0">
                       <div
-                        className="flex items-center justify-between p-4 hover:bg-gray-50 cursor-pointer"
+                        className="flex items-center justify-between p-4 hover:bg-gray-50 cursor-pointer transition-colors"
                         onClick={() => toggleRegion(region)}
                       >
                         <div className="flex items-center gap-3">
                           {isExpanded ? (
-                            <ChevronDown className="h-4 w-4" />
+                            <ChevronDown className="h-4 w-4 transition-transform" />
                           ) : (
-                            <ChevronRight className="h-4 w-4" />
+                            <ChevronRight className="h-4 w-4 transition-transform" />
                           )}
                           <MapPin className="h-5 w-5 text-blue-600" />
                           <div>
@@ -684,7 +684,7 @@ export function PortfolioOverviewTab() {
                       </div>
 
                       {isExpanded && (
-                        <div className="bg-gray-50">
+                        <div className="bg-gray-50 animate-fade-in">
                           {Object.entries(markets).map(([market, groups]) => {
                             const marketProperties = getMarketProperties(region, market);
                             const marketBudget = getTotalBudget(marketProperties);
@@ -695,14 +695,14 @@ export function PortfolioOverviewTab() {
                             return (
                               <div key={market} className="border-t">
                                 <div 
-                                  className="flex items-center justify-between p-4 pl-12 hover:bg-gray-100 cursor-pointer"
+                                  className="flex items-center justify-between p-4 pl-12 hover:bg-gray-100 cursor-pointer transition-colors"
                                   onClick={() => toggleMarket(marketKey)}
                                 >
                                   <div className="flex items-center gap-3">
                                     {isMarketExpanded ? (
-                                      <ChevronDown className="h-4 w-4" />
+                                      <ChevronDown className="h-4 w-4 transition-transform" />
                                     ) : (
-                                      <ChevronRight className="h-4 w-4" />
+                                      <ChevronRight className="h-4 w-4 transition-transform" />
                                     )}
                                     <Building className="h-4 w-4 text-green-600" />
                                     <div>
@@ -722,6 +722,78 @@ export function PortfolioOverviewTab() {
                                     </div>
                                   </div>
                                 </div>
+
+                                {isMarketExpanded && (
+                                  <div className="bg-gray-100 animate-fade-in">
+                                    {Object.entries(groups).map(([group, properties]) => {
+                                      const groupBudget = getTotalBudget(properties);
+                                      const groupSqFt = getTotalSqFt(properties);
+
+                                      return (
+                                        <div key={group} className="border-t border-gray-200">
+                                          <div className="p-4 pl-20">
+                                            <div className="flex items-center justify-between">
+                                              <div className="flex items-center gap-3">
+                                                <Users className="h-4 w-4 text-purple-600" />
+                                                <div>
+                                                  <div className="font-medium text-sm">{group}</div>
+                                                  <div className="text-xs text-gray-500">
+                                                    {properties.length} properties
+                                                  </div>
+                                                </div>
+                                              </div>
+                                              <div className="flex items-center gap-6 text-xs">
+                                                <div className="text-right">
+                                                  <div className="font-medium">{properties.length}</div>
+                                                  <div className="text-gray-500">{groupSqFt.toLocaleString()} sq ft</div>
+                                                </div>
+                                                <div className="text-right">
+                                                  <div className="font-medium">${groupBudget.toLocaleString()}</div>
+                                                </div>
+                                              </div>
+                                            </div>
+
+                                            {/* Individual Properties */}
+                                            <div className="mt-3 bg-white rounded border">
+                                              <div className="px-4 py-2 bg-gray-50 border-b text-xs font-medium text-gray-600">
+                                                <div className="grid grid-cols-4 gap-4">
+                                                  <div>Property</div>
+                                                  <div>Location</div>
+                                                  <div>Type</div>
+                                                  <div className="text-right">Budget</div>
+                                                </div>
+                                              </div>
+                                              {properties.slice(0, 5).map((property: any) => (
+                                                <div key={property.id} className="px-4 py-3 border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                                                  <div className="grid grid-cols-4 gap-4 text-sm">
+                                                    <div className="flex items-center gap-2">
+                                                      <Home className="h-3 w-3 text-blue-500" />
+                                                      <span className="font-medium truncate">{property.property_name}</span>
+                                                    </div>
+                                                    <div className="text-gray-600 truncate">
+                                                      {property.city}, {property.state}
+                                                    </div>
+                                                    <div className="text-gray-600">
+                                                      {property.roof_type || 'N/A'}
+                                                    </div>
+                                                    <div className="text-right font-medium">
+                                                      ${((property.capital_budget_estimated || 0) + (property.preventative_budget_estimated || 0)).toLocaleString()}
+                                                    </div>
+                                                  </div>
+                                                </div>
+                                              ))}
+                                              {properties.length > 5 && (
+                                                <div className="px-4 py-2 text-center text-xs text-gray-500 bg-gray-50">
+                                                  +{properties.length - 5} more properties
+                                                </div>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                )}
                               </div>
                             );
                           })}
