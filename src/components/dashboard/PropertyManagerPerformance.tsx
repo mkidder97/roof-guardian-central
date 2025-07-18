@@ -19,6 +19,8 @@ export function PropertyManagerPerformance() {
   const [performanceData, setPerformanceData] = useState<PropertyManagerData[]>([]);
   const [loading, setLoading] = useState(true);
 
+  console.log('PropertyManagerPerformance component rendered', { performanceData, loading });
+
   useEffect(() => {
     const fetchPropertyManagerData = async () => {
       try {
@@ -141,8 +143,15 @@ export function PropertyManagerPerformance() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-center py-8 text-gray-500">
-            No property manager data available
+          <div className="text-center py-8">
+            <TrendingUp className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+            <h4 className="text-lg font-medium text-gray-600 mb-2">No Property Manager Data</h4>
+            <p className="text-gray-500 mb-4">
+              Property manager names need to be populated in your roof data to see performance analytics.
+            </p>
+            <p className="text-sm text-gray-400">
+              Import updated data or manually assign property managers to see performance metrics.
+            </p>
           </div>
         </CardContent>
       </Card>
