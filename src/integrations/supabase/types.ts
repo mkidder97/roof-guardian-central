@@ -69,6 +69,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "campaign_properties_inspector_id_fkey"
+            columns: ["inspector_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["auth_user_id"]
+          },
+          {
             foreignKeyName: "campaign_properties_roof_id_fkey"
             columns: ["roof_id"]
             isOneToOne: false
@@ -210,6 +217,50 @@ export type Database = {
           name?: string
         }
         Relationships: []
+      }
+      grouping_configurations: {
+        Row: {
+          client_id: string | null
+          created_at: string | null
+          created_by: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          priority: number | null
+          rules: Json
+          updated_at: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          priority?: number | null
+          rules?: Json
+          updated_at?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          priority?: number | null
+          rules?: Json
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "grouping_configurations_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       inspection_campaigns: {
         Row: {
@@ -420,6 +471,42 @@ export type Database = {
           },
         ]
       }
+      inspector_routes: {
+        Row: {
+          created_at: string | null
+          estimated_travel_time: number | null
+          id: string
+          inspector_id: string
+          optimization_score: number | null
+          property_sequence: Json
+          route_date: string
+          total_distance: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          estimated_travel_time?: number | null
+          id?: string
+          inspector_id: string
+          optimization_score?: number | null
+          property_sequence?: Json
+          route_date: string
+          total_distance?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          estimated_travel_time?: number | null
+          id?: string
+          inspector_id?: string
+          optimization_score?: number | null
+          property_sequence?: Json
+          route_date?: string
+          total_distance?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           auth_user_id: string
@@ -503,6 +590,50 @@ export type Database = {
             columns: ["roof_id"]
             isOneToOne: false
             referencedRelation: "roofs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      property_groups: {
+        Row: {
+          client_id: string | null
+          created_at: string | null
+          created_by: string | null
+          group_type: string
+          id: string
+          metadata: Json | null
+          name: string
+          properties: Json
+          updated_at: string | null
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          group_type: string
+          id?: string
+          metadata?: Json | null
+          name: string
+          properties?: Json
+          updated_at?: string | null
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string | null
+          created_by?: string | null
+          group_type?: string
+          id?: string
+          metadata?: Json | null
+          name?: string
+          properties?: Json
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "property_groups_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
             referencedColumns: ["id"]
           },
         ]
@@ -842,6 +973,50 @@ export type Database = {
           },
         ]
       }
+      seasonal_preferences: {
+        Row: {
+          avoid_conditions: string[] | null
+          client_id: string | null
+          created_at: string | null
+          id: string
+          optimal_temperature_range: Json | null
+          preferred_months: number[] | null
+          region: string | null
+          season: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          avoid_conditions?: string[] | null
+          client_id?: string | null
+          created_at?: string | null
+          id?: string
+          optimal_temperature_range?: Json | null
+          preferred_months?: number[] | null
+          region?: string | null
+          season?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          avoid_conditions?: string[] | null
+          client_id?: string | null
+          created_at?: string | null
+          id?: string
+          optimal_temperature_range?: Json | null
+          preferred_months?: number[] | null
+          region?: string | null
+          season?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "seasonal_preferences_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -1059,6 +1234,15 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      calculate_property_proximity: {
+        Args: {
+          property1_lat: number
+          property1_lng: number
+          property2_lat: number
+          property2_lng: number
+        }
+        Returns: number
+      }
       generate_campaign_name: {
         Args: {
           p_market: string
@@ -1066,6 +1250,22 @@ export type Database = {
           p_total_properties: number
         }
         Returns: string
+      }
+      generate_intelligent_groups: {
+        Args: {
+          p_client_id?: string
+          p_group_type?: string
+          p_max_group_size?: number
+          p_max_distance_miles?: number
+        }
+        Returns: {
+          group_id: number
+          property_id: string
+          property_name: string
+          group_center_lat: number
+          group_center_lng: number
+          optimization_score: number
+        }[]
       }
       get_current_user_role: {
         Args: Record<PropertyKey, never>

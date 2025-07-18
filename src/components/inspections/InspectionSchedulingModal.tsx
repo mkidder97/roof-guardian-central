@@ -8,11 +8,14 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Progress } from "@/components/ui/progress";
-import { Search, Calendar, FileDown, CheckCircle, AlertCircle, X } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Search, Calendar, FileDown, CheckCircle, AlertCircle, X, Brain } from "lucide-react";
 import { format, addMonths } from "date-fns";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
+import { IntelligentGrouping } from "./IntelligentGrouping";
+import { PropertyGroup } from "@/lib/intelligentGrouping";
 
 interface InspectionSchedulingModalProps {
   open: boolean;
@@ -110,6 +113,8 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
   });
   const [selectedProperties, setSelectedProperties] = useState<any[]>([]);
   const [filteredProperties, setFilteredProperties] = useState<any[]>([]);
+  const [generatedGroups, setGeneratedGroups] = useState<PropertyGroup[]>([]);
+  const [activeTab, setActiveTab] = useState<'properties' | 'grouping'>('properties');
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [workflowLoading, setWorkflowLoading] = useState(false);
@@ -641,7 +646,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[90vh] overflow-hidden flex flex-col">
+      <DialogContent className="max-w-7xl max-h-[95vh] overflow-hidden flex flex-col">
         <DialogHeader>
           <DialogTitle className="text-xl">Schedule Annual Inspections</DialogTitle>
           <DialogDescription>
@@ -649,9 +654,22 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
           </DialogDescription>
         </DialogHeader>
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 flex-1 min-h-0">
-          {/* Left Panel - Filters */}
-          <Card className="p-4">
+        <Tabs value={activeTab} onValueChange={(value: any) => setActiveTab(value)} className="flex-1 min-h-0 flex flex-col">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="properties" className="flex items-center space-x-2">
+              <Search className="h-4 w-4" />
+              <span>Property Selection</span>
+            </TabsTrigger>
+            <TabsTrigger value="grouping" className="flex items-center space-x-2">
+              <Brain className="h-4 w-4" />
+              <span>Intelligent Grouping</span>
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="properties" className="flex-1 min-h-0">
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 h-full">
+              {/* Left Panel - Filters */}
+              <Card className="p-4">{/* ... keep existing filter content ... */}
             <CardHeader className="p-0 pb-4">
               <CardTitle className="text-base">Filters</CardTitle>
             </CardHeader>
@@ -864,7 +882,18 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
               </ScrollArea>
             </CardContent>
           </Card>
-        </div>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="grouping" className="flex-1 min-h-0">
+            <IntelligentGrouping
+              properties={filteredProperties}
+              selectedProperties={selectedProperties}
+              onGroupsGenerated={setGeneratedGroups}
+              onPropertiesSelected={setSelectedProperties}
+            />
+          </TabsContent>
+        </Tabs>
 
         {/* Workflow Progress Section */}
         {workflowLoading && (
