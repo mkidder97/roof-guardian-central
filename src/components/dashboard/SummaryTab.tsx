@@ -1,8 +1,134 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Building, Calendar, AlertTriangle, CheckCircle } from "lucide-react";
+import { Building, Calendar, AlertTriangle, CheckCircle, Loader2 } from "lucide-react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { format, isAfter, isBefore, subMonths, startOfMonth } from "date-fns";
+
+interface DashboardMetrics {
+  totalRoofs: number;
+  pendingInspections: number;
+  criticalIssues: number;
+  completedThisMonth: number;
+}
+
+interface RecentActivity {
+  id: string;
+  property_name: string;
+  completed_date: string | null;
+  scheduled_date: string | null;
+  status: string;
+}
+
+interface UpcomingExpiration {
+  id: string;
+  property_name: string;
+  manufacturer_warranty_expiration: string | null;
+  installer_warranty_expiration: string | null;
+}
 
 export function SummaryTab() {
+  const [metrics, setMetrics] = useState<DashboardMetrics>({
+    totalRoofs: 0,
+    pendingInspections: 0,
+    criticalIssues: 0,
+    completedThisMonth: 0,
+  });
+  const [recentInspections, setRecentInspections] = useState<RecentActivity[]>([]);
+  const [upcomingExpirations, setUpcomingExpirations] = useState<UpcomingExpiration[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetchDashboardData();
+  }, []);
+
+  const fetchDashboardData = async () => {
+    try {
+      // Get total roofs count
+      const { count: roofCount } = await supabase
+        .from('roofs')
+        .select('*', { count: 'exact', head: true })
+        .eq('is_deleted', false);
+
+      // Get pending inspections
+      const { count: pendingCount } = await supabase
+        .from('inspections')
+        .select('*', { count: 'exact', head: true })
+        .in('status', ['scheduled', 'in-progress']);
+
+      // Get critical issues (expired warranties)
+      const today = new Date().toISOString().split('T')[0];
+      const { count: criticalCount } = await supabase
+        .from('roofs')
+        .select('*', { count: 'exact', head: true })
+        .or(`manufacturer_warranty_expiration.lt.${today},installer_warranty_expiration.lt.${today}`)
+        .eq('is_deleted', false);
+
+      // Get completed inspections this month
+      const firstDayOfMonth = startOfMonth(new Date()).toISOString().split('T')[0];
+      const { count: completedCount } = await supabase
+        .from('inspections')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'completed')
+        .gte('completed_date', firstDayOfMonth);
+
+      // Get recent inspections
+      const { data: recentData } = await supabase
+        .from('inspections')
+        .select(`
+          id,
+          status,
+          completed_date,
+          scheduled_date,
+          roofs!inner(property_name)
+        `)
+        .order('created_at', { ascending: false })
+        .limit(4);
+
+      // Get upcoming warranty expirations
+      const threeMonthsLater = new Date();
+      threeMonthsLater.setMonth(threeMonthsLater.getMonth() + 3);
+      const futureDate = threeMonthsLater.toISOString().split('T')[0];
+      
+      const { data: expirationData } = await supabase
+        .from('roofs')
+        .select('id, property_name, manufacturer_warranty_expiration, installer_warranty_expiration')
+        .or(`manufacturer_warranty_expiration.gte.${today},installer_warranty_expiration.gte.${today}`)
+        .or(`manufacturer_warranty_expiration.lt.${futureDate},installer_warranty_expiration.lt.${futureDate}`)
+        .eq('is_deleted', false)
+        .order('manufacturer_warranty_expiration', { ascending: true })
+        .limit(4);
+
+      setMetrics({
+        totalRoofs: roofCount || 0,
+        pendingInspections: pendingCount || 0,
+        criticalIssues: criticalCount || 0,
+        completedThisMonth: completedCount || 0,
+      });
+
+      setRecentInspections(recentData?.map(item => ({
+        id: item.id,
+        property_name: (item.roofs as any)?.property_name || 'Unknown Property',
+        completed_date: item.completed_date,
+        scheduled_date: item.scheduled_date,
+        status: item.status || 'unknown'
+      })) || []);
+
+      setUpcomingExpirations(expirationData || []);
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <Loader2 className="h-8 w-8 animate-spin" />
+      </div>
+    );
+  }
   return (
     <div className="p-6 space-y-6">
       {/* Stats Cards */}
@@ -13,9 +139,9 @@ export function SummaryTab() {
             <Building className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">1,247</div>
+            <div className="text-2xl font-bold">{metrics.totalRoofs}</div>
             <p className="text-xs text-muted-foreground">
-              +12 from last month
+              Total properties managed
             </p>
           </CardContent>
         </Card>
@@ -26,9 +152,9 @@ export function SummaryTab() {
             <Calendar className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">23</div>
+            <div className="text-2xl font-bold">{metrics.pendingInspections}</div>
             <p className="text-xs text-muted-foreground">
-              7 overdue
+              Scheduled or in progress
             </p>
           </CardContent>
         </Card>
@@ -39,9 +165,9 @@ export function SummaryTab() {
             <AlertTriangle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">8</div>
+            <div className="text-2xl font-bold">{metrics.criticalIssues}</div>
             <p className="text-xs text-muted-foreground">
-              Require immediate attention
+              Expired warranties
             </p>
           </CardContent>
         </Card>
@@ -52,9 +178,9 @@ export function SummaryTab() {
             <CheckCircle className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">142</div>
+            <div className="text-2xl font-bold">{metrics.completedThisMonth}</div>
             <p className="text-xs text-muted-foreground">
-              +18% from last month
+              Inspections completed
             </p>
           </CardContent>
         </Card>
@@ -68,55 +194,79 @@ export function SummaryTab() {
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {[
-                { property: "Westfield Shopping Center", date: "2024-01-15", status: "completed" },
-                { property: "Tech Office Building", date: "2024-01-14", status: "in-progress" },
-                { property: "Manufacturing Plant A", date: "2024-01-13", status: "past-due" },
-                { property: "Retail Complex North", date: "2024-01-12", status: "scheduled" },
-              ].map((item, index) => (
-                <div key={index} className="flex items-center justify-between py-2 border-b">
+              {recentInspections.length > 0 ? recentInspections.map((item) => (
+                <div key={item.id} className="flex items-center justify-between py-2 border-b">
                   <div>
-                    <p className="font-medium">{item.property}</p>
-                    <p className="text-sm text-gray-500">{item.date}</p>
+                    <p className="font-medium">{item.property_name}</p>
+                    <p className="text-sm text-gray-500">
+                      {item.completed_date 
+                        ? format(new Date(item.completed_date), 'MMM dd, yyyy')
+                        : item.scheduled_date 
+                        ? format(new Date(item.scheduled_date), 'MMM dd, yyyy')
+                        : 'No date set'
+                      }
+                    </p>
                   </div>
                   <Badge variant={
                     item.status === "completed" ? "default" :
                     item.status === "in-progress" ? "secondary" :
-                    item.status === "past-due" ? "destructive" : "outline"
+                    item.status === "scheduled" ? "outline" : "destructive"
                   }>
                     {item.status.replace("-", " ")}
                   </Badge>
                 </div>
-              ))}
+              )) : (
+                <div className="text-center py-4 text-muted-foreground">
+                  No recent inspections found
+                </div>
+              )}
             </div>
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle>Upcoming Deadlines</CardTitle>
+            <CardTitle>Upcoming Warranty Expirations</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
-              {[
-                { task: "Annual Inspection - Building 47", due: "3 days", priority: "high" },
-                { task: "Warranty Expiration Review", due: "1 week", priority: "medium" },
-                { task: "Maintenance Schedule Update", due: "2 weeks", priority: "low" },
-                { task: "Quarterly Report Generation", due: "3 weeks", priority: "medium" },
-              ].map((item, index) => (
-                <div key={index} className="flex items-center justify-between py-2 border-b">
-                  <div>
-                    <p className="font-medium">{item.task}</p>
-                    <p className="text-sm text-gray-500">Due in {item.due}</p>
+              {upcomingExpirations.length > 0 ? upcomingExpirations.map((item) => {
+                const nearestExpiration = [
+                  item.manufacturer_warranty_expiration,
+                  item.installer_warranty_expiration
+                ].filter(Boolean).sort()[0];
+                
+                const daysUntilExpiration = nearestExpiration 
+                  ? Math.ceil((new Date(nearestExpiration).getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24))
+                  : null;
+
+                const isExpired = daysUntilExpiration !== null && daysUntilExpiration < 0;
+                const isUrgent = daysUntilExpiration !== null && daysUntilExpiration <= 30;
+
+                return (
+                  <div key={item.id} className="flex items-center justify-between py-2 border-b">
+                    <div>
+                      <p className="font-medium">{item.property_name}</p>
+                      <p className="text-sm text-gray-500">
+                        {nearestExpiration 
+                          ? `${isExpired ? 'Expired' : 'Expires'} ${format(new Date(nearestExpiration), 'MMM dd, yyyy')}`
+                          : 'No warranty data'
+                        }
+                      </p>
+                    </div>
+                    <Badge variant={
+                      isExpired ? "destructive" :
+                      isUrgent ? "secondary" : "outline"
+                    }>
+                      {isExpired ? "Expired" : isUrgent ? "Urgent" : "Upcoming"}
+                    </Badge>
                   </div>
-                  <Badge variant={
-                    item.priority === "high" ? "destructive" :
-                    item.priority === "medium" ? "secondary" : "outline"
-                  }>
-                    {item.priority}
-                  </Badge>
+                );
+              }) : (
+                <div className="text-center py-4 text-muted-foreground">
+                  No warranty expirations in the next 3 months
                 </div>
-              ))}
+              )}
             </div>
           </CardContent>
         </Card>
