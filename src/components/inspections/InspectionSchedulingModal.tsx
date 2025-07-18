@@ -42,6 +42,8 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
   const [filteredProperties, setFilteredProperties] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [workflowLoading, setWorkflowLoading] = useState(false);
+  const [webhookUrl, setWebhookUrl] = useState("YOUR_WEBHOOK_URL_HERE");
 
   useEffect(() => {
     if (open) {
@@ -168,7 +170,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     });
   };
 
-  const initiateInspectionWorkflow = () => {
+  const initiateInspectionWorkflow = async () => {
     if (selectedProperties.length === 0) {
       toast({
         title: "No Properties Selected",
@@ -178,16 +180,106 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
       return;
     }
 
-    // This will eventually trigger the n8n workflow
-    toast({
-      title: "Inspection Workflow Started",
-      description: `Initiated inspection scheduling for ${selectedProperties.length} properties. You will receive an email confirmation shortly.`,
-    });
+    if (!webhookUrl || webhookUrl === "YOUR_WEBHOOK_URL_HERE") {
+      toast({
+        title: "Webhook URL Required",
+        description: "Please configure your n8n webhook URL first.",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    // For now, just close the modal
-    onOpenChange(false);
-    setSelectedProperties([]);
-    setFilteredProperties([]);
+    setWorkflowLoading(true);
+
+    try {
+      // Prepare webhook payload
+      const payload = {
+        selectedProperties: selectedProperties.map(property => ({
+          id: property.id,
+          property_name: property.property_name,
+          address: property.address,
+          city: property.city,
+          state: property.state,
+          zip: property.zip,
+          market: property.market,
+          property_manager_name: property.property_manager_name,
+          property_manager_email: property.property_manager_email,
+          property_manager_phone: property.property_manager_phone,
+          site_contact_name: property.site_contact_name,
+          site_contact_phone: property.site_contact_phone,
+          roof_access: property.roof_access,
+          roof_area: property.roof_area,
+          roof_type: property.roof_type,
+          last_inspection_date: property.last_inspection_date,
+          warranty_status: property.warranty_status,
+        })),
+        filters: {
+          clientId: filters.clientId,
+          region: filters.region,
+          market: filters.market,
+          inspectionType: filters.inspectionType,
+        },
+      };
+
+      console.log("Sending payload to n8n webhook:", payload);
+
+      // Call n8n webhook
+      const response = await fetch(webhookUrl, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const result = await response.json();
+      console.log("n8n workflow response:", result);
+
+      // Handle successful response
+      if (result.success) {
+        toast({
+          title: "Campaign Started!",
+          description: `${result.campaign?.propertyCount || selectedProperties.length} properties processed for ${result.campaign?.market || filters.market} market`,
+        });
+
+        // Close modal and reset state on success
+        onOpenChange(false);
+        setSelectedProperties([]);
+        setFilteredProperties([]);
+      } else {
+        throw new Error(result.message || "Workflow failed");
+      }
+
+    } catch (error) {
+      console.error("Error initiating workflow:", error);
+      
+      // Handle different error types
+      if (error instanceof TypeError && error.message.includes('fetch')) {
+        toast({
+          title: "Network Error",
+          description: "Unable to connect to automation server. Please check your connection.",
+          variant: "destructive",
+        });
+      } else if (error instanceof Error) {
+        toast({
+          title: "Workflow Failed",
+          description: error.message || "Failed to start inspection workflow",
+          variant: "destructive",
+        });
+      } else {
+        toast({
+          title: "Unexpected Error",
+          description: "An unexpected error occurred. Please try again.",
+          variant: "destructive",
+        });
+      }
+    } finally {
+      setWorkflowLoading(false);
+    }
   };
 
   return (
@@ -312,6 +404,18 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                 </div>
               </div>
 
+              {/* Webhook URL Configuration */}
+              <div>
+                <label className="text-sm font-medium">n8n Webhook URL</label>
+                <Input
+                  type="url"
+                  value={webhookUrl}
+                  onChange={(e) => setWebhookUrl(e.target.value)}
+                  placeholder="https://your-n8n-instance.com/webhook/..."
+                  className="text-xs"
+                />
+              </div>
+
               <Button 
                 onClick={() => fetchFilteredProperties(filters)}
                 className="w-full"
@@ -398,11 +502,20 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
           </div>
           <Button 
             onClick={initiateInspectionWorkflow}
-            disabled={selectedProperties.length === 0}
+            disabled={selectedProperties.length === 0 || workflowLoading}
             className="bg-blue-600 hover:bg-blue-700"
           >
-            <Calendar className="h-4 w-4 mr-2" />
-            Start Inspection Workflow ({selectedProperties.length} properties)
+            {workflowLoading ? (
+              <>
+                <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full" />
+                Processing...
+              </>
+            ) : (
+              <>
+                <Calendar className="h-4 w-4 mr-2" />
+                Start Inspection Workflow ({selectedProperties.length} properties)
+              </>
+            )}
           </Button>
         </DialogFooter>
       </DialogContent>
