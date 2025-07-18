@@ -7,12 +7,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Search, Plus, FileDown, Calendar, MapPin, Upload } from "lucide-react";
 import { ExcelImportDialog } from "@/components/excel/ExcelImportDialog";
 import { RoofDetailModal } from "./RoofDetailModal";
+import { InspectionSchedulingModal } from "@/components/inspections/InspectionSchedulingModal";
 import { supabase } from "@/integrations/supabase/client";
 
 export function RoofsTab() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [importDialogOpen, setImportDialogOpen] = useState(false);
+  const [schedulingModalOpen, setSchedulingModalOpen] = useState(false);
   const [selectedRoof, setSelectedRoof] = useState<any>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
   const [roofs, setRoofs] = useState<any[]>([]);
@@ -144,7 +146,11 @@ export function RoofsTab() {
             <Upload className="h-4 w-4 mr-2" />
             Import Excel
           </Button>
-          <Button variant="outline" size="sm">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => setSchedulingModalOpen(true)}
+          >
             <Calendar className="h-4 w-4 mr-2" />
             Schedule
           </Button>
@@ -238,6 +244,11 @@ export function RoofsTab() {
         onImportComplete={() => {
           fetchRoofs(); // Refresh the roofs data after import
         }}
+      />
+
+      <InspectionSchedulingModal
+        open={schedulingModalOpen}
+        onOpenChange={setSchedulingModalOpen}
       />
 
       {selectedRoof && (
