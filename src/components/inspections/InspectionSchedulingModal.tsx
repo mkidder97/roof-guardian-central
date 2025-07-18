@@ -1252,12 +1252,9 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                                 PM: {property.property_manager_name || 'Not assigned'} • Last Inspection: {property.last_inspection_date || 'Never'}
                               </div>
                             </div>
-                            <div className="text-right">
-                              <div className="text-sm font-medium">{property.roof_area?.toLocaleString() || 'N/A'} sq ft</div>
-                              <Badge variant={property.warranty_status === 'active' ? 'default' : 'destructive'}>
-                                {property.warranty_status}
-                              </Badge>
-                            </div>
+                             <div className="text-right">
+                               <div className="text-sm font-medium">{property.roof_area?.toLocaleString() || 'N/A'} sq ft</div>
+                             </div>
                           </div>
                         ))
                       )}
