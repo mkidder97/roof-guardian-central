@@ -30,7 +30,37 @@ const webhookConfig = {
   retryAttempts: 3
 };
 
-// Zod schemas for validation
+// Enhanced Zod schemas with proper null handling
+const webhookPropertySchema = z.object({
+  id: z.string(),
+  property_name: z.string(),
+  address: z.string(),
+  city: z.string(),
+  state: z.string(),
+  zip: z.string().optional(),
+  market: z.string().optional(),
+  property_manager_name: z.string().optional(),
+  property_manager_email: z.string().optional(),
+  property_manager_phone: z.string().optional(),
+  site_contact_name: z.string().optional(),
+  site_contact_phone: z.string().optional(),
+  roof_access: z.string().optional(),
+  roof_area: z.number().optional(),
+  roof_type: z.string().optional(),
+  last_inspection_date: z.string().optional(),
+  warranty_status: z.string().optional(),
+});
+
+const webhookPayloadSchema = z.object({
+  selectedProperties: z.array(webhookPropertySchema),
+  filters: z.object({
+    clientId: z.string().optional(),
+    region: z.string().optional(),
+    market: z.string().optional(),
+    inspectionType: z.string(),
+  }),
+});
+
 const webhookResponseSchema = z.object({
   success: z.boolean(),
   message: z.string(),
@@ -42,34 +72,6 @@ const webhookResponseSchema = z.object({
     pmEmail: z.string(),
     estimatedCompletion: z.string().optional(),
   }).optional(),
-});
-
-const webhookPayloadSchema = z.object({
-  selectedProperties: z.array(z.object({
-    id: z.string(),
-    property_name: z.string(),
-    address: z.string(),
-    city: z.string(),
-    state: z.string(),
-    zip: z.string().optional(),
-    market: z.string().optional(),
-    property_manager_name: z.string().optional(),
-    property_manager_email: z.string().optional(),
-    property_manager_phone: z.string().optional(),
-    site_contact_name: z.string().optional(),
-    site_contact_phone: z.string().optional(),
-    roof_access: z.string().optional(),
-    roof_area: z.number().optional(),
-    roof_type: z.string().optional(),
-    last_inspection_date: z.string().optional(),
-    warranty_status: z.string().optional(),
-  })),
-  filters: z.object({
-    clientId: z.string().optional(),
-    region: z.string().optional(),
-    market: z.string().optional(),
-    inspectionType: z.string(),
-  }),
 });
 
 enum WorkflowSteps {
@@ -142,6 +144,48 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
   // Debounce timer for auto-fetching properties
   const fetchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Helper function to convert null values to undefined for Zod validation
+  const sanitizeProperty = (property: any) => {
+    const sanitized = {
+      id: String(property.id || ''),
+      property_name: String(property.property_name || ''),
+      address: String(property.address || ''),
+      city: String(property.city || ''),
+      state: String(property.state || ''),
+      zip: property.zip === null ? undefined : String(property.zip || ''),
+      market: property.market === null ? undefined : String(property.market || ''),
+      property_manager_name: property.property_manager_name === null ? undefined : String(property.property_manager_name || ''),
+      property_manager_email: property.property_manager_email === null ? undefined : String(property.property_manager_email || ''),
+      property_manager_phone: property.property_manager_phone === null ? undefined : String(property.property_manager_phone || ''),
+      site_contact_name: property.site_contact_name === null ? undefined : String(property.site_contact_name || ''),
+      site_contact_phone: property.site_contact_phone === null ? undefined : String(property.site_contact_phone || ''),
+      roof_access: property.roof_access === null ? undefined : String(property.roof_access || ''),
+      roof_area: property.roof_area === null ? undefined : Number(property.roof_area),
+      roof_type: property.roof_type === null ? undefined : String(property.roof_type || ''),
+      last_inspection_date: property.last_inspection_date === null ? undefined : String(property.last_inspection_date || ''),
+      warranty_status: property.warranty_status === null ? undefined : String(property.warranty_status || ''),
+    };
+
+    console.log('Sanitizing property:', {
+      original: {
+        id: property.id,
+        property_name: property.property_name,
+        zip: property.zip,
+        market: property.market,
+        property_manager_name: property.property_manager_name,
+      },
+      sanitized: {
+        id: sanitized.id,
+        property_name: sanitized.property_name,
+        zip: sanitized.zip,
+        market: sanitized.market,
+        property_manager_name: sanitized.property_manager_name,
+      }
+    });
+
+    return sanitized;
+  };
 
   useEffect(() => {
     if (open) {
@@ -516,10 +560,36 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
 
   const isPayloadValid = (payload: any): boolean => {
     try {
-      webhookPayloadSchema.parse(payload);
+      console.log('Validating payload structure:', {
+        selectedPropertiesCount: payload.selectedProperties?.length,
+        filters: payload.filters,
+        sampleProperty: payload.selectedProperties?.[0]
+      });
+
+      const result = webhookPayloadSchema.parse(payload);
+      console.log('Payload validation successful:', result);
       return true;
     } catch (error) {
       console.error('Payload validation failed:', error);
+      if (error instanceof z.ZodError) {
+        console.error('Detailed validation errors:', error.errors);
+        
+        // Log specific field errors for debugging
+        error.errors.forEach((err, index) => {
+          console.error(`Validation Error ${index + 1}:`, {
+            path: err.path.join('.'),
+            message: err.message,
+            received: err.received,
+            expected: err.expected
+          });
+        });
+        
+        toast({
+          title: "Payload Validation Failed",
+          description: `Field validation error: ${error.errors[0]?.path.join('.')} - ${error.errors[0]?.message}`,
+          variant: "destructive",
+        });
+      }
       return false;
     }
   };
@@ -667,33 +737,28 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
       // Step 2: Validating payload
       updateProgress(WorkflowSteps.VALIDATING, 25);
       
+      console.log('Raw selected properties before sanitization:', selectedProperties.slice(0, 2));
+      
+      // Sanitize properties to ensure proper data types and null handling
+      const sanitizedProperties = selectedProperties.map(sanitizeProperty);
+      
+      console.log('Sanitized properties sample:', sanitizedProperties.slice(0, 2));
+      
       const payload = {
-        selectedProperties: selectedProperties.map(property => ({
-          id: property.id,
-          property_name: property.property_name,
-          address: property.address,
-          city: property.city,
-          state: property.state,
-          zip: property.zip,
-          market: property.market,
-          property_manager_name: property.property_manager_name,
-          property_manager_email: property.property_manager_email,
-          property_manager_phone: property.property_manager_phone,
-          site_contact_name: property.site_contact_name,
-          site_contact_phone: property.site_contact_phone,
-          roof_access: property.roof_access,
-          roof_area: property.roof_area,
-          roof_type: property.roof_type,
-          last_inspection_date: property.last_inspection_date,
-          warranty_status: property.warranty_status,
-        })),
+        selectedProperties: sanitizedProperties,
         filters: {
-          clientId: filters.clientId,
-          region: filters.region,
-          market: filters.market,
-          inspectionType: filters.inspectionType,
+          clientId: filters.clientId === 'all' ? undefined : filters.clientId,
+          region: filters.region || undefined,
+          market: filters.market || undefined,
+          inspectionType: filters.inspectionType || 'annual', // Ensure this is always set
         },
       };
+
+      console.log('Final payload structure:', {
+        selectedPropertiesCount: payload.selectedProperties.length,
+        filters: payload.filters,
+        sampleProperty: payload.selectedProperties[0]
+      });
 
       // Validate payload size (max 10MB)
       const payloadSize = new Blob([JSON.stringify(payload)]).size;
@@ -702,7 +767,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
       }
 
       if (!isPayloadValid(payload)) {
-        throw new Error('Invalid payload data. Please check your selections.');
+        throw new Error('Invalid payload data. Please check your selections and try again.');
       }
 
       console.log("Sending payload to n8n webhook:", payload);
@@ -851,6 +916,9 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
         } else if (error.message.includes('cancelled')) {
           errorTitle = "Request Cancelled";
           errorDescription = "The workflow was cancelled by the user.";
+        } else if (error.message.includes('Invalid payload data')) {
+          errorTitle = "Data Validation Error";
+          errorDescription = "Some property data is invalid. Please check your selections and try again.";
         } else {
           errorDescription = error.message;
         }
