@@ -340,10 +340,13 @@ export function AnalysisTab() {
     const managerProperties = new Map<string, any[]>();
 
     roofs.forEach(property => {
+      console.log('Processing property:', property.property_name, 'Assignments:', property.property_contact_assignments);
       if (property.property_contact_assignments?.length > 0) {
         property.property_contact_assignments.forEach((assignment: any) => {
+          console.log('Assignment:', assignment, 'Contact role:', assignment.client_contacts?.role);
           if (assignment.client_contacts?.role === 'property_manager') {
             const managerName = `${assignment.client_contacts.first_name} ${assignment.client_contacts.last_name}`;
+            console.log('Found property manager:', managerName);
             if (!managerProperties.has(managerName)) {
               managerProperties.set(managerName, []);
             }
@@ -352,6 +355,8 @@ export function AnalysisTab() {
         });
       }
     });
+
+    console.log('Manager properties map:', managerProperties);
 
     managerProperties.forEach((properties, managerName) => {
       const totalSqFt = properties.reduce((sum, p) => sum + (p.roof_area || 0), 0);
