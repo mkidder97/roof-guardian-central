@@ -105,6 +105,32 @@ Deno.serve(async (req) => {
               clientId = newClient.id;
               clientMap.set(customerKey, clientId);
               result.clientsCreated++;
+
+              // Create site contact if available
+              if (roofData.site_contact) {
+                const nameParts = roofData.site_contact.split(' ');
+                const firstName = nameParts[0] || roofData.site_contact;
+                const lastName = nameParts.slice(1).join(' ') || '';
+
+                const { error: contactError } = await supabase
+                  .from('client_contacts')
+                  .insert({
+                    client_id: clientId,
+                    first_name: firstName,
+                    last_name: lastName,
+                    email: roofData.site_contact_email,
+                    office_phone: roofData.site_contact_office_phone,
+                    mobile_phone: roofData.site_contact_mobile_phone,
+                    role: 'site_contact',
+                    is_primary: true,
+                    is_active: true
+                  });
+
+                if (contactError) {
+                  console.error('Error creating contact:', contactError);
+                  // Don't fail the whole import for contact creation errors
+                }
+              }
             }
           }
         }
