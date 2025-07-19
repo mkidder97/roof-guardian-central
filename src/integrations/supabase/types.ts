@@ -14,6 +14,71 @@ export type Database = {
   }
   public: {
     Tables: {
+      campaign_communications: {
+        Row: {
+          campaign_id: string | null
+          cc_emails: string[] | null
+          communication_type: string | null
+          created_at: string | null
+          direction: string | null
+          from_email: string | null
+          gmail_message_id: string | null
+          gmail_thread_id: string | null
+          id: string
+          message_content: string | null
+          read_at: string | null
+          received_at: string | null
+          sent_at: string | null
+          subject: string | null
+          to_email: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          campaign_id?: string | null
+          cc_emails?: string[] | null
+          communication_type?: string | null
+          created_at?: string | null
+          direction?: string | null
+          from_email?: string | null
+          gmail_message_id?: string | null
+          gmail_thread_id?: string | null
+          id?: string
+          message_content?: string | null
+          read_at?: string | null
+          received_at?: string | null
+          sent_at?: string | null
+          subject?: string | null
+          to_email?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          campaign_id?: string | null
+          cc_emails?: string[] | null
+          communication_type?: string | null
+          created_at?: string | null
+          direction?: string | null
+          from_email?: string | null
+          gmail_message_id?: string | null
+          gmail_thread_id?: string | null
+          id?: string
+          message_content?: string | null
+          read_at?: string | null
+          received_at?: string | null
+          sent_at?: string | null
+          subject?: string | null
+          to_email?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "campaign_communications_campaign_id_fkey"
+            columns: ["campaign_id"]
+            isOneToOne: false
+            referencedRelation: "inspection_campaigns"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       campaign_properties: {
         Row: {
           automation_data: Json | null
