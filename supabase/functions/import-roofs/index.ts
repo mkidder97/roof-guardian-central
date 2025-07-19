@@ -1,3 +1,4 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
@@ -11,8 +12,10 @@ interface ExcelRow {
 
 interface ImportResult {
   success: number;
+  updated: number;
   errors: Array<{ row: number; error: string }>;
   clientsCreated: number;
+  propertyManagerAssignments: number;
 }
 
 Deno.serve(async (req) => {
@@ -33,12 +36,16 @@ Deno.serve(async (req) => {
 
     const result: ImportResult = {
       success: 0,
+      updated: 0,
       errors: [],
-      clientsCreated: 0
+      clientsCreated: 0,
+      propertyManagerAssignments: 0
     };
 
-    // Create a map to track existing clients
+    // Create maps to track existing data
     const clientMap = new Map<string, string>();
+    const propertyManagerMap = new Map<string, any>();
+    const existingPropertiesMap = new Map<string, any>();
     
     // Get existing clients
     const { data: existingClients } = await supabase
@@ -48,6 +55,41 @@ Deno.serve(async (req) => {
     if (existingClients) {
       existingClients.forEach(client => {
         clientMap.set(client.company_name.toLowerCase(), client.id);
+      });
+    }
+
+    // Get existing property managers from client_contacts
+    const { data: propertyManagers } = await supabase
+      .from('client_contacts')
+      .select('id, first_name, last_name, email, client_id')
+      .eq('role', 'property_manager');
+
+    if (propertyManagers) {
+      propertyManagers.forEach(pm => {
+        const fullName = `${pm.first_name} ${pm.last_name}`.toLowerCase();
+        const firstName = pm.first_name.toLowerCase();
+        propertyManagerMap.set(fullName, pm);
+        propertyManagerMap.set(firstName, pm); // Also match by first name only
+        if (pm.email) {
+          propertyManagerMap.set(pm.email.toLowerCase(), pm);
+        }
+      });
+    }
+
+    // Get existing properties to detect duplicates
+    const { data: existingProperties } = await supabase
+      .from('roofs')
+      .select('id, property_name, address, property_code')
+      .or('is_deleted.is.null,is_deleted.eq.false');
+
+    if (existingProperties) {
+      existingProperties.forEach(prop => {
+        // Create multiple keys for matching
+        const nameAddressKey = `${prop.property_name}_${prop.address}`.toLowerCase();
+        if (prop.property_code) {
+          existingPropertiesMap.set(prop.property_code.toLowerCase(), prop);
+        }
+        existingPropertiesMap.set(nameAddressKey, prop);
       });
     }
 
@@ -66,6 +108,17 @@ Deno.serve(async (req) => {
             error: 'Missing required fields: Property Name or Address'
           });
           continue;
+        }
+
+        // Check if property already exists
+        const nameAddressKey = `${roofData.property_name}_${roofData.address}`.toLowerCase();
+        const propertyCodeKey = roofData.property_code?.toLowerCase();
+        
+        let existingProperty = null;
+        if (propertyCodeKey && existingPropertiesMap.has(propertyCodeKey)) {
+          existingProperty = existingPropertiesMap.get(propertyCodeKey);
+        } else if (existingPropertiesMap.has(nameAddressKey)) {
+          existingProperty = existingPropertiesMap.get(nameAddressKey);
         }
 
         // Handle client creation/lookup
@@ -105,52 +158,100 @@ Deno.serve(async (req) => {
               clientId = newClient.id;
               clientMap.set(customerKey, clientId);
               result.clientsCreated++;
-
-              // Create site contact if available
-              if (roofData.site_contact) {
-                const nameParts = roofData.site_contact.split(' ');
-                const firstName = nameParts[0] || roofData.site_contact;
-                const lastName = nameParts.slice(1).join(' ') || '';
-
-                const { error: contactError } = await supabase
-                  .from('client_contacts')
-                  .insert({
-                    client_id: clientId,
-                    first_name: firstName,
-                    last_name: lastName,
-                    email: roofData.site_contact_email,
-                    office_phone: roofData.site_contact_office_phone,
-                    mobile_phone: roofData.site_contact_mobile_phone,
-                    role: 'site_contact',
-                    is_primary: true,
-                    is_active: true
-                  });
-
-                if (contactError) {
-                  console.error('Error creating contact:', contactError);
-                  // Don't fail the whole import for contact creation errors
-                }
-              }
             }
           }
         }
 
-        // Insert roof data
-        const { error: roofError } = await supabase
-          .from('roofs')
-          .insert({
-            ...roofData,
-            client_id: clientId
-          });
+        // Enhanced property manager matching
+        let propertyManagerInfo = null;
+        const pmFields = ['property_manager_name', 'site_contact'];
+        
+        for (const field of pmFields) {
+          if (roofData[field]) {
+            const pmName = roofData[field].toLowerCase().trim();
+            // Try exact match first
+            if (propertyManagerMap.has(pmName)) {
+              propertyManagerInfo = propertyManagerMap.get(pmName);
+              break;
+            }
+            // Try partial matches
+            for (const [key, pm] of propertyManagerMap.entries()) {
+              if (key.includes(pmName) || pmName.includes(key)) {
+                propertyManagerInfo = pm;
+                break;
+              }
+            }
+            if (propertyManagerInfo) break;
+          }
+        }
 
-        if (roofError) {
-          console.error('Error inserting roof:', roofError);
-          result.errors.push({
-            row: rowNumber,
-            error: `Failed to insert roof: ${roofError.message}`
-          });
+        // Set property manager fields if found
+        if (propertyManagerInfo) {
+          roofData.property_manager_name = `${propertyManagerInfo.first_name} ${propertyManagerInfo.last_name}`;
+          roofData.property_manager_email = propertyManagerInfo.email;
+        }
+
+        roofData.client_id = clientId;
+
+        if (existingProperty) {
+          // UPDATE existing property
+          console.log(`Updating existing property: ${roofData.property_name}`);
+          
+          // Filter out null/undefined values to avoid overwriting existing data with blanks
+          const updateData = Object.fromEntries(
+            Object.entries(roofData).filter(([_, value]) => value !== null && value !== undefined && value !== '')
+          );
+
+          const { error: updateError } = await supabase
+            .from('roofs')
+            .update(updateData)
+            .eq('id', existingProperty.id);
+
+          if (updateError) {
+            console.error('Error updating roof:', updateError);
+            result.errors.push({
+              row: rowNumber,
+              error: `Failed to update roof: ${updateError.message}`
+            });
+          } else {
+            result.updated++;
+            
+            // Handle property manager assignment
+            if (propertyManagerInfo) {
+              await handlePropertyManagerAssignment(supabase, existingProperty.id, propertyManagerInfo.id);
+              result.propertyManagerAssignments++;
+            }
+          }
         } else {
-          result.success++;
+          // INSERT new property
+          console.log(`Creating new property: ${roofData.property_name}`);
+          
+          const { data: newRoof, error: roofError } = await supabase
+            .from('roofs')
+            .insert(roofData)
+            .select('id')
+            .single();
+
+          if (roofError) {
+            console.error('Error inserting roof:', roofError);
+            result.errors.push({
+              row: rowNumber,
+              error: `Failed to insert roof: ${roofError.message}`
+            });
+          } else {
+            result.success++;
+            
+            // Handle property manager assignment
+            if (propertyManagerInfo && newRoof) {
+              await handlePropertyManagerAssignment(supabase, newRoof.id, propertyManagerInfo.id);
+              result.propertyManagerAssignments++;
+            }
+
+            // Create site contact if available and no property manager was matched
+            if (roofData.site_contact && !propertyManagerInfo && clientId) {
+              await createSiteContact(supabase, clientId, roofData);
+            }
+          }
         }
 
       } catch (error) {
@@ -162,7 +263,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    console.log(`Import completed: ${result.success} successes, ${result.errors.length} errors, ${result.clientsCreated} clients created`);
+    console.log(`Import completed: ${result.success} created, ${result.updated} updated, ${result.errors.length} errors, ${result.clientsCreated} clients created, ${result.propertyManagerAssignments} PM assignments`);
 
     return new Response(JSON.stringify(result), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -179,6 +280,63 @@ Deno.serve(async (req) => {
     );
   }
 });
+
+async function handlePropertyManagerAssignment(supabase: any, roofId: string, contactId: string) {
+  try {
+    // Check if assignment already exists
+    const { data: existing } = await supabase
+      .from('property_contact_assignments')
+      .select('id')
+      .eq('roof_id', roofId)
+      .eq('contact_id', contactId)
+      .eq('assignment_type', 'property_manager')
+      .single();
+
+    if (!existing) {
+      // Create new assignment
+      await supabase
+        .from('property_contact_assignments')
+        .insert({
+          roof_id: roofId,
+          contact_id: contactId,
+          assignment_type: 'property_manager',
+          is_active: true
+        });
+    }
+  } catch (error) {
+    console.error('Error handling property manager assignment:', error);
+  }
+}
+
+async function createSiteContact(supabase: any, clientId: string, roofData: any) {
+  try {
+    if (roofData.site_contact) {
+      const nameParts = roofData.site_contact.split(' ');
+      const firstName = nameParts[0] || roofData.site_contact;
+      const lastName = nameParts.slice(1).join(' ') || '';
+
+      const { error: contactError } = await supabase
+        .from('client_contacts')
+        .insert({
+          client_id: clientId,
+          first_name: firstName,
+          last_name: lastName,
+          email: roofData.site_contact_email,
+          office_phone: roofData.site_contact_office_phone,
+          mobile_phone: roofData.site_contact_mobile_phone,
+          role: 'site_contact',
+          is_primary: true,
+          is_active: true
+        });
+
+      if (contactError) {
+        console.error('Error creating contact:', contactError);
+      }
+    }
+  } catch (error) {
+    console.error('Error creating site contact:', error);
+  }
+}
 
 function mapExcelRowToRoof(headers: string[], row: any[]): any {
   const data: any = {};
@@ -234,7 +392,6 @@ function mapExcelRowToRoof(headers: string[], row: any[]): any {
     'Capital Budget Year': 'capital_budget_year',
     'Capital Budget Estimated': 'capital_budget_estimated',
     'Capital Budget Actual': 'capital_budget_actual',
-    'Capital Budge tCompleted': 'capital_budget_completed',
     'Capital Budget Completed': 'capital_budget_completed',
     'Capital Budget Category': 'capital_budget_category',
     'Capital Budget ScopeOfWork': 'capital_budget_scope_of_work',
@@ -245,7 +402,15 @@ function mapExcelRowToRoof(headers: string[], row: any[]): any {
     'Preventative Budget Category': 'preventative_budget_category',
     'Preventative Budget Scope Of Work': 'preventative_budget_scope_of_work',
     'Total Leaks 12 mo': 'total_leaks_12mo',
-    'Total Leak Expense 12mo': 'total_leak_expense_12mo'
+    'Total Leak Expense 12mo': 'total_leak_expense_12mo',
+    'Property Manager': 'property_manager_name',
+    'Property Manager Name': 'property_manager_name',
+    'Property Manager Email': 'property_manager_email',
+    'Property Manager Phone': 'property_manager_phone',
+    'Asset Manager': 'asset_manager_name',
+    'Asset Manager Name': 'asset_manager_name',
+    'Asset Manager Email': 'asset_manager_email',
+    'Asset Manager Phone': 'asset_manager_phone'
   };
 
   // Map the data
@@ -254,9 +419,11 @@ function mapExcelRowToRoof(headers: string[], row: any[]): any {
     if (dbColumn && value !== null && value !== undefined && value !== '') {
       // Handle specific data type conversions
       if (dbColumn === 'zip' || dbColumn === 'install_year') {
-        data[dbColumn] = parseInt(value);
+        const numValue = parseInt(value);
+        if (!isNaN(numValue)) data[dbColumn] = numValue;
       } else if (dbColumn === 'roof_area' || dbColumn.includes('budget_estimated') || dbColumn.includes('budget_year')) {
-        data[dbColumn] = parseFloat(value);
+        const numValue = parseFloat(value);
+        if (!isNaN(numValue)) data[dbColumn] = numValue;
       } else if (dbColumn.includes('warranty_expiration')) {
         // Handle date conversion
         if (value instanceof Date) {

@@ -1,3 +1,4 @@
+
 import { useState, useRef } from "react";
 import { Upload, FileSpreadsheet, AlertCircle, CheckCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -16,8 +17,10 @@ interface ExcelImportDialogProps {
 
 interface ImportResult {
   success: number;
+  updated: number;
   errors: Array<{ row: number; error: string }>;
   clientsCreated: number;
+  propertyManagerAssignments: number;
 }
 
 export function ExcelImportDialog({ open, onOpenChange, onImportComplete }: ExcelImportDialogProps) {
@@ -75,9 +78,25 @@ export function ExcelImportDialog({ open, onOpenChange, onImportComplete }: Exce
       setProgress(100);
       setImportResult(result);
       
+      const totalProcessed = (result.success || 0) + (result.updated || 0);
+      const toastMessage = [];
+      
+      if (result.success > 0) {
+        toastMessage.push(`${result.success} new properties created`);
+      }
+      if (result.updated > 0) {
+        toastMessage.push(`${result.updated} properties updated`);
+      }
+      if (result.clientsCreated > 0) {
+        toastMessage.push(`${result.clientsCreated} new clients created`);
+      }
+      if (result.propertyManagerAssignments > 0) {
+        toastMessage.push(`${result.propertyManagerAssignments} property manager assignments made`);
+      }
+
       toast({
         title: "Import completed",
-        description: `Successfully imported ${result.success} roofs. ${result.clientsCreated} new clients created.`,
+        description: toastMessage.join(', '),
       });
 
       onImportComplete();
@@ -116,7 +135,7 @@ export function ExcelImportDialog({ open, onOpenChange, onImportComplete }: Exce
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileSpreadsheet className="h-5 w-5" />
-            Import Roofs from Excel
+            Import & Update Properties from Excel
           </DialogTitle>
         </DialogHeader>
 
@@ -132,8 +151,11 @@ export function ExcelImportDialog({ open, onOpenChange, onImportComplete }: Exce
               <p className="text-sm text-muted-foreground mb-2">
                 Drag and drop your Excel file here, or click to browse
               </p>
-              <p className="text-xs text-muted-foreground">
+              <p className="text-xs text-muted-foreground mb-2">
                 Supports .xlsx and .xls files
+              </p>
+              <p className="text-xs text-blue-600">
+                ✓ Creates new properties • ✓ Updates existing properties • ✓ Assigns property managers
               </p>
               <input
                 ref={fileInputRef}
@@ -159,8 +181,15 @@ export function ExcelImportDialog({ open, onOpenChange, onImportComplete }: Exce
               <Alert>
                 <CheckCircle className="h-4 w-4" />
                 <AlertDescription>
-                  Import completed successfully! {importResult.success} roofs imported.
-                  {importResult.clientsCreated > 0 && ` ${importResult.clientsCreated} new clients created.`}
+                  <div className="space-y-1">
+                    <div className="font-medium">Import completed successfully!</div>
+                    <div className="text-sm space-y-1">
+                      {importResult.success > 0 && <div>• {importResult.success} new properties created</div>}
+                      {importResult.updated > 0 && <div>• {importResult.updated} existing properties updated</div>}
+                      {importResult.clientsCreated > 0 && <div>• {importResult.clientsCreated} new clients created</div>}
+                      {importResult.propertyManagerAssignments > 0 && <div>• {importResult.propertyManagerAssignments} property manager assignments made</div>}
+                    </div>
+                  </div>
                 </AlertDescription>
               </Alert>
 
