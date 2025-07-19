@@ -10,11 +10,12 @@ import { Progress } from '@/components/ui/progress';
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Search, Calendar, CheckCircle, X, FileDown, Filter, MapPin, AlertCircle } from 'lucide-react';
+import { Search, Calendar, CheckCircle, X, FileDown, Filter, MapPin, AlertCircle, User } from 'lucide-react';
 
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { useN8nWorkflow, type CampaignWorkflowData, type ProcessingResult } from '@/hooks/useN8nWorkflow';
+import { useInspectors, type Inspector } from '@/hooks/useInspectors';
 
 interface Property {
   id: string;
@@ -75,7 +76,8 @@ interface WorkflowProgress {
 
 export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSchedulingModalProps) {
   const { toast } = useToast();
-  const { processCampaignsBatch } = useN8nWorkflow(); // Use batch processing instead of sequential
+  const { processCampaignsBatch } = useN8nWorkflow();
+  const { inspectors, loading: inspectorsLoading } = useInspectors();
   
   const [properties, setProperties] = useState<Property[]>([]);
   const [filteredProperties, setFilteredProperties] = useState<Property[]>([]);
@@ -104,6 +106,10 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
   });
 
   const itemsPerPage = 50;
+
+  // New inspector-related state
+  const [selectedInspector, setSelectedInspector] = useState<Inspector | null>(null);
+  const [propertyInspectorOverrides, setPropertyInspectorOverrides] = useState<Record<string, Inspector>>({});
 
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
@@ -148,10 +154,23 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     setCurrentPage(1);
   }, [properties, searchTerm]);
 
+  // Set default inspector (Michael Kidder) when inspectors load
+  useEffect(() => {
+    if (inspectors.length > 0 && !selectedInspector) {
+      const defaultInspector = inspectors.find(inspector => 
+        inspector.email === 'mkidder@southernroof.biz'
+      ) || inspectors[0]; // Fallback to first inspector if Michael not found
+      
+      setSelectedInspector(defaultInspector);
+    }
+  }, [inspectors, selectedInspector]);
+
   const resetModalState = () => {
     setSelectedProperties([]);
     setSearchTerm('');
     setCurrentPage(1);
+    setSelectedInspector(null);
+    setPropertyInspectorOverrides({});
     setWorkflowProgress({
       isProcessing: false,
       currentCampaign: '',
@@ -360,6 +379,15 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
       return;
     }
 
+    if (!selectedInspector) {
+      toast({
+        title: "No Inspector Selected",
+        description: "Please select an inspector for this campaign.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     // Group properties by property manager with enhanced validation
     const propertiesByManager = selectedProperties.reduce((groups, property) => {
       const pmEmail = property.property_manager_email;
@@ -401,7 +429,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
       return;
     }
 
-    // Create campaign data for each property manager
+    // Create enhanced campaign data for each property manager
     const campaignsToProcess: CampaignWorkflowData[] = [];
     
     for (const [pmEmail, properties] of Object.entries(propertiesByManager)) {
@@ -415,24 +443,40 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
         property_manager_email: pmEmail,
         region: filters.region === 'all' ? properties[0].region : filters.region,
         market: filters.market === 'all' ? properties[0].market : filters.market,
-        properties: properties.map(prop => ({
-          roof_id: prop.id,
-          property_name: prop.property_name,
-          address: `${prop.address}, ${prop.city}, ${prop.state}`
-        }))
+        // Include inspector information
+        inspector_id: selectedInspector.id,
+        inspector_name: selectedInspector.full_name,
+        inspector_email: selectedInspector.email,
+        properties: properties.map(prop => {
+          const propertyInspector = propertyInspectorOverrides[prop.id] || selectedInspector;
+          return {
+            roof_id: prop.id,
+            property_name: prop.property_name,
+            address: `${prop.address}, ${prop.city}, ${prop.state}`,
+            // Include property-level inspector override if different from campaign default
+            inspector_id: propertyInspector.id !== selectedInspector.id ? propertyInspector.id : undefined,
+            inspector_email: propertyInspector.id !== selectedInspector.id ? propertyInspector.email : undefined,
+          };
+        })
       };
 
       campaignsToProcess.push(campaignData);
     }
 
-    console.log(`About to process ${campaignsToProcess.length} campaigns as a batch:`, 
-      campaignsToProcess.map(c => ({ name: c.campaign_name, email: c.property_manager_email, count: c.properties.length }))
+    console.log(`About to process ${campaignsToProcess.length} campaigns as a batch with inspector assignments:`, 
+      campaignsToProcess.map(c => ({ 
+        name: c.campaign_name, 
+        email: c.property_manager_email, 
+        inspector: c.inspector_name,
+        inspector_email: c.inspector_email,
+        count: c.properties.length 
+      }))
     );
 
     // Initialize progress tracking for batch processing
     setWorkflowProgress({
       isProcessing: true,
-      currentCampaign: 'Processing campaign batch...',
+      currentCampaign: 'Processing campaign batch with inspector assignments...',
       processedCount: 0,
       totalCount: 1, // Single batch operation
       results: []
@@ -453,7 +497,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
       if (results.failed.length === 0) {
         toast({
           title: "Batch Campaign Created Successfully!",
-          description: `Successfully created campaigns for ${results.successful.length} property managers: ${results.successful.map(r => r.campaignData.property_manager_email).join(', ')}`,
+          description: `Successfully created campaigns for ${results.successful.length} property managers with inspector ${selectedInspector.full_name} assigned.`,
         });
       } else if (results.successful.length > 0) {
         toast({
@@ -510,6 +554,21 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     window.URL.revokeObjectURL(url);
   };
 
+  const handlePropertyInspectorOverride = (propertyId: string, inspector: Inspector | null) => {
+    if (inspector && inspector.id !== selectedInspector?.id) {
+      setPropertyInspectorOverrides(prev => ({
+        ...prev,
+        [propertyId]: inspector
+      }));
+    } else {
+      setPropertyInspectorOverrides(prev => {
+        const newOverrides = { ...prev };
+        delete newOverrides[propertyId];
+        return newOverrides;
+      });
+    }
+  };
+
   const filteredAndPaginatedProperties = {
     properties: filteredProperties.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage),
     totalPages: Math.ceil(filteredProperties.length / itemsPerPage),
@@ -529,106 +588,156 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
               <div className="space-y-4 h-full flex flex-col">
                 
+              {/* Enhanced Filter Card with Inspector Selection */}
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center space-x-2">
                     <Filter className="h-4 w-4" />
-                    <span>Filter Properties</span>
+                    <span>Campaign Settings & Filters</span>
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                    <Select value={filters.region} onValueChange={(value) => setFilters(prev => ({ ...prev, region: value }))}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Region" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Regions</SelectItem>
-                        <SelectItem value="Central">Central</SelectItem>
-                        <SelectItem value="East">East</SelectItem>
-                        <SelectItem value="West">West</SelectItem>
-                        <SelectItem value="North">North</SelectItem>
-                        <SelectItem value="South">South</SelectItem>
-                      </SelectContent>
-                    </Select>
-
-                    <Select value={filters.market} onValueChange={(value) => setFilters(prev => ({ ...prev, market: value }))}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Market" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Markets</SelectItem>
-                        <SelectItem value="Dallas">Dallas</SelectItem>
-                        <SelectItem value="Houston">Houston</SelectItem>
-                        <SelectItem value="Austin">Austin</SelectItem>
-                        <SelectItem value="San Antonio">San Antonio</SelectItem>
-                      </SelectContent>
-                    </Select>
-
-                    <Select value={filters.inspectionType} onValueChange={(value) => setFilters(prev => ({ ...prev, inspectionType: value }))}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Inspection Type" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="annual">Annual</SelectItem>
-                        <SelectItem value="preventative">Preventative</SelectItem>
-                        <SelectItem value="emergency">Emergency</SelectItem>
-                      </SelectContent>
-                    </Select>
-
-                    <div className="space-y-2">
-                      <label className="text-sm font-medium">Zipcodes</label>
-                      <div className="border rounded-md p-2 max-h-32 overflow-y-auto">
-                        <div className="space-y-1">
-                          <div className="flex items-center space-x-2">
-                            <Checkbox
-                              id="all-zipcodes"
-                              checked={filters.zipcodes.length === 0}
-                              onCheckedChange={(checked) => {
-                                if (checked) {
-                                  setFilters(prev => ({ ...prev, zipcodes: [] }));
-                                }
-                              }}
-                            />
-                            <label htmlFor="all-zipcodes" className="text-sm cursor-pointer">
-                              All Zipcodes
-                            </label>
-                          </div>
-                          {availableZipcodes.map((zipcode) => (
-                            <div key={zipcode} className="flex items-center space-x-2">
-                              <Checkbox
-                                id={`zipcode-${zipcode}`}
-                                checked={filters.zipcodes.includes(zipcode)}
-                                onCheckedChange={(checked) => {
-                                  if (checked) {
-                                    setFilters(prev => ({ ...prev, zipcodes: [...prev.zipcodes, zipcode] }));
-                                  } else {
-                                    setFilters(prev => ({ ...prev, zipcodes: prev.zipcodes.filter(z => z !== zipcode) }));
-                                  }
-                                }}
-                              />
-                              <label htmlFor={`zipcode-${zipcode}`} className="text-sm cursor-pointer">
-                                {zipcode}
-                              </label>
-                            </div>
-                          ))}
-                        </div>
+                  <div className="space-y-4">
+                    {/* Inspector Selection Section */}
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-blue-50 rounded-lg border">
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium flex items-center space-x-2">
+                          <User className="h-4 w-4" />
+                          <span>Assigned Inspector (Campaign Default)</span>
+                        </label>
+                        <Select
+                          value={selectedInspector?.id || ''}
+                          onValueChange={(value) => {
+                            const inspector = inspectors.find(i => i.id === value);
+                            setSelectedInspector(inspector || null);
+                          }}
+                          disabled={inspectorsLoading}
+                        >
+                          <SelectTrigger>
+                            <SelectValue placeholder={inspectorsLoading ? "Loading inspectors..." : "Select inspector"} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {inspectors.map((inspector) => (
+                              <SelectItem key={inspector.id} value={inspector.id}>
+                                <div className="flex flex-col">
+                                  <span className="font-medium">{inspector.full_name}</span>
+                                  <span className="text-xs text-gray-500">{inspector.email}</span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
                       </div>
-                      {filters.zipcodes.length > 0 && (
-                        <div className="text-xs text-gray-600">
-                          {filters.zipcodes.length} zipcode{filters.zipcodes.length !== 1 ? 's' : ''} selected
+                      
+                      {selectedInspector && (
+                        <div className="space-y-2">
+                          <label className="text-sm font-medium">Selected Inspector</label>
+                          <div className="p-3 bg-white rounded border">
+                            <div className="font-medium">{selectedInspector.full_name}</div>
+                            <div className="text-sm text-gray-600">{selectedInspector.email}</div>
+                            <Badge variant="secondary" className="text-xs mt-1">
+                              Default for all properties
+                            </Badge>
+                          </div>
                         </div>
                       )}
                     </div>
 
-                    <Button onClick={fetchProperties} className="w-full">
-                      Apply Filters
-                    </Button>
+                    {/* Property Filters */}
+                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                      <Select value={filters.region} onValueChange={(value) => setFilters(prev => ({ ...prev, region: value }))}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Region" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Regions</SelectItem>
+                          <SelectItem value="Central">Central</SelectItem>
+                          <SelectItem value="East">East</SelectItem>
+                          <SelectItem value="West">West</SelectItem>
+                          <SelectItem value="North">North</SelectItem>
+                          <SelectItem value="South">South</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      <Select value={filters.market} onValueChange={(value) => setFilters(prev => ({ ...prev, market: value }))}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Market" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Markets</SelectItem>
+                          <SelectItem value="Dallas">Dallas</SelectItem>
+                          <SelectItem value="Houston">Houston</SelectItem>
+                          <SelectItem value="Austin">Austin</SelectItem>
+                          <SelectItem value="San Antonio">San Antonio</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      <Select value={filters.inspectionType} onValueChange={(value) => setFilters(prev => ({ ...prev, inspectionType: value }))}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Inspection Type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="annual">Annual</SelectItem>
+                          <SelectItem value="preventative">Preventative</SelectItem>
+                          <SelectItem value="emergency">Emergency</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      <div className="space-y-2">
+                        <label className="text-sm font-medium">Zipcodes</label>
+                        <div className="border rounded-md p-2 max-h-32 overflow-y-auto">
+                          <div className="space-y-1">
+                            <div className="flex items-center space-x-2">
+                              <Checkbox
+                                id="all-zipcodes"
+                                checked={filters.zipcodes.length === 0}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setFilters(prev => ({ ...prev, zipcodes: [] }));
+                                  }
+                                }}
+                              />
+                              <label htmlFor="all-zipcodes" className="text-sm cursor-pointer">
+                                All Zipcodes
+                              </label>
+                            </div>
+                            {availableZipcodes.map((zipcode) => (
+                              <div key={zipcode} className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`zipcode-${zipcode}`}
+                                  checked={filters.zipcodes.includes(zipcode)}
+                                  onCheckedChange={(checked) => {
+                                    if (checked) {
+                                      setFilters(prev => ({ ...prev, zipcodes: [...prev.zipcodes, zipcode] }));
+                                    } else {
+                                      setFilters(prev => ({ ...prev, zipcodes: prev.zipcodes.filter(z => z !== zipcode) }));
+                                    }
+                                  }}
+                                />
+                                <label htmlFor={`zipcode-${zipcode}`} className="text-sm cursor-pointer">
+                                  {zipcode}
+                                </label>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        {filters.zipcodes.length > 0 && (
+                          <div className="text-xs text-gray-600">
+                            {filters.zipcodes.length} zipcode{filters.zipcodes.length !== 1 ? 's' : ''} selected
+                          </div>
+                        )}
+                      </div>
+
+                      <Button onClick={fetchProperties} className="w-full">
+                        Apply Filters
+                      </Button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
 
                 
+                {/* Enhanced Property Selection Card */}
                 <Card className="flex-1 min-h-0 flex flex-col">
                   <CardHeader className="pb-3 flex-shrink-0">
                   <div className="flex items-center justify-between">
@@ -708,32 +817,92 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                           )}
                         </div>
                       ) : (
-                        filteredAndPaginatedProperties.properties.map((property) => (
-                         <div key={property.id} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
-                           <Checkbox
-                             checked={selectedProperties.some(p => p.id === property.id)}
-                             onCheckedChange={(checked) => {
-                               if (checked) {
-                                 setSelectedProperties(prev => [...prev, property]);
-                               } else {
-                                 setSelectedProperties(prev => prev.filter(p => p.id !== property.id));
-                               }
-                             }}
-                           />
-                           <div className="flex-1">
-                             <div className="font-medium">{property.property_name}</div>
-                             <div className="text-sm text-gray-600">
-                               {property.address}, {property.city}, {property.state}
-                             </div>
-                             <div className="text-xs text-gray-500">
-                               PM: {property.property_manager_name || 'Not assigned'} • Last Inspection: {property.last_inspection_date || 'Never'}
-                             </div>
-                           </div>
-                            <div className="text-right">
-                              <div className="text-sm font-medium">{property.roof_area?.toLocaleString() || 'N/A'} sq ft</div>
+                        filteredAndPaginatedProperties.properties.map((property) => {
+                          const propertyInspector = propertyInspectorOverrides[property.id];
+                          const isSelected = selectedProperties.some(p => p.id === property.id);
+                          
+                          return (
+                            <div key={property.id} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
+                              <Checkbox
+                                checked={isSelected}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setSelectedProperties(prev => [...prev, property]);
+                                  } else {
+                                    setSelectedProperties(prev => prev.filter(p => p.id !== property.id));
+                                    // Clear any inspector override when deselecting
+                                    setPropertyInspectorOverrides(prev => {
+                                      const newOverrides = { ...prev };
+                                      delete newOverrides[property.id];
+                                      return newOverrides;
+                                    });
+                                  }
+                                }}
+                              />
+                              <div className="flex-1">
+                                <div className="font-medium">{property.property_name}</div>
+                                <div className="text-sm text-gray-600">
+                                  {property.address}, {property.city}, {property.state}
+                                </div>
+                                <div className="text-xs text-gray-500">
+                                  PM: {property.property_manager_name || 'Not assigned'} • Last Inspection: {property.last_inspection_date || 'Never'}
+                                </div>
+                                
+                                {/* Inspector Assignment Section */}
+                                {isSelected && (
+                                  <div className="mt-2 p-2 bg-gray-50 rounded text-xs">
+                                    <div className="flex items-center justify-between">
+                                      <span className="text-gray-600">Inspector:</span>
+                                      <div className="flex items-center space-x-2">
+                                        {propertyInspector ? (
+                                          <Badge variant="outline" className="text-xs">
+                                            Override: {propertyInspector.full_name}
+                                          </Badge>
+                                        ) : selectedInspector ? (
+                                          <Badge variant="secondary" className="text-xs">
+                                            Default: {selectedInspector.full_name}
+                                          </Badge>
+                                        ) : (
+                                          <Badge variant="destructive" className="text-xs">
+                                            No inspector selected
+                                          </Badge>
+                                        )}
+                                        
+                                        {/* Optional: Add inspector override selector - can be implemented later */}
+                                        {/* <Select
+                                          value={propertyInspector?.id || 'default'}
+                                          onValueChange={(value) => {
+                                            if (value === 'default') {
+                                              handlePropertyInspectorOverride(property.id, null);
+                                            } else {
+                                              const inspector = inspectors.find(i => i.id === value);
+                                              handlePropertyInspectorOverride(property.id, inspector || null);
+                                            }
+                                          }}
+                                        >
+                                          <SelectTrigger className="h-6 w-32 text-xs">
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="default">Use Default</SelectItem>
+                                            {inspectors.map((inspector) => (
+                                              <SelectItem key={inspector.id} value={inspector.id}>
+                                                {inspector.full_name}
+                                              </SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select> */}
+                                      </div>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                              <div className="text-right">
+                                <div className="text-sm font-medium">{property.roof_area?.toLocaleString() || 'N/A'} sq ft</div>
+                              </div>
                             </div>
-                         </div>
-                       ))
+                          );
+                        })
                      )}
                    </div>
                  </ScrollArea>
@@ -750,7 +919,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">
-                      Processing campaign batch...
+                      Processing campaign batch with inspector assignments...
                     </span>
                     <span className="text-sm text-blue-600">
                       {workflowProgress.processedCount}/{workflowProgress.totalCount}
@@ -761,7 +930,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                     className="w-full" 
                   />
                   <div className="text-sm text-blue-700">
-                    Sending all campaigns to N8n in a single batch request...
+                    Sending all campaigns to N8n with inspector information...
                   </div>
                 </div>
               </Card>
@@ -795,6 +964,9 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                         )}
                         <div className="flex-1">
                           <div className="font-medium">{result.campaignData.campaign_name}</div>
+                          {result.campaignData.inspector_name && (
+                            <div className="text-xs opacity-75">Inspector: {result.campaignData.inspector_name}</div>
+                          )}
                           {result.error && (
                             <div className="text-xs opacity-75">{result.error}</div>
                           )}
@@ -819,7 +991,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
             </div>
             <Button 
               onClick={handleStartWorkflow}
-              disabled={selectedProperties.length === 0 || workflowProgress.isProcessing}
+              disabled={selectedProperties.length === 0 || !selectedInspector || workflowProgress.isProcessing}
               className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
             >
               {workflowProgress.isProcessing ? (
@@ -835,7 +1007,12 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
               ) : (
                 <>
                   <Calendar className="h-4 w-4 mr-2" />
-                  Start Batch Campaign ({selectedProperties.length} properties)
+                  Start Campaign ({selectedProperties.length} properties)
+                  {selectedInspector && (
+                    <Badge variant="secondary" className="ml-2 text-xs">
+                      {selectedInspector.full_name}
+                    </Badge>
+                  )}
                 </>
               )}
             </Button>

@@ -9,10 +9,17 @@ interface CampaignWorkflowData {
   property_manager_email: string
   region: string
   market: string
+  // Enhanced with inspector information
+  inspector_id?: string
+  inspector_name?: string
+  inspector_email?: string
   properties: Array<{
     roof_id: string
     property_name: string
     address: string
+    // Property-level inspector override
+    inspector_id?: string
+    inspector_email?: string
   }>
 }
 
@@ -53,18 +60,25 @@ const REQUEST_TIMEOUT = 60000
 const processCampaignsBatch = async (campaigns: CampaignWorkflowData[]): Promise<BatchProcessingResult> => {
   console.log(`Processing ${campaigns.length} campaigns as a batch`)
   
-  // Create batch payload structure
+  // Create enhanced batch payload structure with inspector information
   const batchPayload = {
     batch_id: `BATCH-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
     batch_mode: true,
     campaigns: campaigns,
+    // Include default inspector info for the batch
+    default_inspector: campaigns[0] ? {
+      inspector_id: campaigns[0].inspector_id,
+      inspector_name: campaigns[0].inspector_name,
+      inspector_email: campaigns[0].inspector_email
+    } : null,
     supabase_url: "https://cycfmmxveqcpqtmncmup.supabase.co",
     supabase_service_key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN5Y2ZtbXh2ZXFjcHF0bW5jbXVwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1Mjc5MDg1MSwiZXhwIjoyMDY4MzY2ODUxfQ.lSkzBLqHs5DKWGsMLbLZrOoL2KZIYBCHNlLuLhFWm5M"
   }
   
-  console.log('Sending batch payload to N8n:', {
+  console.log('Sending enhanced batch payload to N8n:', {
     batch_id: batchPayload.batch_id,
     campaign_count: campaigns.length,
+    default_inspector: batchPayload.default_inspector,
     property_managers: campaigns.map(c => c.property_manager_email)
   })
 
@@ -106,7 +120,6 @@ const processCampaignsBatch = async (campaigns: CampaignWorkflowData[]): Promise
     clearTimeout(timeoutId)
     console.error('Batch processing failed, attempting individual fallbacks:', error)
     
-    // If batch fails, try fallback creation for each campaign
     const results: ProcessingResult[] = []
     
     for (const campaign of campaigns) {
@@ -207,6 +220,10 @@ async function triggerN8nWorkflow(
     property_manager_email: campaignData.property_manager_email,
     region: campaignData.region,
     market: campaignData.market,
+    // Include inspector information for n8n workflow
+    inspector_id: campaignData.inspector_id,
+    inspector_name: campaignData.inspector_name,
+    inspector_email: campaignData.inspector_email,
     properties: campaignData.properties,
     // Add Supabase credentials for the workflow
     supabase_url: "https://cycfmmxveqcpqtmncmup.supabase.co",
@@ -217,6 +234,7 @@ async function triggerN8nWorkflow(
     campaign_id: payload.campaign_id,
     campaign_name: payload.campaign_name,
     property_manager_email: payload.property_manager_email,
+    inspector_email: payload.inspector_email,
     properties_count: payload.properties.length
   })
 
@@ -275,10 +293,15 @@ async function createCampaignFallback(campaignData: CampaignWorkflowData): Promi
           propertyManager: campaignData.property_manager_email.split('@')[0], // Extract name from email
           propertyCount: campaignData.properties.length,
           pmEmail: campaignData.property_manager_email,
+          // Include inspector information in fallback
+          inspector_id: campaignData.inspector_id,
+          inspector_name: campaignData.inspector_name,
+          inspector_email: campaignData.inspector_email,
           estimatedCompletion: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(), // 30 days from now
           properties: campaignData.properties.map(p => ({
             id: p.roof_id,
-            name: p.property_name
+            name: p.property_name,
+            inspector_id: p.inspector_id || campaignData.inspector_id // Use property override or campaign default
           })),
           gmail: {
             draftId: 'fallback-' + Date.now(),
