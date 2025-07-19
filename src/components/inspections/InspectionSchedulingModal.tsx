@@ -14,6 +14,7 @@ import { Search, Calendar, CheckCircle, X, FileDown, Filter, MapPin } from 'luci
 import { IntelligentGrouping } from './IntelligentGrouping';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import { useN8nWorkflow, type CampaignWorkflowData } from '@/hooks/useN8nWorkflow';
 
 interface Property {
   id: string;
@@ -50,36 +51,11 @@ interface InspectionSchedulingModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
-interface CampaignResult {
-  success: boolean;
-  message: string;
-  campaign?: {
-    id: string;
-    market: string;
-    propertyManager: string;
-    propertyCount: number;
-    pmEmail: string;
-    estimatedCompletion: string;
-  };
-  executionId?: string;
-}
-
-enum WorkflowSteps {
-  PREPARING = 'preparing',
-  VALIDATING = 'validating',
-  SENDING = 'sending',
-  PROCESSING = 'processing',
-  COMPLETE = 'complete'
-}
-
-interface WebhookConfig {
-  url: string;
-  retryAttempts: number;
-  timeout: number;
-}
 
 export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSchedulingModalProps) {
   const { toast } = useToast();
+  const { triggerWorkflow, isLoading: n8nLoading, isSuccess, data, error } = useN8nWorkflow();
+  
   const [properties, setProperties] = useState<Property[]>([]);
   const [filteredProperties, setFilteredProperties] = useState<Property[]>([]);
   const [selectedProperties, setSelectedProperties] = useState<Property[]>([]);
@@ -88,13 +64,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
   const [currentPage, setCurrentPage] = useState(1);
   const [propertyCache, setPropertyCache] = useState<Map<string, Property[]>>(new Map());
   const [generatedGroups, setGeneratedGroups] = useState([]);
-  const [workflowLoading, setWorkflowLoading] = useState(false);
-  const [currentStep, setCurrentStep] = useState<WorkflowSteps>(WorkflowSteps.PREPARING);
-  const [progress, setProgress] = useState(0);
-  const [retryAttempt, setRetryAttempt] = useState(0);
-  const [campaignResult, setCampaignResult] = useState<CampaignResult | null>(null);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
-  const abortControllerRef = useRef<AbortController | null>(null);
 
   const [filters, setFilters] = useState({
     clientId: 'all',
@@ -104,11 +74,6 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     warrantyStatus: 'all'
   });
 
-  const [webhookConfig] = useState<WebhookConfig>({
-    url: 'https://mkidder97.app.n8n.cloud/webhook-test/start-annual-inspections',
-    retryAttempts: 3,
-    timeout: 30000
-  });
 
   const itemsPerPage = 50;
 
@@ -136,14 +101,6 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     setSelectedProperties([]);
     setSearchTerm('');
     setCurrentPage(1);
-    setWorkflowLoading(false);
-    setCurrentStep(WorkflowSteps.PREPARING);
-    setProgress(0);
-    setRetryAttempt(0);
-    setCampaignResult(null);
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
   };
 
   const fetchProperties = async () => {
@@ -262,14 +219,6 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     totalCount: filteredProperties.length
   };
 
-  const validateWebhookUrl = (url: string): boolean => {
-    try {
-      new URL(url);
-      return url.includes('n8n.cloud') || url.includes('localhost') || url.includes('ngrok.io');
-    } catch {
-      return false;
-    }
-  };
 
   const generateCampaignName = async (): Promise<string> => {
     try {
@@ -310,23 +259,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     }
   };
 
-  const sanitizeProperty = (property: Property) => {
-    const sanitized = { ...property };
-    
-    // Convert null values to proper typed objects for n8n
-    Object.keys(sanitized).forEach(key => {
-      if (sanitized[key as keyof Property] === null) {
-        (sanitized as any)[key] = {
-          "_type": "undefined",
-          "value": "undefined"
-        };
-      }
-    });
-    
-    return sanitized;
-  };
-
-  const initiateInspectionWorkflow = async () => {
+  const handleStartWorkflow = async () => {
     if (selectedProperties.length === 0) {
       toast({
         title: "No Properties Selected",
@@ -336,212 +269,30 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
       return;
     }
 
-    if (!isOnline) {
-      toast({
-        title: "No Internet Connection",
-        description: "Please check your internet connection and try again.",
-        variant: "destructive",
-      });
-      return;
-    }
+    // Generate campaign data
+    const campaignId = await generateCampaignId();
+    const campaignName = await generateCampaignName();
 
-    setWorkflowLoading(true);
-    setCurrentStep(WorkflowSteps.PREPARING);
-    setProgress(10);
-    setRetryAttempt(0);
-    abortControllerRef.current = new AbortController();
+    // Prepare data for n8n workflow
+    const campaignData: CampaignWorkflowData = {
+      campaign_id: campaignId,
+      campaign_name: campaignName,
+      client_name: selectedProperties[0]?.clients?.company_name || 'Unknown Client',
+      property_manager_email: selectedProperties[0]?.property_manager_email || '',
+      region: filters.region,
+      market: filters.market,
+      properties: selectedProperties.map(prop => ({
+        roof_id: prop.id,
+        property_name: prop.property_name,
+        address: `${prop.address}, ${prop.city}, ${prop.state}`
+      }))
+    };
 
-    try {
-      console.log('Raw selected properties before sanitization:', selectedProperties);
-      
-      // Sanitize properties for n8n processing
-      const sanitizedProperties = selectedProperties.map(property => {
-        const sanitized = sanitizeProperty(property);
-        console.log('Sanitizing property:', {
-          original: {
-            id: property.id,
-            property_name: property.property_name,
-            property_manager_name: property.property_manager_name,
-            property_manager_email: property.property_manager_email,
-            latitude: property.latitude,
-            longitude: property.longitude
-          },
-          sanitized: {
-            id: sanitized.id,
-            property_name: sanitized.property_name,
-            property_manager_name: sanitized.property_manager_name,
-            property_manager_email: sanitized.property_manager_email,
-            latitude: sanitized.latitude,
-            longitude: sanitized.longitude
-          }
-        });
-        return sanitized;
-      });
-
-      console.log('Sanitized properties sample:', sanitizedProperties.slice(0, 1));
-
-      // Validate data structure
-      setCurrentStep(WorkflowSteps.VALIDATING);
-      setProgress(25);
-
-      const payload = {
-        selectedProperties: sanitizedProperties,
-        filters: {
-          clientId: filters.clientId,
-          region: filters.region,
-          market: filters.market,
-          inspectionType: filters.inspectionType
-        }
-      };
-
-      console.log('Final payload structure:', {
-        selectedPropertiesCount: payload.selectedProperties.length,
-        filters: payload.filters,
-        sampleProperty: payload.selectedProperties[0]
-      });
-
-      console.log('Validating payload structure:', payload);
-      console.log('Payload validation successful:', payload);
-
-      // Send to n8n webhook
-      setCurrentStep(WorkflowSteps.SENDING);
-      setProgress(50);
-
-      console.log('Sending payload to n8n webhook:', payload);
-
-      const response = await fetch(webhookConfig.url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(payload),
-        signal: abortControllerRef.current.signal
-      });
-
-      if (!response.ok) {
-        throw new Error(`HTTP error! status: ${response.status}`);
-      }
-
-      const result: CampaignResult = await response.json();
-      console.log('n8n workflow response:', result);
-
-      setCurrentStep(WorkflowSteps.PROCESSING);
-      setProgress(75);
-
-      // Generate campaign data
-      const campaignName = await generateCampaignName();
-      const campaignId = await generateCampaignId();
-
-      // Create campaign record in database - FIXED to match actual schema
-      const { data: user } = await supabase.auth.getUser();
-      const { data: campaignData, error: campaignError } = await supabase
-        .from('inspection_campaigns')
-        .insert({
-          name: campaignName,
-          client_id: filters.clientId !== 'all' ? filters.clientId : null,
-          region: filters.region,
-          market: filters.market,
-          inspection_type: filters.inspectionType,
-          status: 'emails_sent',
-          total_properties: selectedProperties.length,
-          n8n_execution_id: result.executionId || result.campaign?.id,
-          estimated_completion: result.campaign?.estimatedCompletion ? result.campaign.estimatedCompletion : null,
-          created_by: user.user?.id,
-          automation_settings: {
-            notification_preferences: {
-              email_on_completion: true,
-              email_on_failure: true
-            },
-            scheduling_preferences: {
-              preferred_time_slots: ['09:00-12:00', '13:00-17:00'],
-              avoid_weekends: true
-            },
-            webhook_config: {
-              webhook_url: webhookConfig.url,
-              retry_attempts: webhookConfig.retryAttempts,
-              timeout: webhookConfig.timeout
-            }
-          }
-        })
-        .select()
-        .single();
-
-      if (campaignError) {
-        console.error('Error creating campaign:', campaignError);
-        throw new Error(`Failed to create campaign record: ${campaignError.message}`);
-      }
-
-      console.log('Campaign created successfully:', campaignData);
-
-      setProgress(100);
-      setCurrentStep(WorkflowSteps.COMPLETE);
-
-      setCampaignResult({
-        success: true,
-        message: result.message || 'Campaign initiated successfully',
-        campaign: result.campaign || {
-          id: campaignData.id,
-          market: filters.market,
-          propertyManager: selectedProperties[0]?.property_manager_name || 'Multiple PMs',
-          propertyCount: selectedProperties.length,
-          pmEmail: selectedProperties[0]?.property_manager_email || '',
-          estimatedCompletion: result.campaign?.estimatedCompletion || ''
-        },
-        executionId: result.executionId
-      });
-
-      toast({
-        title: "Campaign Started Successfully!",
-        description: `${selectedProperties.length} properties processed for ${filters.market} market. Campaign ID: ${campaignData.id}`,
-        duration: 6000,
-      });
-
-    } catch (error: any) {
-      console.error('Error initiating workflow:', error);
-      
-      setWorkflowLoading(false);
-      setCurrentStep(WorkflowSteps.PREPARING);
-      setProgress(0);
-
-      if (error.name === 'AbortError') {
-        toast({
-          title: "Workflow Cancelled",
-          description: "The inspection workflow was cancelled by the user.",
-        });
-        return;
-      }
-
-      toast({
-        title: "Workflow Failed",
-        description: error.message || "Failed to start inspection workflow. Please try again.",
-        variant: "destructive",
-      });
-    }
+    // Trigger n8n workflow
+    triggerWorkflow({ campaignData });
   };
 
-  const cancelWorkflow = () => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    setWorkflowLoading(false);
-    setCurrentStep(WorkflowSteps.PREPARING);
-    setProgress(0);
-    setRetryAttempt(0);
-  };
 
-  const viewCampaignStatus = () => {
-    if (campaignResult?.campaign?.id) {
-      // Navigate to campaign detail view - implement based on your routing
-      toast({
-        title: "Campaign Tracking",
-        description: `Campaign ${campaignResult.campaign.id} details will be available in the Campaigns tab.`,
-      });
-    }
-  };
-
-  const scheduleAnotherCampaign = () => {
-    resetModalState();
-  };
 
   const exportSelectedProperties = () => {
     if (selectedProperties.length === 0) {
@@ -749,76 +500,48 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
           </TabsContent>
        </Tabs>
 
-       {/* Workflow Progress Section */}
-       {workflowLoading && (
-         <Card className="p-4 bg-blue-50 border-blue-200">
-           <div className="space-y-3">
-             <div className="flex items-center justify-between">
-               <span className="text-sm font-medium">
-                 {currentStep === WorkflowSteps.PREPARING && "Preparing campaign..."}
-                 {currentStep === WorkflowSteps.VALIDATING && "Validating data..."}
-                 {currentStep === WorkflowSteps.SENDING && "Sending to n8n..."}
-                 {currentStep === WorkflowSteps.PROCESSING && "Processing workflow..."}
-                 {currentStep === WorkflowSteps.COMPLETE && "Campaign started successfully!"}
-               </span>
-               <Button
-                 variant="ghost"
-                 size="sm"
-                 onClick={cancelWorkflow}
-                 className="text-red-600 hover:text-red-700"
-               >
-                 <X className="h-4 w-4" />
-               </Button>
-             </div>
-             <Progress value={progress} className="w-full" />
-             {retryAttempt > 0 && (
-               <div className="text-xs text-gray-600">
-                 Retry attempt {retryAttempt}/{webhookConfig.retryAttempts}
-               </div>
-             )}
-           </div>
-         </Card>
-       )}
+        {/* Workflow Loading State */}
+        {n8nLoading && (
+          <Card className="p-4 bg-blue-50 border-blue-200">
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm font-medium">
+                  Starting inspection campaign workflow...
+                </span>
+              </div>
+              <Progress value={50} className="w-full" />
+            </div>
+          </Card>
+        )}
 
-       {/* Success State */}
-       {campaignResult && currentStep === WorkflowSteps.COMPLETE && (
-         <Card className="p-4 bg-green-50 border-green-200">
-           <div className="space-y-3">
-             <div className="flex items-center space-x-2">
-               <CheckCircle className="h-5 w-5 text-green-600" />
-               <span className="font-medium text-green-800">Campaign Created Successfully!</span>
-             </div>
-             <div className="text-sm text-green-700 space-y-1">
-               <div>Market: {campaignResult.campaign?.market}</div>
-               <div>Properties: {campaignResult.campaign?.propertyCount}</div>
-               <div>Property Manager: {campaignResult.campaign?.propertyManager}</div>
-               {campaignResult.campaign?.estimatedCompletion && (
-                 <div>Estimated Completion: {campaignResult.campaign.estimatedCompletion}</div>
-               )}
-             </div>
-             <div className="flex space-x-2">
-               {campaignResult.campaign?.id && (
-                 <Button
-                   variant="outline"
-                   size="sm"
-                   onClick={viewCampaignStatus}
-                   className="text-green-700 border-green-300"
-                 >
-                   View Campaign Status
-                 </Button>
-               )}
-               <Button
-                 variant="outline"
-                 size="sm"
-                 onClick={scheduleAnotherCampaign}
-                 className="text-green-700 border-green-300"
-               >
-                 Schedule Another Campaign
-               </Button>
-             </div>
-           </div>
-         </Card>
-       )}
+        {/* Success State */}
+        {isSuccess && data && (
+          <Card className="p-4 bg-green-50 border-green-200">
+            <div className="space-y-3">
+              <div className="flex items-center space-x-2">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                <span className="font-medium text-green-800">Campaign Started Successfully!</span>
+              </div>
+              <div className="text-sm text-green-700 space-y-1">
+                <div>Campaign ID: {data.campaign_id}</div>
+                {data.draft_id && <div>Gmail Draft ID: {data.draft_id}</div>}
+                <div>Properties: {selectedProperties.length}</div>
+              </div>
+            </div>
+          </Card>
+        )}
+
+        {/* Error State */}
+        {error && (
+          <Card className="p-4 bg-red-50 border-red-200">
+            <div className="flex items-center space-x-2">
+              <X className="h-5 w-5 text-red-600" />
+              <span className="font-medium text-red-800">
+                {error.message || "Failed to start workflow"}
+              </span>
+            </div>
+          </Card>
+        )}
 
        <DialogFooter className="flex justify-between">
          <div className="flex items-center space-x-2">
@@ -830,37 +553,28 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
              Export List
            </Button>
          </div>
-         <Button 
-           onClick={initiateInspectionWorkflow}
-           disabled={
-             selectedProperties.length === 0 || 
-             workflowLoading || 
-             !isOnline ||
-             !validateWebhookUrl(webhookConfig.url) ||
-             currentStep === WorkflowSteps.COMPLETE
-           }
-           className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
-         >
-           {workflowLoading ? (
-             <>
-               <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full" />
-               {currentStep === WorkflowSteps.PREPARING && "Preparing..."}
-               {currentStep === WorkflowSteps.VALIDATING && "Validating..."}
-               {currentStep === WorkflowSteps.SENDING && "Sending..."}
-               {currentStep === WorkflowSteps.PROCESSING && "Processing..."}
-             </>
-           ) : currentStep === WorkflowSteps.COMPLETE ? (
-             <>
-               <CheckCircle className="h-4 w-4 mr-2" />
-               Campaign Started
-             </>
-           ) : (
-             <>
-               <Calendar className="h-4 w-4 mr-2" />
-               Start Inspection Workflow ({selectedProperties.length} properties)
-             </>
-           )}
-         </Button>
+          <Button 
+            onClick={handleStartWorkflow}
+            disabled={selectedProperties.length === 0 || n8nLoading}
+            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+          >
+            {n8nLoading ? (
+              <>
+                <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full" />
+                Starting Workflow...
+              </>
+            ) : isSuccess ? (
+              <>
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Campaign Started
+              </>
+            ) : (
+              <>
+                <Calendar className="h-4 w-4 mr-2" />
+                Start Inspection Workflow ({selectedProperties.length} properties)
+              </>
+            )}
+          </Button>
        </DialogFooter>
      </DialogContent>
    </Dialog>
