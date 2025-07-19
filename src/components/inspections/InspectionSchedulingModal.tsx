@@ -536,9 +536,41 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                     <CardTitle className="text-lg">
                       Available Properties ({filteredAndPaginatedProperties.totalCount})
                     </CardTitle>
-                    <Badge variant="secondary" className="text-sm">
-                      {selectedProperties.length} selected
-                    </Badge>
+                    <div className="flex items-center space-x-2">
+                      <Badge variant="secondary" className="text-sm">
+                        {selectedProperties.length} selected
+                      </Badge>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          const currentPageProperties = filteredAndPaginatedProperties.properties;
+                          const allCurrentSelected = currentPageProperties.every(prop => 
+                            selectedProperties.some(selected => selected.id === prop.id)
+                          );
+                          
+                          if (allCurrentSelected) {
+                            // Deselect all current page properties
+                            setSelectedProperties(prev => 
+                              prev.filter(selected => 
+                                !currentPageProperties.some(current => current.id === selected.id)
+                              )
+                            );
+                          } else {
+                            // Select all current page properties
+                            const newSelections = currentPageProperties.filter(prop => 
+                              !selectedProperties.some(selected => selected.id === prop.id)
+                            );
+                            setSelectedProperties(prev => [...prev, ...newSelections]);
+                          }
+                        }}
+                        className="whitespace-nowrap"
+                      >
+                        {filteredAndPaginatedProperties.properties.every(prop => 
+                          selectedProperties.some(selected => selected.id === prop.id)
+                        ) ? 'Deselect All' : 'Select All'}
+                      </Button>
+                    </div>
                   </div>
                   <div className="flex items-center space-x-2">
                     <div className="relative flex-1">
