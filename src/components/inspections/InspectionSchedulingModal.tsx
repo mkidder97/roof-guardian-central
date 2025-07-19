@@ -180,6 +180,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     }
 
     setLoading(true);
+    console.log('Fetching properties with filters:', filters);
     try {
       let query = supabase
         .from('roofs')
@@ -231,18 +232,22 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
       }
       
       if (filters.region !== 'all') {
+        console.log('Filtering by region:', filters.region);
         query = query.eq('region', filters.region);
       }
       
       if (filters.market !== 'all') {
+        console.log('Filtering by market:', filters.market);
         query = query.eq('market', filters.market);
       }
       
       if (filters.zipcodes.length > 0) {
+        console.log('Filtering by zipcodes:', filters.zipcodes);
         query = query.in('zip', filters.zipcodes);
       }
 
       const { data, error } = await query;
+      console.log('Query result:', { data: data?.length || 0, error });
 
       if (error) throw error;
 
