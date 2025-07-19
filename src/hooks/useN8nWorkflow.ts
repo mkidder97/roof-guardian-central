@@ -17,11 +17,8 @@ interface CampaignWorkflowData {
 
 interface N8nWebhookResponse {
   success: boolean
-  executionId?: string
-  campaign?: {
-    id: string
-    estimatedCompletion?: string
-  }
+  draft_id?: string
+  campaign_id?: string
   message?: string
   error?: string
 }
@@ -31,25 +28,25 @@ interface TriggerWorkflowParams {
   webhookUrl?: string
 }
 
-const DEFAULT_WEBHOOK_URL = 'https://mkidder97.app.n8n.cloud/webhook-test/start-annual-inspections'
+// Updated to match the correct n8n workflow endpoint
+const DEFAULT_WEBHOOK_URL = 'https://mkidder97.app.n8n.cloud/webhook/roofmind-campaign'
 
 async function triggerN8nWorkflow(
   campaignData: CampaignWorkflowData,
   webhookUrl: string = DEFAULT_WEBHOOK_URL
 ): Promise<N8nWebhookResponse> {
+  // Updated payload structure to match our n8n workflow
   const payload = {
-    selectedProperties: campaignData.properties,
-    filters: {
-      clientId: campaignData.client_name,
-      region: campaignData.region,
-      market: campaignData.market,
-      inspectionType: 'annual'
-    },
-    campaign: {
-      id: campaignData.campaign_id,
-      name: campaignData.campaign_name,
-      propertyManagerEmail: campaignData.property_manager_email
-    }
+    campaign_id: campaignData.campaign_id,
+    campaign_name: campaignData.campaign_name,
+    client_name: campaignData.client_name,
+    property_manager_email: campaignData.property_manager_email,
+    region: campaignData.region,
+    market: campaignData.market,
+    properties: campaignData.properties,
+    // Add Supabase credentials for the workflow
+    supabase_url: import.meta.env.VITE_SUPABASE_URL,
+    supabase_service_key: import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY
   }
 
   const response = await fetch(webhookUrl, {
@@ -77,7 +74,7 @@ export function useN8nWorkflow() {
     onSuccess: (data, variables) => {
       toast({
         title: "Workflow Triggered Successfully",
-        description: `Campaign "${variables.campaignData.campaign_name}" has been started with ${variables.campaignData.properties.length} properties.`,
+        description: `Campaign "${variables.campaignData.campaign_name}" has been started. Gmail draft created with ID: ${data.draft_id}`,
       })
     },
     onError: (error: Error) => {
@@ -95,11 +92,4 @@ export function useN8nWorkflow() {
     triggerWorkflowAsync: mutation.mutateAsync,
     isLoading: mutation.isPending,
     isError: mutation.isError,
-    isSuccess: mutation.isSuccess,
-    error: mutation.error,
-    data: mutation.data,
-    reset: mutation.reset,
-  }
-}
-
-export type { CampaignWorkflowData, N8nWebhookResponse, TriggerWorkflowParams }
+    is
