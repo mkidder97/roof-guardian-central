@@ -10,11 +10,11 @@ import { Progress } from '@/components/ui/progress';
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Search, Calendar, CheckCircle, X, FileDown, Filter, MapPin } from 'lucide-react';
+import { Search, Calendar, CheckCircle, X, FileDown, Filter, MapPin, AlertCircle } from 'lucide-react';
 
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
-import { useN8nWorkflow, type CampaignWorkflowData } from '@/hooks/useN8nWorkflow';
+import { useN8nWorkflow, type CampaignWorkflowData, type ProcessingResult } from '@/hooks/useN8nWorkflow';
 
 interface Property {
   id: string;
@@ -66,10 +66,17 @@ interface InspectionSchedulingModalProps {
   onOpenChange: (open: boolean) => void;
 }
 
+interface WorkflowProgress {
+  isProcessing: boolean
+  currentCampaign: string
+  processedCount: number
+  totalCount: number
+  results: ProcessingResult[]
+}
 
 export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSchedulingModalProps) {
   const { toast } = useToast();
-  const { triggerWorkflow, isLoading: n8nLoading, isSuccess, data, error } = useN8nWorkflow();
+  const { processCampaignsSequentially } = useN8nWorkflow();
   
   const [properties, setProperties] = useState<Property[]>([]);
   const [filteredProperties, setFilteredProperties] = useState<Property[]>([]);
@@ -89,6 +96,14 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     zipcodes: [] as string[]
   });
 
+  // New state for workflow progress
+  const [workflowProgress, setWorkflowProgress] = useState<WorkflowProgress>({
+    isProcessing: false,
+    currentCampaign: '',
+    processedCount: 0,
+    totalCount: 0,
+    results: []
+  });
 
   const itemsPerPage = 50;
 
@@ -123,6 +138,13 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     setSelectedProperties([]);
     setSearchTerm('');
     setCurrentPage(1);
+    setWorkflowProgress({
+      isProcessing: false,
+      currentCampaign: '',
+      processedCount: 0,
+      totalCount: 0,
+      results: []
+    });
   };
 
   const fetchAvailableZipcodes = async () => {
@@ -304,7 +326,6 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     totalCount: filteredProperties.length
   };
 
-
   const generateCampaignName = async (): Promise<string> => {
     try {
       const { data, error } = await supabase
@@ -364,7 +385,9 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
       return groups;
     }, {} as Record<string, Property[]>);
 
-    // Create separate campaigns for each property manager
+    // Create campaign data for each property manager
+    const campaignsToProcess: CampaignWorkflowData[] = [];
+    
     for (const [pmEmail, properties] of Object.entries(propertiesByManager)) {
       const campaignId = await generateCampaignId();
       const campaignName = await generateCampaignName();
@@ -383,18 +406,63 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
         }))
       };
 
-      // Trigger n8n workflow for this property manager
-      triggerWorkflow({ campaignData });
+      campaignsToProcess.push(campaignData);
     }
 
-    toast({
-      title: "Campaigns Started",
-      description: `Started ${Object.keys(propertiesByManager).length} campaign(s) for different property managers.`,
-      variant: "default",
+    // Initialize progress tracking
+    setWorkflowProgress({
+      isProcessing: true,
+      currentCampaign: '',
+      processedCount: 0,
+      totalCount: campaignsToProcess.length,
+      results: []
     });
+
+    try {
+      // Process campaigns sequentially with progress updates
+      const results = await processCampaignsSequentially(campaignsToProcess);
+
+      setWorkflowProgress(prev => ({
+        ...prev,
+        isProcessing: false,
+        processedCount: results.total,
+        results: [...results.successful, ...results.failed]
+      }));
+
+      // Show results toast
+      if (results.failed.length === 0) {
+        toast({
+          title: "All Campaigns Started Successfully!",
+          description: `Successfully started ${results.successful.length} campaign(s) for different property managers.`,
+        });
+      } else if (results.successful.length > 0) {
+        toast({
+          title: "Partial Success",
+          description: `${results.successful.length} campaigns succeeded, ${results.failed.length} failed. Check details below.`,
+          variant: "default",
+        });
+      } else {
+        toast({
+          title: "All Campaigns Failed",
+          description: `Failed to start ${results.failed.length} campaign(s). Check details below.`,
+          variant: "destructive",
+        });
+      }
+
+    } catch (error) {
+      console.error('Workflow processing failed:', error);
+      setWorkflowProgress(prev => ({
+        ...prev,
+        isProcessing: false
+      }));
+      
+      toast({
+        title: "Workflow Processing Failed",
+        description: "An unexpected error occurred while processing campaigns.",
+        variant: "destructive",
+      });
+    }
   };
-
-
 
   const exportSelectedProperties = () => {
     if (selectedProperties.length === 0) {
@@ -434,7 +502,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
 
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
               <div className="space-y-4 h-full flex flex-col">
-                {/* Filters */}
+                
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center space-x-2">
@@ -534,7 +602,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                 </CardContent>
               </Card>
 
-                {/* Search and Selection Summary */}
+                
                 <Card className="flex-1 min-h-0 flex flex-col">
                   <CardHeader className="pb-3 flex-shrink-0">
                   <div className="flex items-center justify-between">
@@ -650,47 +718,71 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
             </div>
           </div>
 
-          {/* Status Cards with proper spacing */}
+          {/* Enhanced Status Cards with detailed progress */}
           <div className="space-y-3 mt-4 mb-4">
-            {/* Workflow Loading State */}
-            {n8nLoading && (
+            {/* Workflow Processing State */}
+            {workflowProgress.isProcessing && (
               <Card className="p-4 bg-blue-50 border-blue-200">
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">
-                      Starting inspection campaign workflow...
+                      Processing inspection campaigns...
+                    </span>
+                    <span className="text-sm text-blue-600">
+                      {workflowProgress.processedCount}/{workflowProgress.totalCount}
                     </span>
                   </div>
-                  <Progress value={50} className="w-full" />
+                  <Progress 
+                    value={(workflowProgress.processedCount / workflowProgress.totalCount) * 100} 
+                    className="w-full" 
+                  />
+                  {workflowProgress.currentCampaign && (
+                    <div className="text-sm text-blue-700">
+                      Current: {workflowProgress.currentCampaign}
+                    </div>
+                  )}
                 </div>
               </Card>
             )}
 
-            {/* Success State */}
-            {isSuccess && data && (
-              <Card className="p-4 bg-green-50 border-green-200">
+            {/* Results Display */}
+            {workflowProgress.results.length > 0 && !workflowProgress.isProcessing && (
+              <Card className="p-4">
                 <div className="space-y-3">
-                  <div className="flex items-center space-x-2">
-                    <CheckCircle className="h-5 w-5 text-green-600" />
-                    <span className="font-medium text-green-800">Campaign Started Successfully!</span>
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">Campaign Processing Results</span>
+                    <div className="flex items-center space-x-4 text-sm">
+                      <span className="text-green-600">
+                        ✓ {workflowProgress.results.filter(r => r.success).length} succeeded
+                      </span>
+                      <span className="text-red-600">
+                        ✗ {workflowProgress.results.filter(r => !r.success).length} failed
+                      </span>
+                    </div>
                   </div>
-                  <div className="text-sm text-green-700 space-y-1">
-                    <div>Campaign ID: {data.campaign_id}</div>
-                    {data.draft_id && <div>Gmail Draft ID: {data.draft_id}</div>}
-                    <div>Properties: {selectedProperties.length}</div>
+                  
+                  <div className="max-h-32 overflow-y-auto space-y-2">
+                    {workflowProgress.results.map((result, index) => (
+                      <div key={index} className={`text-sm p-2 rounded flex items-center space-x-2 ${
+                        result.success ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'
+                      }`}>
+                        {result.success ? (
+                          <CheckCircle className="h-4 w-4 text-green-600" />
+                        ) : (
+                          <AlertCircle className="h-4 w-4 text-red-600" />
+                        )}
+                        <div className="flex-1">
+                          <div className="font-medium">{result.campaignData.campaign_name}</div>
+                          {result.error && (
+                            <div className="text-xs opacity-75">{result.error}</div>
+                          )}
+                          {result.success && result.attempts > 1 && (
+                            <div className="text-xs opacity-75">Succeeded after {result.attempts} attempts</div>
+                          )}
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </div>
-              </Card>
-            )}
-
-            {/* Error State */}
-            {error && (
-              <Card className="p-4 bg-red-50 border-red-200">
-                <div className="flex items-center space-x-2">
-                  <X className="h-5 w-5 text-red-600" />
-                  <span className="font-medium text-red-800">
-                    {error.message || "Failed to start workflow"}
-                  </span>
                 </div>
               </Card>
             )}
@@ -708,18 +800,18 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
             </div>
             <Button 
               onClick={handleStartWorkflow}
-              disabled={selectedProperties.length === 0 || n8nLoading}
+              disabled={selectedProperties.length === 0 || workflowProgress.isProcessing}
               className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
             >
-              {n8nLoading ? (
+              {workflowProgress.isProcessing ? (
                 <>
                   <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full" />
-                  Starting Workflow...
+                  Processing ({workflowProgress.processedCount}/{workflowProgress.totalCount})
                 </>
-              ) : isSuccess ? (
+              ) : workflowProgress.results.length > 0 ? (
                 <>
                   <CheckCircle className="h-4 w-4 mr-2" />
-                  Campaign Started
+                  Processing Complete
                 </>
               ) : (
                 <>
