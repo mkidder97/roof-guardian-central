@@ -78,7 +78,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [propertyCache, setPropertyCache] = useState<Map<string, Property[]>>(new Map());
-  
+  const [availableZipcodes, setAvailableZipcodes] = useState<string[]>([]);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   const [filters, setFilters] = useState({
@@ -86,7 +86,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     region: 'all',
     market: 'all',
     inspectionType: 'annual',
-    zipcode: 'all'
+    zipcodes: [] as string[]
   });
 
 
@@ -115,13 +115,33 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
   useEffect(() => {
     if (open) {
       fetchProperties();
+      fetchAvailableZipcodes();
     }
-  }, [filters.zipcode, filters.region, filters.market]);
+  }, [filters.zipcodes, filters.region, filters.market]);
 
   const resetModalState = () => {
     setSelectedProperties([]);
     setSearchTerm('');
     setCurrentPage(1);
+  };
+
+  const fetchAvailableZipcodes = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('roofs')
+        .select('zip')
+        .eq('status', 'active')
+        .neq('is_deleted', true)
+        .not('zip', 'is', null)
+        .order('zip');
+
+      if (error) throw error;
+
+      const uniqueZipcodes = [...new Set(data?.map(item => item.zip))].filter(Boolean);
+      setAvailableZipcodes(uniqueZipcodes);
+    } catch (error) {
+      console.error('Error fetching zipcodes:', error);
+    }
   };
 
   const processPropertyData = (rawProperties: any[]): Property[] => {
@@ -150,7 +170,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
   };
 
   const fetchProperties = async () => {
-    const cacheKey = `${filters.clientId}-${filters.region}-${filters.market}-${filters.zipcode}`;
+    const cacheKey = `${filters.clientId}-${filters.region}-${filters.market}-${filters.zipcodes.join(',')}`;
     
     if (propertyCache.has(cacheKey)) {
       const cachedProperties = propertyCache.get(cacheKey)!;
@@ -218,8 +238,8 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
         query = query.eq('market', filters.market);
       }
       
-      if (filters.zipcode !== 'all') {
-        query = query.eq('zip', filters.zipcode);
+      if (filters.zipcodes.length > 0) {
+        query = query.in('zip', filters.zipcodes);
       }
 
       const { data, error } = await query;
@@ -457,122 +477,50 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                       </SelectContent>
                     </Select>
 
-                    <Select value={filters.zipcode} onValueChange={(value) => setFilters(prev => ({ ...prev, zipcode: value }))}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Zipcode" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="all">All Zipcodes</SelectItem>
-                        <SelectItem value="75001">75001</SelectItem>
-                        <SelectItem value="75002">75002</SelectItem>
-                        <SelectItem value="75006">75006</SelectItem>
-                        <SelectItem value="75007">75007</SelectItem>
-                        <SelectItem value="75010">75010</SelectItem>
-                        <SelectItem value="75038">75038</SelectItem>
-                        <SelectItem value="75039">75039</SelectItem>
-                        <SelectItem value="75040">75040</SelectItem>
-                        <SelectItem value="75041">75041</SelectItem>
-                        <SelectItem value="75042">75042</SelectItem>
-                        <SelectItem value="75043">75043</SelectItem>
-                        <SelectItem value="75044">75044</SelectItem>
-                        <SelectItem value="75051">75051</SelectItem>
-                        <SelectItem value="75052">75052</SelectItem>
-                        <SelectItem value="75054">75054</SelectItem>
-                        <SelectItem value="75056">75056</SelectItem>
-                        <SelectItem value="75057">75057</SelectItem>
-                        <SelectItem value="75060">75060</SelectItem>
-                        <SelectItem value="75061">75061</SelectItem>
-                        <SelectItem value="75062">75062</SelectItem>
-                        <SelectItem value="75063">75063</SelectItem>
-                        <SelectItem value="75067">75067</SelectItem>
-                        <SelectItem value="75068">75068</SelectItem>
-                        <SelectItem value="75069">75069</SelectItem>
-                        <SelectItem value="75070">75070</SelectItem>
-                        <SelectItem value="75071">75071</SelectItem>
-                        <SelectItem value="75074">75074</SelectItem>
-                        <SelectItem value="75075">75075</SelectItem>
-                        <SelectItem value="75076">75076</SelectItem>
-                        <SelectItem value="75077">75077</SelectItem>
-                        <SelectItem value="75078">75078</SelectItem>
-                        <SelectItem value="75080">75080</SelectItem>
-                        <SelectItem value="75081">75081</SelectItem>
-                        <SelectItem value="75082">75082</SelectItem>
-                        <SelectItem value="75083">75083</SelectItem>
-                        <SelectItem value="75085">75085</SelectItem>
-                        <SelectItem value="75086">75086</SelectItem>
-                        <SelectItem value="75087">75087</SelectItem>
-                        <SelectItem value="75088">75088</SelectItem>
-                        <SelectItem value="75089">75089</SelectItem>
-                        <SelectItem value="75093">75093</SelectItem>
-                        <SelectItem value="75094">75094</SelectItem>
-                        <SelectItem value="75098">75098</SelectItem>
-                        <SelectItem value="75104">75104</SelectItem>
-                        <SelectItem value="75115">75115</SelectItem>
-                        <SelectItem value="75116">75116</SelectItem>
-                        <SelectItem value="75119">75119</SelectItem>
-                        <SelectItem value="75125">75125</SelectItem>
-                        <SelectItem value="75134">75134</SelectItem>
-                        <SelectItem value="75149">75149</SelectItem>
-                        <SelectItem value="75150">75150</SelectItem>
-                        <SelectItem value="75154">75154</SelectItem>
-                        <SelectItem value="75159">75159</SelectItem>
-                        <SelectItem value="75166">75166</SelectItem>
-                        <SelectItem value="75172">75172</SelectItem>
-                        <SelectItem value="75180">75180</SelectItem>
-                        <SelectItem value="75182">75182</SelectItem>
-                        <SelectItem value="75201">75201</SelectItem>
-                        <SelectItem value="75202">75202</SelectItem>
-                        <SelectItem value="75203">75203</SelectItem>
-                        <SelectItem value="75204">75204</SelectItem>
-                        <SelectItem value="75205">75205</SelectItem>
-                        <SelectItem value="75206">75206</SelectItem>
-                        <SelectItem value="75207">75207</SelectItem>
-                        <SelectItem value="75208">75208</SelectItem>
-                        <SelectItem value="75209">75209</SelectItem>
-                        <SelectItem value="75210">75210</SelectItem>
-                        <SelectItem value="75211">75211</SelectItem>
-                        <SelectItem value="75212">75212</SelectItem>
-                        <SelectItem value="75214">75214</SelectItem>
-                        <SelectItem value="75215">75215</SelectItem>
-                        <SelectItem value="75216">75216</SelectItem>
-                        <SelectItem value="75217">75217</SelectItem>
-                        <SelectItem value="75218">75218</SelectItem>
-                        <SelectItem value="75219">75219</SelectItem>
-                        <SelectItem value="75220">75220</SelectItem>
-                        <SelectItem value="75223">75223</SelectItem>
-                        <SelectItem value="75224">75224</SelectItem>
-                        <SelectItem value="75225">75225</SelectItem>
-                        <SelectItem value="75226">75226</SelectItem>
-                        <SelectItem value="75227">75227</SelectItem>
-                        <SelectItem value="75228">75228</SelectItem>
-                        <SelectItem value="75229">75229</SelectItem>
-                        <SelectItem value="75230">75230</SelectItem>
-                        <SelectItem value="75231">75231</SelectItem>
-                        <SelectItem value="75232">75232</SelectItem>
-                        <SelectItem value="75233">75233</SelectItem>
-                        <SelectItem value="75234">75234</SelectItem>
-                        <SelectItem value="75235">75235</SelectItem>
-                        <SelectItem value="75236">75236</SelectItem>
-                        <SelectItem value="75237">75237</SelectItem>
-                        <SelectItem value="75238">75238</SelectItem>
-                        <SelectItem value="75240">75240</SelectItem>
-                        <SelectItem value="75241">75241</SelectItem>
-                        <SelectItem value="75243">75243</SelectItem>
-                        <SelectItem value="75244">75244</SelectItem>
-                        <SelectItem value="75246">75246</SelectItem>
-                        <SelectItem value="75247">75247</SelectItem>
-                        <SelectItem value="75248">75248</SelectItem>
-                        <SelectItem value="75249">75249</SelectItem>
-                        <SelectItem value="75250">75250</SelectItem>
-                        <SelectItem value="75251">75251</SelectItem>
-                        <SelectItem value="75252">75252</SelectItem>
-                        <SelectItem value="75253">75253</SelectItem>
-                        <SelectItem value="75254">75254</SelectItem>
-                        <SelectItem value="75287">75287</SelectItem>
-                        <SelectItem value="75390">75390</SelectItem>
-                        <SelectItem value="75398">75398</SelectItem>
-                      </SelectContent>
-                    </Select>
+                    <div className="space-y-2">
+                      <label className="text-sm font-medium">Zipcodes</label>
+                      <div className="border rounded-md p-2 max-h-32 overflow-y-auto">
+                        <div className="space-y-1">
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id="all-zipcodes"
+                              checked={filters.zipcodes.length === 0}
+                              onCheckedChange={(checked) => {
+                                if (checked) {
+                                  setFilters(prev => ({ ...prev, zipcodes: [] }));
+                                }
+                              }}
+                            />
+                            <label htmlFor="all-zipcodes" className="text-sm cursor-pointer">
+                              All Zipcodes
+                            </label>
+                          </div>
+                          {availableZipcodes.map((zipcode) => (
+                            <div key={zipcode} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`zipcode-${zipcode}`}
+                                checked={filters.zipcodes.includes(zipcode)}
+                                onCheckedChange={(checked) => {
+                                  if (checked) {
+                                    setFilters(prev => ({ ...prev, zipcodes: [...prev.zipcodes, zipcode] }));
+                                  } else {
+                                    setFilters(prev => ({ ...prev, zipcodes: prev.zipcodes.filter(z => z !== zipcode) }));
+                                  }
+                                }}
+                              />
+                              <label htmlFor={`zipcode-${zipcode}`} className="text-sm cursor-pointer">
+                                {zipcode}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                      {filters.zipcodes.length > 0 && (
+                        <div className="text-xs text-gray-600">
+                          {filters.zipcodes.length} zipcode{filters.zipcodes.length !== 1 ? 's' : ''} selected
+                        </div>
+                      )}
+                    </div>
 
                     <Button onClick={fetchProperties} className="w-full">
                       Apply Filters
