@@ -115,7 +115,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     window.addEventListener('offline', handleOffline);
     
     return () => {
-      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('online', handleOffline);
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
@@ -375,15 +375,47 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
       return;
     }
 
-    // Group properties by property manager
+    // Group properties by property manager with enhanced validation
     const propertiesByManager = selectedProperties.reduce((groups, property) => {
-      const pmEmail = property.property_manager_email || 'unassigned';
+      const pmEmail = property.property_manager_email;
+      
+      // Skip properties without valid property manager emails
+      if (!pmEmail || pmEmail === 'Not assigned' || !pmEmail.includes('@') || !pmEmail.includes('.')) {
+        console.warn(`Skipping property ${property.property_name} - invalid PM email: ${pmEmail}`);
+        return groups;
+      }
+      
       if (!groups[pmEmail]) {
         groups[pmEmail] = [];
       }
       groups[pmEmail].push(property);
       return groups;
     }, {} as Record<string, Property[]>);
+
+    const managerEmails = Object.keys(propertiesByManager);
+    const skippedProperties = selectedProperties.length - Object.values(propertiesByManager).flat().length;
+    
+    console.log(`Properties grouped by ${managerEmails.length} property managers:`);
+    managerEmails.forEach(email => {
+      console.log(`- ${email}: ${propertiesByManager[email].length} properties`);
+    });
+    
+    if (skippedProperties > 0) {
+      toast({
+        title: "Properties Skipped",
+        description: `${skippedProperties} properties were skipped due to missing or invalid property manager assignments.`,
+        variant: "destructive",
+      });
+    }
+
+    if (managerEmails.length === 0) {
+      toast({
+        title: "No Valid Property Managers",
+        description: "None of the selected properties have valid property manager email assignments.",
+        variant: "destructive",
+      });
+      return;
+    }
 
     // Create campaign data for each property manager
     const campaignsToProcess: CampaignWorkflowData[] = [];
@@ -397,8 +429,8 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
         campaign_name: `${campaignName} - ${properties[0].property_manager_name}`,
         client_name: properties[0]?.clients?.company_name || 'Unknown Client',
         property_manager_email: pmEmail,
-        region: filters.region,
-        market: filters.market,
+        region: filters.region === 'all' ? properties[0].region : filters.region,
+        market: filters.market === 'all' ? properties[0].market : filters.market,
         properties: properties.map(prop => ({
           roof_id: prop.id,
           property_name: prop.property_name,
@@ -408,6 +440,10 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
 
       campaignsToProcess.push(campaignData);
     }
+
+    console.log(`About to process ${campaignsToProcess.length} campaigns:`, 
+      campaignsToProcess.map(c => ({ name: c.campaign_name, email: c.property_manager_email, count: c.properties.length }))
+    );
 
     // Initialize progress tracking
     setWorkflowProgress({
@@ -429,22 +465,22 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
         results: [...results.successful, ...results.failed]
       }));
 
-      // Show results toast
+      // Show detailed results toast
       if (results.failed.length === 0) {
         toast({
           title: "All Campaigns Started Successfully!",
-          description: `Successfully started ${results.successful.length} campaign(s) for different property managers.`,
+          description: `Successfully started ${results.successful.length} campaign(s) for different property managers: ${results.successful.map(r => r.campaignData.property_manager_email).join(', ')}`,
         });
       } else if (results.successful.length > 0) {
         toast({
           title: "Partial Success",
-          description: `${results.successful.length} campaigns succeeded, ${results.failed.length} failed. Check details below.`,
+          description: `${results.successful.length} campaigns succeeded (${results.successful.map(r => r.campaignData.property_manager_email).join(', ')}), ${results.failed.length} failed (${results.failed.map(r => r.campaignData.property_manager_email).join(', ')}). Check details below.`,
           variant: "default",
         });
       } else {
         toast({
           title: "All Campaigns Failed",
-          description: `Failed to start ${results.failed.length} campaign(s). Check details below.`,
+          description: `Failed to start ${results.failed.length} campaign(s) for: ${results.failed.map(r => r.campaignData.property_manager_email).join(', ')}. Check details below.`,
           variant: "destructive",
         });
       }
