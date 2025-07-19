@@ -92,4 +92,11 @@ export function useN8nWorkflow() {
     triggerWorkflowAsync: mutation.mutateAsync,
     isLoading: mutation.isPending,
     isError: mutation.isError,
-    is
+    isSuccess: mutation.isSuccess,
+    error: mutation.error,
+    data: mutation.data,
+    reset: mutation.reset,
+  }
+}
+
+export type { CampaignWorkflowData, N8nWebhookResponse, TriggerWorkflowParams }
