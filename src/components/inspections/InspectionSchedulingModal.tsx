@@ -120,15 +120,24 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
 
   const processPropertyData = (rawProperties: any[]): Property[] => {
     return rawProperties.map(property => {
-      const propertyManager = property.property_contact_assignments?.[0]?.client_contacts;
+      // First check property_contact_assignments for linked property managers
+      const propertyManager = property.property_contact_assignments?.find(
+        assignment => assignment.assignment_type === 'property_manager' && assignment.is_active
+      )?.client_contacts;
+      
+      // If no linked property manager, use the direct property manager fields
+      const pmName = propertyManager 
+        ? `${propertyManager.first_name} ${propertyManager.last_name}`
+        : property.property_manager_name || 'Not assigned';
+      
+      const pmEmail = propertyManager?.email || property.property_manager_email || '';
+      const pmPhone = propertyManager?.office_phone || propertyManager?.mobile_phone || property.property_manager_phone || '';
       
       return {
         ...property,
-        property_manager_name: propertyManager 
-          ? `${propertyManager.first_name} ${propertyManager.last_name}`
-          : 'Not assigned',
-        property_manager_email: propertyManager?.email || '',
-        property_manager_phone: propertyManager?.office_phone || propertyManager?.mobile_phone || '',
+        property_manager_name: pmName,
+        property_manager_email: pmEmail,
+        property_manager_phone: pmPhone,
         warranty_status: getWarrantyStatus(property.manufacturer_warranty_expiration)
       };
     });
@@ -169,11 +178,14 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
           installer_warranty_expiration,
           client_id,
           status,
+          property_manager_name,
+          property_manager_email,
+          property_manager_phone,
           clients!inner(company_name),
           property_contact_assignments!left(
             assignment_type,
             is_active,
-            client_contacts!inner(
+            client_contacts!left(
               id,
               first_name,
               last_name,
@@ -186,9 +198,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
           )
         `)
         .eq('status', 'active')
-        .eq('property_contact_assignments.assignment_type', 'primary_manager')
-        .eq('property_contact_assignments.is_active', true)
-        .eq('property_contact_assignments.client_contacts.role', 'property_manager');
+        .neq('is_deleted', true);
 
       if (filters.clientId !== 'all') {
         query = query.eq('client_id', filters.clientId);
@@ -489,7 +499,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                   </div>
                 </CardHeader>
                 <CardContent className="flex-1 min-h-0 overflow-hidden p-0">
-                  <ScrollArea className="h-full w-full px-6 py-4">
+                  <ScrollArea className="h-full max-h-[400px] w-full px-6 py-4 pointer-events-auto">
                     <div className="space-y-2 pr-4">
                       {loading ? (
                         <div className="text-center py-8">
