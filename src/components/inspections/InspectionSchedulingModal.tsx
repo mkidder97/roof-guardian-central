@@ -322,23 +322,23 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-7xl max-h-[90vh] flex flex-col">
-        <DialogHeader>
-          <DialogTitle className="flex items-center space-x-2">
+        <DialogContent className="max-w-7xl max-h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle className="flex items-center space-x-2">
             <Calendar className="h-5 w-5" />
             <span>Schedule Inspection Campaign</span>
           </DialogTitle>
         </DialogHeader>
 
-        <Tabs defaultValue="selection" className="flex-1 flex flex-col min-h-0">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="selection">Property Selection</TabsTrigger>
+          <Tabs defaultValue="selection" className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            <TabsList className="grid w-full grid-cols-2 mb-4">
+              <TabsTrigger value="selection">Property Selection</TabsTrigger>
             <TabsTrigger value="grouping">Intelligent Grouping</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="selection" className="flex-1 min-h-0">
-            <div className="space-y-4 h-full flex flex-col">
-              {/* Filters */}
+            <TabsContent value="selection" className="flex-1 min-h-0 overflow-hidden">
+              <div className="space-y-4 h-full flex flex-col">
+                {/* Filters */}
               <Card>
                 <CardHeader>
                   <CardTitle className="text-lg flex items-center space-x-2">
@@ -406,9 +406,9 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                 </CardContent>
               </Card>
 
-              {/* Search and Selection Summary */}
-              <Card className="flex-1 min-h-0 flex flex-col">
-                <CardHeader>
+                {/* Search and Selection Summary */}
+                <Card className="flex-1 min-h-0 flex flex-col overflow-hidden">
+                  <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg">
                       Available Properties ({filteredAndPaginatedProperties.totalCount})
@@ -490,92 +490,95 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
            </div>
          </TabsContent>
 
-          <TabsContent value="grouping" className="flex-1 min-h-0">
-            <IntelligentGrouping
-              properties={filteredProperties}
-              selectedProperties={selectedProperties}
-              onGroupsGenerated={setGeneratedGroups}
-              onPropertiesSelected={(properties: Property[]) => setSelectedProperties(properties)}
-            />
-          </TabsContent>
-       </Tabs>
+            <TabsContent value="grouping" className="flex-1 min-h-0 overflow-hidden">
+              <IntelligentGrouping
+                properties={filteredProperties}
+                selectedProperties={selectedProperties}
+                onGroupsGenerated={setGeneratedGroups}
+                onPropertiesSelected={(properties: Property[]) => setSelectedProperties(properties)}
+              />
+            </TabsContent>
+          </Tabs>
 
-        {/* Workflow Loading State */}
-        {n8nLoading && (
-          <Card className="p-4 bg-blue-50 border-blue-200">
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <span className="text-sm font-medium">
-                  Starting inspection campaign workflow...
-                </span>
-              </div>
-              <Progress value={50} className="w-full" />
-            </div>
-          </Card>
-        )}
-
-        {/* Success State */}
-        {isSuccess && data && (
-          <Card className="p-4 bg-green-50 border-green-200">
-            <div className="space-y-3">
-              <div className="flex items-center space-x-2">
-                <CheckCircle className="h-5 w-5 text-green-600" />
-                <span className="font-medium text-green-800">Campaign Started Successfully!</span>
-              </div>
-              <div className="text-sm text-green-700 space-y-1">
-                <div>Campaign ID: {data.campaign_id}</div>
-                {data.draft_id && <div>Gmail Draft ID: {data.draft_id}</div>}
-                <div>Properties: {selectedProperties.length}</div>
-              </div>
-            </div>
-          </Card>
-        )}
-
-        {/* Error State */}
-        {error && (
-          <Card className="p-4 bg-red-50 border-red-200">
-            <div className="flex items-center space-x-2">
-              <X className="h-5 w-5 text-red-600" />
-              <span className="font-medium text-red-800">
-                {error.message || "Failed to start workflow"}
-              </span>
-            </div>
-          </Card>
-        )}
-
-       <DialogFooter className="flex justify-between">
-         <div className="flex items-center space-x-2">
-           <Button variant="outline" onClick={() => onOpenChange(false)}>
-             Cancel
-           </Button>
-           <Button variant="outline" onClick={exportSelectedProperties}>
-             <FileDown className="h-4 w-4 mr-2" />
-             Export List
-           </Button>
-         </div>
-          <Button 
-            onClick={handleStartWorkflow}
-            disabled={selectedProperties.length === 0 || n8nLoading}
-            className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
-          >
-            {n8nLoading ? (
-              <>
-                <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full" />
-                Starting Workflow...
-              </>
-            ) : isSuccess ? (
-              <>
-                <CheckCircle className="h-4 w-4 mr-2" />
-                Campaign Started
-              </>
-            ) : (
-              <>
-                <Calendar className="h-4 w-4 mr-2" />
-                Start Inspection Workflow ({selectedProperties.length} properties)
-              </>
+          {/* Status Cards with proper spacing */}
+          <div className="space-y-3 mt-4 mb-4">
+            {/* Workflow Loading State */}
+            {n8nLoading && (
+              <Card className="p-4 bg-blue-50 border-blue-200">
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium">
+                      Starting inspection campaign workflow...
+                    </span>
+                  </div>
+                  <Progress value={50} className="w-full" />
+                </div>
+              </Card>
             )}
-          </Button>
-       </DialogFooter>
+
+            {/* Success State */}
+            {isSuccess && data && (
+              <Card className="p-4 bg-green-50 border-green-200">
+                <div className="space-y-3">
+                  <div className="flex items-center space-x-2">
+                    <CheckCircle className="h-5 w-5 text-green-600" />
+                    <span className="font-medium text-green-800">Campaign Started Successfully!</span>
+                  </div>
+                  <div className="text-sm text-green-700 space-y-1">
+                    <div>Campaign ID: {data.campaign_id}</div>
+                    {data.draft_id && <div>Gmail Draft ID: {data.draft_id}</div>}
+                    <div>Properties: {selectedProperties.length}</div>
+                  </div>
+                </div>
+              </Card>
+            )}
+
+            {/* Error State */}
+            {error && (
+              <Card className="p-4 bg-red-50 border-red-200">
+                <div className="flex items-center space-x-2">
+                  <X className="h-5 w-5 text-red-600" />
+                  <span className="font-medium text-red-800">
+                    {error.message || "Failed to start workflow"}
+                  </span>
+                </div>
+              </Card>
+            )}
+          </div>
+
+          <DialogFooter className="flex justify-between items-center pt-4 border-t bg-background">
+            <div className="flex items-center space-x-2">
+              <Button variant="outline" onClick={() => onOpenChange(false)}>
+                Cancel
+              </Button>
+              <Button variant="outline" onClick={exportSelectedProperties}>
+                <FileDown className="h-4 w-4 mr-2" />
+                Export List
+              </Button>
+            </div>
+            <Button 
+              onClick={handleStartWorkflow}
+              disabled={selectedProperties.length === 0 || n8nLoading}
+              className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+            >
+              {n8nLoading ? (
+                <>
+                  <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full" />
+                  Starting Workflow...
+                </>
+              ) : isSuccess ? (
+                <>
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Campaign Started
+                </>
+              ) : (
+                <>
+                  <Calendar className="h-4 w-4 mr-2" />
+                  Start Inspection Workflow ({selectedProperties.length} properties)
+                </>
+              )}
+            </Button>
+          </DialogFooter>
      </DialogContent>
    </Dialog>
  );
