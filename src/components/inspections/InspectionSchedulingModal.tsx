@@ -28,9 +28,6 @@ interface Property {
   roof_type: string;
   roof_area: number;
   last_inspection_date: string | null;
-  property_manager_name: string;
-  property_manager_email: string;
-  property_manager_phone: string;
   site_contact_name: string | null;
   site_contact_phone: string | null;
   roof_access: string;
@@ -43,6 +40,24 @@ interface Property {
   clients?: {
     company_name: string;
   };
+  property_contact_assignments?: Array<{
+    assignment_type: string;
+    is_active: boolean;
+    client_contacts: {
+      id: string;
+      first_name: string;
+      last_name: string;
+      email: string;
+      office_phone: string;
+      mobile_phone: string;
+      role: string;
+      title: string;
+    };
+  }>;
+  // Computed properties for easier access
+  property_manager_name?: string;
+  property_manager_email?: string;
+  property_manager_phone?: string;
   warranty_status?: string;
 }
 
@@ -103,6 +118,22 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     setCurrentPage(1);
   };
 
+  const processPropertyData = (rawProperties: any[]): Property[] => {
+    return rawProperties.map(property => {
+      const propertyManager = property.property_contact_assignments?.[0]?.client_contacts;
+      
+      return {
+        ...property,
+        property_manager_name: propertyManager 
+          ? `${propertyManager.first_name} ${propertyManager.last_name}`
+          : 'Not assigned',
+        property_manager_email: propertyManager?.email || '',
+        property_manager_phone: propertyManager?.office_phone || propertyManager?.mobile_phone || '',
+        warranty_status: getWarrantyStatus(property.manufacturer_warranty_expiration)
+      };
+    });
+  };
+
   const fetchProperties = async () => {
     const cacheKey = `${filters.clientId}-${filters.region}-${filters.market}-${filters.warrantyStatus}`;
     
@@ -129,9 +160,6 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
           roof_type,
           roof_area,
           last_inspection_date,
-          property_manager_name,
-          property_manager_email,
-          property_manager_phone,
           site_contact_name,
           site_contact_phone,
           roof_access,
@@ -141,9 +169,26 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
           installer_warranty_expiration,
           client_id,
           status,
-          clients!inner(company_name)
+          clients!inner(company_name),
+          property_contact_assignments!left(
+            assignment_type,
+            is_active,
+            client_contacts!inner(
+              id,
+              first_name,
+              last_name,
+              email,
+              office_phone,
+              mobile_phone,
+              role,
+              title
+            )
+          )
         `)
-        .eq('status', 'active');
+        .eq('status', 'active')
+        .eq('property_contact_assignments.assignment_type', 'primary_manager')
+        .eq('property_contact_assignments.is_active', true)
+        .eq('property_contact_assignments.client_contacts.role', 'property_manager');
 
       if (filters.clientId !== 'all') {
         query = query.eq('client_id', filters.clientId);
@@ -161,10 +206,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
 
       if (error) throw error;
 
-      const processedProperties: Property[] = (data || []).map(property => ({
-        ...property,
-        warranty_status: getWarrantyStatus(property.manufacturer_warranty_expiration)
-      }));
+      const processedProperties: Property[] = processPropertyData(data || []);
 
       // Apply warranty status filter
       const finalProperties = filters.warrantyStatus === 'all' 
@@ -269,27 +311,44 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
       return;
     }
 
-    // Generate campaign data
-    const campaignId = await generateCampaignId();
-    const campaignName = await generateCampaignName();
+    // Group properties by property manager
+    const propertiesByManager = selectedProperties.reduce((groups, property) => {
+      const pmEmail = property.property_manager_email || 'unassigned';
+      if (!groups[pmEmail]) {
+        groups[pmEmail] = [];
+      }
+      groups[pmEmail].push(property);
+      return groups;
+    }, {} as Record<string, Property[]>);
 
-    // Prepare data for n8n workflow
-    const campaignData: CampaignWorkflowData = {
-      campaign_id: campaignId,
-      campaign_name: campaignName,
-      client_name: selectedProperties[0]?.clients?.company_name || 'Unknown Client',
-      property_manager_email: selectedProperties[0]?.property_manager_email || '',
-      region: filters.region,
-      market: filters.market,
-      properties: selectedProperties.map(prop => ({
-        roof_id: prop.id,
-        property_name: prop.property_name,
-        address: `${prop.address}, ${prop.city}, ${prop.state}`
-      }))
-    };
+    // Create separate campaigns for each property manager
+    for (const [pmEmail, properties] of Object.entries(propertiesByManager)) {
+      const campaignId = await generateCampaignId();
+      const campaignName = await generateCampaignName();
 
-    // Trigger n8n workflow
-    triggerWorkflow({ campaignData });
+      const campaignData: CampaignWorkflowData = {
+        campaign_id: campaignId,
+        campaign_name: `${campaignName} - ${properties[0].property_manager_name}`,
+        client_name: properties[0]?.clients?.company_name || 'Unknown Client',
+        property_manager_email: pmEmail,
+        region: filters.region,
+        market: filters.market,
+        properties: properties.map(prop => ({
+          roof_id: prop.id,
+          property_name: prop.property_name,
+          address: `${prop.address}, ${prop.city}, ${prop.state}`
+        }))
+      };
+
+      // Trigger n8n workflow for this property manager
+      triggerWorkflow({ campaignData });
+    }
+
+    toast({
+      title: "Campaigns Started",
+      description: `Started ${Object.keys(propertiesByManager).length} campaign(s) for different property managers.`,
+      variant: "default",
+    });
   };
 
 
