@@ -54,7 +54,6 @@ interface Property {
       title: string;
     };
   }>;
-  // Computed properties for easier access
   property_manager_name?: string;
   property_manager_email?: string;
   property_manager_phone?: string;
@@ -76,7 +75,7 @@ interface WorkflowProgress {
 
 export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSchedulingModalProps) {
   const { toast } = useToast();
-  const { processCampaignsSequentially } = useN8nWorkflow();
+  const { processCampaignsBatch } = useN8nWorkflow(); // Use batch processing instead of sequential
   
   const [properties, setProperties] = useState<Property[]>([]);
   const [filteredProperties, setFilteredProperties] = useState<Property[]>([]);
@@ -96,7 +95,6 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     zipcodes: [] as string[]
   });
 
-  // New state for workflow progress
   const [workflowProgress, setWorkflowProgress] = useState<WorkflowProgress>({
     isProcessing: false,
     currentCampaign: '',
@@ -134,6 +132,22 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     }
   }, [filters.zipcodes, filters.region, filters.market]);
 
+  useEffect(() => {
+    const filtered = properties.filter(property => {
+      const searchLower = searchTerm.toLowerCase();
+      return (
+        property.property_name.toLowerCase().includes(searchLower) ||
+        property.address.toLowerCase().includes(searchLower) ||
+        property.city.toLowerCase().includes(searchLower) ||
+        property.market.toLowerCase().includes(searchLower) ||
+        property.region.toLowerCase().includes(searchLower) ||
+        (property.property_manager_name && property.property_manager_name.toLowerCase().includes(searchLower))
+      );
+    });
+    setFilteredProperties(filtered);
+    setCurrentPage(1);
+  }, [properties, searchTerm]);
+
   const resetModalState = () => {
     setSelectedProperties([]);
     setSearchTerm('');
@@ -168,12 +182,10 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
 
   const processPropertyData = (rawProperties: any[]): Property[] => {
     return rawProperties.map(property => {
-      // First check property_contact_assignments for linked property managers
       const propertyManager = property.property_contact_assignments?.find(
         assignment => assignment.assignment_type === 'property_manager' && assignment.is_active
       )?.client_contacts;
       
-      // If no linked property manager, use the direct property manager fields
       const pmName = propertyManager 
         ? `${propertyManager.first_name} ${propertyManager.last_name}`
         : property.property_manager_name || 'Not assigned';
@@ -274,8 +286,6 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
       if (error) throw error;
 
       const processedProperties: Property[] = processPropertyData(data || []);
-
-      // Since we're filtering by zipcode in the query, no additional filtering needed
       const finalProperties = processedProperties;
 
       setProperties(finalProperties);
@@ -304,28 +314,6 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     return 'active';
   };
 
-  useEffect(() => {
-    const filtered = properties.filter(property => {
-      const searchLower = searchTerm.toLowerCase();
-      return (
-        property.property_name.toLowerCase().includes(searchLower) ||
-        property.address.toLowerCase().includes(searchLower) ||
-        property.city.toLowerCase().includes(searchLower) ||
-        property.market.toLowerCase().includes(searchLower) ||
-        property.region.toLowerCase().includes(searchLower) ||
-        (property.property_manager_name && property.property_manager_name.toLowerCase().includes(searchLower))
-      );
-    });
-    setFilteredProperties(filtered);
-    setCurrentPage(1);
-  }, [properties, searchTerm]);
-
-  const filteredAndPaginatedProperties = {
-    properties: filteredProperties.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage),
-    totalPages: Math.ceil(filteredProperties.length / itemsPerPage),
-    totalCount: filteredProperties.length
-  };
-
   const generateCampaignName = async (): Promise<string> => {
     try {
       const { data, error } = await supabase
@@ -342,7 +330,6 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
       return data;
     } catch (error) {
       console.error('Error generating campaign name:', error);
-      // Fallback campaign name generation
       const market = filters.market === 'all' ? 'Multi-Market' : filters.market;
       const type = filters.inspectionType.charAt(0).toUpperCase() + filters.inspectionType.slice(1);
       const date = format(new Date(), 'MM/dd/yyyy');
@@ -352,13 +339,11 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
 
   const generateCampaignId = async (): Promise<string> => {
     try {
-      // Since the RPC function may not be available in types yet, use direct fallback
       const timestamp = Date.now();
       const randomPart = Math.random().toString(36).substring(2, 10).toUpperCase();
       return `CAMP-${timestamp}-${randomPart}`;
     } catch (error) {
       console.error('Error generating campaign ID:', error);
-      // Fallback campaign ID generation
       const timestamp = Date.now();
       const randomPart = Math.random().toString(36).substring(2, 10).toUpperCase();
       return `CAMP-${timestamp}-${randomPart}`;
@@ -379,7 +364,6 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     const propertiesByManager = selectedProperties.reduce((groups, property) => {
       const pmEmail = property.property_manager_email;
       
-      // Skip properties without valid property manager emails
       if (!pmEmail || pmEmail === 'Not assigned' || !pmEmail.includes('@') || !pmEmail.includes('.')) {
         console.warn(`Skipping property ${property.property_name} - invalid PM email: ${pmEmail}`);
         return groups;
@@ -441,60 +425,60 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
       campaignsToProcess.push(campaignData);
     }
 
-    console.log(`About to process ${campaignsToProcess.length} campaigns:`, 
+    console.log(`About to process ${campaignsToProcess.length} campaigns as a batch:`, 
       campaignsToProcess.map(c => ({ name: c.campaign_name, email: c.property_manager_email, count: c.properties.length }))
     );
 
-    // Initialize progress tracking
+    // Initialize progress tracking for batch processing
     setWorkflowProgress({
       isProcessing: true,
-      currentCampaign: '',
+      currentCampaign: 'Processing campaign batch...',
       processedCount: 0,
-      totalCount: campaignsToProcess.length,
+      totalCount: 1, // Single batch operation
       results: []
     });
 
     try {
-      // Process campaigns sequentially with progress updates
-      const results = await processCampaignsSequentially(campaignsToProcess);
+      // Process all campaigns as a single batch
+      const results = await processCampaignsBatch(campaignsToProcess);
 
       setWorkflowProgress(prev => ({
         ...prev,
         isProcessing: false,
-        processedCount: results.total,
+        processedCount: 1,
         results: [...results.successful, ...results.failed]
       }));
 
       // Show detailed results toast
       if (results.failed.length === 0) {
         toast({
-          title: "All Campaigns Started Successfully!",
-          description: `Successfully started ${results.successful.length} campaign(s) for different property managers: ${results.successful.map(r => r.campaignData.property_manager_email).join(', ')}`,
+          title: "Batch Campaign Created Successfully!",
+          description: `Successfully created campaigns for ${results.successful.length} property managers: ${results.successful.map(r => r.campaignData.property_manager_email).join(', ')}`,
         });
       } else if (results.successful.length > 0) {
         toast({
           title: "Partial Success",
-          description: `${results.successful.length} campaigns succeeded (${results.successful.map(r => r.campaignData.property_manager_email).join(', ')}), ${results.failed.length} failed (${results.failed.map(r => r.campaignData.property_manager_email).join(', ')}). Check details below.`,
+          description: `${results.successful.length} campaigns succeeded, ${results.failed.length} failed. Check details below.`,
           variant: "default",
         });
       } else {
         toast({
-          title: "All Campaigns Failed",
-          description: `Failed to start ${results.failed.length} campaign(s) for: ${results.failed.map(r => r.campaignData.property_manager_email).join(', ')}. Check details below.`,
+          title: "Batch Processing Failed",
+          description: `Failed to create campaigns. ${results.failed[0]?.error || 'Unknown error'}`,
           variant: "destructive",
         });
       }
 
     } catch (error) {
-      console.error('Workflow processing failed:', error);
+      console.error('Batch processing failed:', error);
       setWorkflowProgress(prev => ({
         ...prev,
         isProcessing: false
       }));
       
       toast({
-        title: "Workflow Processing Failed",
-        description: "An unexpected error occurred while processing campaigns.",
+        title: "Batch Processing Failed",
+        description: "An unexpected error occurred while processing the campaign batch.",
         variant: "destructive",
       });
     }
@@ -524,6 +508,12 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     a.download = `inspection-properties-${format(new Date(), 'yyyy-MM-dd')}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
+  };
+
+  const filteredAndPaginatedProperties = {
+    properties: filteredProperties.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage),
+    totalPages: Math.ceil(filteredProperties.length / itemsPerPage),
+    totalCount: filteredProperties.length
   };
 
   return (
@@ -659,14 +649,12 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                           );
                           
                           if (allCurrentSelected) {
-                            // Deselect all current page properties
                             setSelectedProperties(prev => 
                               prev.filter(selected => 
                                 !currentPageProperties.some(current => current.id === selected.id)
                               )
                             );
                           } else {
-                            // Select all current page properties
                             const newSelections = currentPageProperties.filter(prop => 
                               !selectedProperties.some(selected => selected.id === prop.id)
                             );
@@ -754,15 +742,15 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
             </div>
           </div>
 
-          {/* Enhanced Status Cards with detailed progress */}
+          {/* Enhanced Status Cards with batch processing feedback */}
           <div className="space-y-3 mt-4 mb-4">
-            {/* Workflow Processing State */}
+            {/* Batch Processing State */}
             {workflowProgress.isProcessing && (
               <Card className="p-4 bg-blue-50 border-blue-200">
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="text-sm font-medium">
-                      Processing inspection campaigns...
+                      Processing campaign batch...
                     </span>
                     <span className="text-sm text-blue-600">
                       {workflowProgress.processedCount}/{workflowProgress.totalCount}
@@ -772,11 +760,9 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                     value={(workflowProgress.processedCount / workflowProgress.totalCount) * 100} 
                     className="w-full" 
                   />
-                  {workflowProgress.currentCampaign && (
-                    <div className="text-sm text-blue-700">
-                      Current: {workflowProgress.currentCampaign}
-                    </div>
-                  )}
+                  <div className="text-sm text-blue-700">
+                    Sending all campaigns to N8n in a single batch request...
+                  </div>
                 </div>
               </Card>
             )}
@@ -786,7 +772,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
               <Card className="p-4">
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="font-medium">Campaign Processing Results</span>
+                    <span className="font-medium">Batch Processing Results</span>
                     <div className="flex items-center space-x-4 text-sm">
                       <span className="text-green-600">
                         ✓ {workflowProgress.results.filter(r => r.success).length} succeeded
@@ -811,9 +797,6 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                           <div className="font-medium">{result.campaignData.campaign_name}</div>
                           {result.error && (
                             <div className="text-xs opacity-75">{result.error}</div>
-                          )}
-                          {result.success && result.attempts > 1 && (
-                            <div className="text-xs opacity-75">Succeeded after {result.attempts} attempts</div>
                           )}
                         </div>
                       </div>
@@ -842,17 +825,17 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
               {workflowProgress.isProcessing ? (
                 <>
                   <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full" />
-                  Processing ({workflowProgress.processedCount}/{workflowProgress.totalCount})
+                  Processing Batch...
                 </>
               ) : workflowProgress.results.length > 0 ? (
                 <>
                   <CheckCircle className="h-4 w-4 mr-2" />
-                  Processing Complete
+                  Batch Complete
                 </>
               ) : (
                 <>
                   <Calendar className="h-4 w-4 mr-2" />
-                  Start Inspection Workflow ({selectedProperties.length} properties)
+                  Start Batch Campaign ({selectedProperties.length} properties)
                 </>
               )}
             </Button>

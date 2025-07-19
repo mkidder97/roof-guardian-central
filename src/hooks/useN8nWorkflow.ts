@@ -1,4 +1,3 @@
-
 import { useMutation } from '@tanstack/react-query'
 import { useToast } from '@/hooks/use-toast'
 import { supabase } from '@/integrations/supabase/client'
@@ -38,11 +37,108 @@ interface ProcessingResult {
   attempts: number
 }
 
+interface BatchProcessingResult {
+  successful: ProcessingResult[]
+  failed: ProcessingResult[]
+  total: number
+}
+
 // Updated to match the correct n8n workflow endpoint
 const DEFAULT_WEBHOOK_URL = 'https://mkidder97.app.n8n.cloud/webhook-test/roofmind-campaign'
 const MAX_RETRIES = 3
-const RETRY_DELAY = 2000 // Increased to 2 seconds
-const REQUEST_TIMEOUT = 60000 // Increased to 60 seconds
+const RETRY_DELAY = 2000
+const REQUEST_TIMEOUT = 60000
+
+// New batch processing function
+const processCampaignsBatch = async (campaigns: CampaignWorkflowData[]): Promise<BatchProcessingResult> => {
+  console.log(`Processing ${campaigns.length} campaigns as a batch`)
+  
+  // Create batch payload structure
+  const batchPayload = {
+    batch_id: `BATCH-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+    batch_mode: true,
+    campaigns: campaigns,
+    supabase_url: "https://cycfmmxveqcpqtmncmup.supabase.co",
+    supabase_service_key: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN5Y2ZtbXh2ZXFjcHF0bW5jbXVwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1Mjc5MDg1MSwiZXhwIjoyMDY4MzY2ODUxfQ.lSkzBLqHs5DKWGsMLbLZrOoL2KZIYBCHNlLuLhFWm5M"
+  }
+  
+  console.log('Sending batch payload to N8n:', {
+    batch_id: batchPayload.batch_id,
+    campaign_count: campaigns.length,
+    property_managers: campaigns.map(c => c.property_manager_email)
+  })
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT)
+
+  try {
+    const response = await fetch(DEFAULT_WEBHOOK_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(batchPayload),
+      signal: controller.signal
+    })
+
+    clearTimeout(timeoutId)
+
+    if (!response.ok) {
+      throw new Error(`Batch webhook failed: ${response.status} ${response.statusText}`)
+    }
+
+    const result = await response.json()
+    console.log('Batch processing successful:', result)
+    
+    // Convert successful batch response to ProcessingResult format
+    const successful = campaigns.map(campaign => ({
+      success: true,
+      campaignData: campaign,
+      response: result,
+      attempts: 1
+    }))
+    
+    return {
+      successful,
+      failed: [],
+      total: campaigns.length
+    }
+    
+  } catch (error) {
+    clearTimeout(timeoutId)
+    console.error('Batch processing failed, attempting individual fallbacks:', error)
+    
+    // If batch fails, try fallback creation for each campaign
+    const results: ProcessingResult[] = []
+    
+    for (const campaign of campaigns) {
+      try {
+        await createCampaignFallback(campaign)
+        results.push({
+          success: true,
+          campaignData: campaign,
+          attempts: 1
+        })
+        console.log(`Fallback successful for campaign: ${campaign.campaign_name}`)
+      } catch (fallbackError) {
+        results.push({
+          success: false,
+          campaignData: campaign,
+          error: `Batch failed: ${error.message}. Fallback failed: ${fallbackError.message}`,
+          attempts: 1
+        })
+        console.error(`Both batch and fallback failed for campaign: ${campaign.campaign_name}`, fallbackError)
+      }
+    }
+    
+    const successful = results.filter(r => r.success)
+    const failed = results.filter(r => !r.success)
+    
+    return {
+      successful,
+      failed,
+      total: campaigns.length
+    }
+  }
+}
 
 async function triggerN8nWorkflowWithRetry(
   campaignData: CampaignWorkflowData,
@@ -77,7 +173,7 @@ async function triggerN8nWorkflowWithRetry(
       })
       
       if (attempt < maxRetries) {
-        const delay = RETRY_DELAY * Math.pow(2, attempt - 1) // Exponential backoff
+        const delay = RETRY_DELAY * Math.pow(2, attempt - 1)
         console.log(`Retrying in ${delay}ms...`)
         await new Promise(resolve => setTimeout(resolve, delay))
       }
@@ -209,78 +305,74 @@ async function createCampaignFallback(campaignData: CampaignWorkflowData): Promi
   }
 }
 
+const processCampaignsSequentially = async (campaigns: CampaignWorkflowData[]): Promise<BatchProcessingResult> => {
+  const results: ProcessingResult[] = []
+  
+  console.log(`Starting to process ${campaigns.length} campaigns sequentially`)
+  
+  // Validate all campaigns have valid property manager emails
+  const validCampaigns = campaigns.filter(campaign => {
+    if (!campaign.property_manager_email || 
+        !campaign.property_manager_email.includes('@') || 
+        !campaign.property_manager_email.includes('.')) {
+      console.warn(`Skipping campaign due to invalid property manager email: ${campaign.property_manager_email}`)
+      return false
+    }
+    return true
+  })
+  
+  if (validCampaigns.length !== campaigns.length) {
+    toast({
+      title: "Warning",
+      description: `${campaigns.length - validCampaigns.length} campaigns skipped due to invalid property manager emails`,
+      variant: "destructive",
+    })
+  }
+  
+  for (let i = 0; i < validCampaigns.length; i++) {
+    const campaign = validCampaigns[i]
+    console.log(`Processing campaign ${i + 1}/${validCampaigns.length}: ${campaign.campaign_name}`)
+    console.log(`Property Manager: ${campaign.property_manager_email} (${campaign.properties.length} properties)`)
+    
+    // Add delay between requests to avoid overwhelming N8n (increased to 3 seconds)
+    if (i > 0) {
+      console.log('Waiting 3 seconds before next campaign...')
+      await new Promise(resolve => setTimeout(resolve, 3000))
+    }
+    
+    const result = await triggerN8nWorkflowWithRetry(campaign)
+    
+    // If N8n fails, try fallback creation
+    if (!result.success) {
+      console.log(`N8n failed for ${campaign.campaign_name}, attempting fallback...`)
+      try {
+        await createCampaignFallback(campaign)
+        result.success = true
+        result.error = undefined
+        console.log(`Fallback successful for campaign: ${campaign.campaign_name}`)
+      } catch (fallbackError) {
+        console.error(`Both N8n and fallback failed for campaign: ${campaign.campaign_name}`, fallbackError)
+        result.error = `N8n failed: ${result.error}. Fallback failed: ${fallbackError.message}`
+      }
+    }
+    
+    results.push(result)
+  }
+  
+  const successful = results.filter(r => r.success)
+  const failed = results.filter(r => !r.success)
+  
+  console.log(`Campaign processing complete: ${successful.length} successful, ${failed.length} failed`)
+  
+  return {
+    successful,
+    failed,
+    total: validCampaigns.length
+  }
+}
+
 export function useN8nWorkflow() {
   const { toast } = useToast()
-
-  const processCampaignsSequentially = async (campaigns: CampaignWorkflowData[]): Promise<{
-    successful: ProcessingResult[]
-    failed: ProcessingResult[]
-    total: number
-  }> => {
-    const results: ProcessingResult[] = []
-    
-    console.log(`Starting to process ${campaigns.length} campaigns sequentially`)
-    
-    // Validate all campaigns have valid property manager emails
-    const validCampaigns = campaigns.filter(campaign => {
-      if (!campaign.property_manager_email || 
-          !campaign.property_manager_email.includes('@') || 
-          !campaign.property_manager_email.includes('.')) {
-        console.warn(`Skipping campaign due to invalid property manager email: ${campaign.property_manager_email}`)
-        return false
-      }
-      return true
-    })
-    
-    if (validCampaigns.length !== campaigns.length) {
-      toast({
-        title: "Warning",
-        description: `${campaigns.length - validCampaigns.length} campaigns skipped due to invalid property manager emails`,
-        variant: "destructive",
-      })
-    }
-    
-    for (let i = 0; i < validCampaigns.length; i++) {
-      const campaign = validCampaigns[i]
-      console.log(`Processing campaign ${i + 1}/${validCampaigns.length}: ${campaign.campaign_name}`)
-      console.log(`Property Manager: ${campaign.property_manager_email} (${campaign.properties.length} properties)`)
-      
-      // Add delay between requests to avoid overwhelming N8n (increased to 3 seconds)
-      if (i > 0) {
-        console.log('Waiting 3 seconds before next campaign...')
-        await new Promise(resolve => setTimeout(resolve, 3000))
-      }
-      
-      const result = await triggerN8nWorkflowWithRetry(campaign)
-      
-      // If N8n fails, try fallback creation
-      if (!result.success) {
-        console.log(`N8n failed for ${campaign.campaign_name}, attempting fallback...`)
-        try {
-          await createCampaignFallback(campaign)
-          result.success = true
-          result.error = undefined
-          console.log(`Fallback successful for campaign: ${campaign.campaign_name}`)
-        } catch (fallbackError) {
-          console.error(`Both N8n and fallback failed for campaign: ${campaign.campaign_name}`, fallbackError)
-          result.error = `N8n failed: ${result.error}. Fallback failed: ${fallbackError.message}`
-        }
-      }
-      
-      results.push(result)
-    }
-    
-    const successful = results.filter(r => r.success)
-    const failed = results.filter(r => !r.success)
-    
-    console.log(`Campaign processing complete: ${successful.length} successful, ${failed.length} failed`)
-    
-    return {
-      successful,
-      failed,
-      total: validCampaigns.length
-    }
-  }
 
   const mutation = useMutation({
     mutationFn: async ({ campaignData, webhookUrl }: TriggerWorkflowParams) => {
@@ -314,7 +406,8 @@ export function useN8nWorkflow() {
   return {
     triggerWorkflow: mutation.mutate,
     triggerWorkflowAsync: mutation.mutateAsync,
-    processCampaignsSequentially,
+    processCampaignsSequentially, // Keep for backward compatibility
+    processCampaignsBatch, // New batch function
     isLoading: mutation.isPending,
     isError: mutation.isError,
     isSuccess: mutation.isSuccess,
@@ -324,4 +417,4 @@ export function useN8nWorkflow() {
   }
 }
 
-export type { CampaignWorkflowData, N8nWebhookResponse, TriggerWorkflowParams, ProcessingResult }
+export type { CampaignWorkflowData, N8nWebhookResponse, TriggerWorkflowParams, ProcessingResult, BatchProcessingResult }
