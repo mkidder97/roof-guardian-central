@@ -105,7 +105,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
   });
 
   const [webhookConfig] = useState<WebhookConfig>({
-    url: 'https://jrs-inspection-automation.app.n8n.cloud/webhook/property-manager-inspection-request',
+    url: 'https://mkidder97.app.n8n.cloud/webhook-test/start-annual-inspections',
     retryAttempts: 3,
     timeout: 30000
   });
