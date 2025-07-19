@@ -407,8 +407,8 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
               </Card>
 
                 {/* Search and Selection Summary */}
-                <Card className="flex-1 min-h-0 flex flex-col overflow-hidden">
-                  <CardHeader className="pb-3">
+                <Card className="flex-1 min-h-0 flex flex-col">
+                  <CardHeader className="pb-3 flex-shrink-0">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg">
                       Available Properties ({filteredAndPaginatedProperties.totalCount})
@@ -429,9 +429,9 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="flex-1 min-h-0">
-                  <ScrollArea className="h-full">
-                    <div className="space-y-2">
+                <CardContent className="flex-1 min-h-0 overflow-hidden p-0">
+                  <ScrollArea className="h-full w-full px-6 py-4">
+                    <div className="space-y-2 pr-4">
                       {loading ? (
                         <div className="text-center py-8">
                           <div className="animate-spin h-8 w-8 border-2 border-blue-600 border-t-transparent rounded-full mx-auto mb-2" />
