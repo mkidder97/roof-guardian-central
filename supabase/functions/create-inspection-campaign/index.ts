@@ -50,26 +50,24 @@ serve(async (req) => {
       .from('inspection_campaigns')
       .insert([
         {
-          campaign_id: campaignId,
           name: campaignData.name,
           market: campaignData.market,
           region: campaignData.region,
           total_properties: campaignData.propertyCount,
-          property_manager_name: campaignData.propertyManager,
-          property_manager_email: campaignData.pmEmail,
           estimated_completion: campaignData.estimatedCompletion,
           n8n_execution_id: campaignData.execution.executionId,
-          gmail_draft_id: campaignData.gmail.draftId,
-          gmail_thread_id: campaignData.gmail.threadId,
-          automation_settings: {
-            processingTimeMs: campaignData.execution.processingTimeMs
-          },
-          campaign_metadata: {
+          metadata: {
+            campaignId: campaignId,
+            propertyManager: campaignData.propertyManager,
+            pmEmail: campaignData.pmEmail,
+            gmailDraftId: campaignData.gmail.draftId,
+            gmailThreadId: campaignData.gmail.threadId,
+            processingTimeMs: campaignData.execution.processingTimeMs,
             createdViaAutomation: true,
             gmailIntegration: true
           },
           created_by: userId === 'system' ? null : userId,
-          status: 'emails_sent'
+          status: 'active'
         }
       ])
       .select()
@@ -132,10 +130,10 @@ serve(async (req) => {
         success: true,
         campaign: {
           id: campaign.id,
-          campaign_id: campaign.campaign_id,
           name: campaign.name,
           status: campaign.status,
-          total_properties: campaign.total_properties
+          total_properties: campaign.total_properties,
+          campaign_id: campaignId
         },
         message: 'Campaign created successfully'
       }),
