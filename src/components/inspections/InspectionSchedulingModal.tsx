@@ -7,11 +7,11 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Search, Calendar, CheckCircle, X, FileDown, Filter, MapPin } from 'lucide-react';
-import { IntelligentGrouping } from './IntelligentGrouping';
+
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { useN8nWorkflow, type CampaignWorkflowData } from '@/hooks/useN8nWorkflow';
@@ -78,7 +78,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
   const [loading, setLoading] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [propertyCache, setPropertyCache] = useState<Map<string, Property[]>>(new Map());
-  const [generatedGroups, setGeneratedGroups] = useState([]);
+  
   const [isOnline, setIsOnline] = useState(navigator.onLine);
 
   const [filters, setFilters] = useState({
@@ -399,13 +399,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
           </DialogTitle>
         </DialogHeader>
 
-          <Tabs defaultValue="selection" className="flex-1 flex flex-col min-h-0 overflow-hidden">
-            <TabsList className="grid w-full grid-cols-2 mb-4">
-              <TabsTrigger value="selection">Property Selection</TabsTrigger>
-            <TabsTrigger value="grouping">Intelligent Grouping</TabsTrigger>
-          </TabsList>
-
-            <TabsContent value="selection" className="flex-1 min-h-0 overflow-hidden">
+          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
               <div className="space-y-4 h-full flex flex-col">
                 {/* Filters */}
               <Card>
@@ -556,18 +550,8 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                  </ScrollArea>
                </CardContent>
              </Card>
-           </div>
-         </TabsContent>
-
-            <TabsContent value="grouping" className="flex-1 min-h-0 overflow-hidden">
-              <IntelligentGrouping
-                properties={filteredProperties}
-                selectedProperties={selectedProperties}
-                onGroupsGenerated={setGeneratedGroups}
-                onPropertiesSelected={(properties: Property[]) => setSelectedProperties(properties)}
-              />
-            </TabsContent>
-          </Tabs>
+            </div>
+          </div>
 
           {/* Status Cards with proper spacing */}
           <div className="space-y-3 mt-4 mb-4">
