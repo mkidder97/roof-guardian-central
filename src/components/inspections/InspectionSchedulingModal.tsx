@@ -492,9 +492,9 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                     </div>
                   </div>
                 </CardHeader>
-                <CardContent className="flex-1 min-h-0 overflow-hidden p-0">
-                  <ScrollArea className="h-full max-h-[400px] w-full px-6 py-4 pointer-events-auto">
-                    <div className="space-y-2 pr-4">
+                <CardContent className="flex-1 min-h-0 p-0">
+                  <ScrollArea className="h-[400px] w-full pointer-events-auto">
+                    <div className="space-y-2 p-6">
                       {loading ? (
                         <div className="text-center py-8">
                           <div className="animate-spin h-8 w-8 border-2 border-blue-600 border-t-transparent rounded-full mx-auto mb-2" />
