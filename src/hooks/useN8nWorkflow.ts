@@ -29,7 +29,7 @@ interface TriggerWorkflowParams {
 }
 
 // Updated to match the correct n8n workflow endpoint
-const DEFAULT_WEBHOOK_URL = 'https://mkidder97.app.n8n.cloud/webhook/roofmind-campaign'
+const DEFAULT_WEBHOOK_URL = 'https://mkidder97.app.n8n.cloud/webhook-test/roofmind-campaign'
 
 async function triggerN8nWorkflow(
   campaignData: CampaignWorkflowData,
