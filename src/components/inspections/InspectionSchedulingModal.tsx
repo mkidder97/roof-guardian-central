@@ -984,13 +984,22 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                 <div className="space-y-3">
                   <div className="flex items-center justify-between">
                     <span className="font-medium">Batch Processing Results</span>
-                    <div className="flex items-center space-x-4 text-sm">
-                      <span className="text-green-600">
-                        ✓ {workflowProgress.results.filter(r => r.success).length} succeeded
-                      </span>
-                      <span className="text-red-600">
-                        ✗ {workflowProgress.results.filter(r => !r.success).length} failed
-                      </span>
+                    <div className="flex items-center space-x-4">
+                      <div className="flex items-center space-x-4 text-sm">
+                        <span className="text-green-600">
+                          ✓ {workflowProgress.results.filter(r => r.success).length} succeeded
+                        </span>
+                        <span className="text-red-600">
+                          ✗ {workflowProgress.results.filter(r => !r.success).length} failed
+                        </span>
+                      </div>
+                      <button
+                        onClick={() => setWorkflowProgress(prev => ({ ...prev, results: [] }))}
+                        className="text-gray-400 hover:text-gray-600 transition-colors"
+                        title="Close results"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
                     </div>
                   </div>
                   
