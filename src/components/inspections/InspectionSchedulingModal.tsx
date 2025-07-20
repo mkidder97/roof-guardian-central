@@ -119,7 +119,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     window.addEventListener('offline', handleOffline);
     
     return () => {
-      window.removeEventListener('online', handleOffline);
+      window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
     };
   }, []);
@@ -575,6 +575,81 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     totalCount: filteredProperties.length
   };
 
+  const handleSelectAll = () => {
+    if (filteredProperties.length > 100) {
+      // Show confirmation for large selections
+      const confirmed = window.confirm(
+        `You're about to select all ${filteredProperties.length} properties. This may take a moment to process. Continue?`
+      );
+      if (!confirmed) return;
+    }
+
+    const allCurrentSelected = filteredProperties.every(prop => 
+      selectedProperties.some(selected => selected.id === prop.id)
+    );
+    
+    if (allCurrentSelected) {
+      // Deselect all filtered properties
+      setSelectedProperties(prev => 
+        prev.filter(selected => 
+          !filteredProperties.some(filtered => filtered.id === selected.id)
+        )
+      );
+    } else {
+      // Select all filtered properties that aren't already selected
+      const newSelections = filteredProperties.filter(prop => 
+        !selectedProperties.some(selected => selected.id === prop.id)
+      );
+      setSelectedProperties(prev => [...prev, ...newSelections]);
+    }
+  };
+
+  const handleSelectCurrentPage = () => {
+    const currentPageProperties = filteredAndPaginatedProperties.properties;
+    const allCurrentPageSelected = currentPageProperties.every(prop => 
+      selectedProperties.some(selected => selected.id === prop.id)
+    );
+    
+    if (allCurrentPageSelected) {
+      // Deselect current page properties
+      setSelectedProperties(prev => 
+        prev.filter(selected => 
+          !currentPageProperties.some(current => current.id === selected.id)
+        )
+      );
+    } else {
+      // Select current page properties that aren't already selected
+      const newSelections = currentPageProperties.filter(prop => 
+        !selectedProperties.some(selected => selected.id === prop.id)
+      );
+      setSelectedProperties(prev => [...prev, ...newSelections]);
+    }
+  };
+
+  const getSelectionStats = () => {
+    const totalFiltered = filteredProperties.length;
+    const totalSelected = selectedProperties.length;
+    const currentPageSelected = filteredAndPaginatedProperties.properties.filter(prop =>
+      selectedProperties.some(selected => selected.id === prop.id)
+    ).length;
+    const currentPageTotal = filteredAndPaginatedProperties.properties.length;
+    
+    return {
+      totalFiltered,
+      totalSelected,
+      currentPageSelected,
+      currentPageTotal,
+      allFilteredSelected: totalFiltered > 0 && filteredProperties.every(prop => 
+        selectedProperties.some(selected => selected.id === prop.id)
+      ),
+      allCurrentPageSelected: currentPageTotal > 0 && filteredAndPaginatedProperties.properties.every(prop => 
+        selectedProperties.some(selected => selected.id === prop.id)
+      )
+    };
+  };
+
+  const selectionStats = getSelectionStats();
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-7xl max-h-[90vh] flex flex-col">
@@ -726,36 +801,50 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                       <Badge variant="secondary" className="text-sm">
                         {selectedProperties.length} selected
                       </Badge>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => {
-                          const currentPageProperties = filteredAndPaginatedProperties.properties;
-                          const allCurrentSelected = currentPageProperties.every(prop => 
-                            selectedProperties.some(selected => selected.id === prop.id)
-                          );
-                          
-                          if (allCurrentSelected) {
-                            setSelectedProperties(prev => 
-                              prev.filter(selected => 
-                                !currentPageProperties.some(current => current.id === selected.id)
-                              )
-                            );
-                          } else {
-                            const newSelections = currentPageProperties.filter(prop => 
-                              !selectedProperties.some(selected => selected.id === prop.id)
-                            );
-                            setSelectedProperties(prev => [...prev, ...newSelections]);
-                          }
-                        }}
-                        className="whitespace-nowrap"
-                      >
-                        {filteredAndPaginatedProperties.properties.every(prop => 
-                          selectedProperties.some(selected => selected.id === prop.id)
-                        ) ? 'Deselect All' : 'Select All'}
-                      </Button>
+                      
+                      {/* Enhanced Selection Controls */}
+                      <div className="flex items-center space-x-1">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={handleSelectAll}
+                          className="whitespace-nowrap text-xs h-7 px-2"
+                        >
+                          {selectionStats.allFilteredSelected ? 'Deselect All' : `Select All ${selectionStats.totalFiltered}`}
+                        </Button>
+                        
+                        {filteredAndPaginatedProperties.totalPages > 1 && (
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={handleSelectCurrentPage}
+                            className="whitespace-nowrap text-xs h-7 px-2"
+                          >
+                            {selectionStats.allCurrentPageSelected ? 'Deselect Page' : 'Select Page'}
+                          </Button>
+                        )}
+                      </div>
                     </div>
                   </div>
+                  
+                  {/* Selection Status Indicator */}
+                  {selectedProperties.length > 0 && (
+                    <div className="text-xs text-muted-foreground">
+                      {selectionStats.allFilteredSelected ? (
+                        <span className="text-green-600 font-medium">All {selectionStats.totalFiltered} filtered properties selected</span>
+                      ) : (
+                        <span>
+                          {selectedProperties.length} of {selectionStats.totalFiltered} properties selected
+                          {filteredAndPaginatedProperties.totalPages > 1 && (
+                            <span className="ml-2">
+                              ({selectionStats.currentPageSelected} of {selectionStats.currentPageTotal} on this page)
+                            </span>
+                          )}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                  
                   <div className="flex items-center space-x-2">
                     <div className="relative flex-1">
                       <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -845,31 +934,6 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                                             No inspector selected
                                           </Badge>
                                         )}
-                                        
-                                        {/* Optional: Add inspector override selector - can be implemented later */}
-                                        {/* <Select
-                                          value={propertyInspector?.id || 'default'}
-                                          onValueChange={(value) => {
-                                            if (value === 'default') {
-                                              handlePropertyInspectorOverride(property.id, null);
-                                            } else {
-                                              const inspector = inspectors.find(i => i.id === value);
-                                              handlePropertyInspectorOverride(property.id, inspector || null);
-                                            }
-                                          }}
-                                        >
-                                          <SelectTrigger className="h-6 w-32 text-xs">
-                                            <SelectValue />
-                                          </SelectTrigger>
-                                          <SelectContent>
-                                            <SelectItem value="default">Use Default</SelectItem>
-                                            {inspectors.map((inspector) => (
-                                              <SelectItem key={inspector.id} value={inspector.id}>
-                                                {inspector.full_name}
-                                              </SelectItem>
-                                            ))}
-                                          </SelectContent>
-                                        </Select> */}
                                       </div>
                                     </div>
                                   </div>
