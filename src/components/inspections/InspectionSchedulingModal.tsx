@@ -588,158 +588,92 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
               <div className="space-y-4 h-full flex flex-col">
                 
-              {/* Enhanced Filter Card with Inspector Selection */}
+              {/* Compact Filter Card */}
               <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg flex items-center space-x-2">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base flex items-center space-x-2">
                     <Filter className="h-4 w-4" />
                     <span>Campaign Settings & Filters</span>
                   </CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {/* Inspector Selection Section */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 bg-blue-50 rounded-lg border">
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium flex items-center space-x-2">
-                          <User className="h-4 w-4" />
-                          <span>Assigned Inspector (Campaign Default)</span>
-                        </label>
-                        <Select
-                          value={selectedInspector?.id || ''}
-                          onValueChange={(value) => {
-                            const inspector = inspectors.find(i => i.id === value);
-                            setSelectedInspector(inspector || null);
-                          }}
-                          disabled={inspectorsLoading}
-                        >
-                          <SelectTrigger>
-                            <SelectValue placeholder={inspectorsLoading ? "Loading inspectors..." : "Select inspector"} />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {inspectors.map((inspector) => (
-                              <SelectItem key={inspector.id} value={inspector.id}>
-                                <div className="flex flex-col">
-                                  <span className="font-medium">{inspector.full_name}</span>
-                                  <span className="text-xs text-gray-500">{inspector.email}</span>
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                      </div>
-                      
-                      {selectedInspector && (
-                        <div className="space-y-2">
-                          <label className="text-sm font-medium">Selected Inspector</label>
-                          <div className="p-3 bg-white rounded border">
-                            <div className="font-medium">{selectedInspector.full_name}</div>
-                            <div className="text-sm text-gray-600">{selectedInspector.email}</div>
-                            <Badge variant="secondary" className="text-xs mt-1">
-                              Default for all properties
-                            </Badge>
-                          </div>
-                        </div>
-                      )}
+                <CardContent className="space-y-2">
+                  {/* Single Row Layout */}
+                  <div className="grid grid-cols-1 lg:grid-cols-7 gap-2 items-center">
+                    {/* Inspector Selection */}
+                    <div className="lg:col-span-2 flex items-center gap-2">
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      <span className="text-sm font-medium">Inspector:</span>
+                      <Select
+                        value={selectedInspector?.id || ''}
+                        onValueChange={(value) => {
+                          const inspector = inspectors.find(i => i.id === value);
+                          setSelectedInspector(inspector || null);
+                        }}
+                        disabled={inspectorsLoading}
+                      >
+                        <SelectTrigger className="h-8">
+                          <SelectValue placeholder={inspectorsLoading ? "Loading..." : "Select"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {inspectors.map((inspector) => (
+                            <SelectItem key={inspector.id} value={inspector.id}>
+                              {inspector.full_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
                     </div>
 
                     {/* Property Filters */}
-                    <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-                      <Select value={filters.region} onValueChange={(value) => setFilters(prev => ({ ...prev, region: value }))}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Region" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Regions</SelectItem>
-                          <SelectItem value="Central">Central</SelectItem>
-                          <SelectItem value="East">East</SelectItem>
-                          <SelectItem value="West">West</SelectItem>
-                          <SelectItem value="North">North</SelectItem>
-                          <SelectItem value="South">South</SelectItem>
-                        </SelectContent>
-                      </Select>
+                    <Select value={filters.region} onValueChange={(value) => setFilters(prev => ({ ...prev, region: value }))}>
+                      <SelectTrigger className="h-8">
+                        <SelectValue placeholder="Region" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Regions</SelectItem>
+                        <SelectItem value="Central">Central</SelectItem>
+                        <SelectItem value="East">East</SelectItem>
+                        <SelectItem value="West">West</SelectItem>
+                        <SelectItem value="North">North</SelectItem>
+                        <SelectItem value="South">South</SelectItem>
+                      </SelectContent>
+                    </Select>
 
-                      <Select value={filters.market} onValueChange={(value) => setFilters(prev => ({ ...prev, market: value }))}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Market" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">All Markets</SelectItem>
-                          <SelectItem value="Dallas">Dallas</SelectItem>
-                          <SelectItem value="Houston">Houston</SelectItem>
-                          <SelectItem value="Austin">Austin</SelectItem>
-                          <SelectItem value="San Antonio">San Antonio</SelectItem>
-                        </SelectContent>
-                      </Select>
+                    <Select value={filters.market} onValueChange={(value) => setFilters(prev => ({ ...prev, market: value }))}>
+                      <SelectTrigger className="h-8">
+                        <SelectValue placeholder="Market" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">All Markets</SelectItem>
+                        <SelectItem value="Dallas">Dallas</SelectItem>
+                        <SelectItem value="Houston">Houston</SelectItem>
+                        <SelectItem value="Austin">Austin</SelectItem>
+                        <SelectItem value="San Antonio">San Antonio</SelectItem>
+                      </SelectContent>
+                    </Select>
 
-                      <Select value={filters.inspectionType} onValueChange={(value) => setFilters(prev => ({ ...prev, inspectionType: value }))}>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Inspection Type" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="annual">Annual</SelectItem>
-                          <SelectItem value="preventative">Preventative</SelectItem>
-                          <SelectItem value="emergency">Emergency</SelectItem>
-                        </SelectContent>
-                      </Select>
+                    <Select value={filters.inspectionType} onValueChange={(value) => setFilters(prev => ({ ...prev, inspectionType: value }))}>
+                      <SelectTrigger className="h-8">
+                        <SelectValue placeholder="Type" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="annual">Annual</SelectItem>
+                        <SelectItem value="preventative">Preventative</SelectItem>
+                        <SelectItem value="emergency">Emergency</SelectItem>
+                      </SelectContent>
+                    </Select>
 
-                      <div className="space-y-2">
-                        <label className="text-sm font-medium">Zipcodes</label>
-                        <div className="border rounded-md p-2 max-h-32 overflow-y-auto">
-                          <div className="space-y-1">
-                            <div className="flex items-center space-x-2">
-                              <Checkbox
-                                id="all-zipcodes"
-                                checked={filters.zipcodes.length === 0}
-                                onCheckedChange={(checked) => {
-                                  if (checked) {
-                                    setFilters(prev => ({ ...prev, zipcodes: [] }));
-                                  }
-                                }}
-                              />
-                              <label htmlFor="all-zipcodes" className="text-sm cursor-pointer">
-                                All Zipcodes
-                              </label>
-                            </div>
-                            {availableZipcodes.map((zipcode) => (
-                              <div key={zipcode} className="flex items-center space-x-2">
-                                <Checkbox
-                                  id={`zipcode-${zipcode}`}
-                                  checked={filters.zipcodes.includes(zipcode)}
-                                  onCheckedChange={(checked) => {
-                                    if (checked) {
-                                      setFilters(prev => ({ ...prev, zipcodes: [...prev.zipcodes, zipcode] }));
-                                    } else {
-                                      setFilters(prev => ({ ...prev, zipcodes: prev.zipcodes.filter(z => z !== zipcode) }));
-                                    }
-                                  }}
-                                />
-                                <label htmlFor={`zipcode-${zipcode}`} className="text-sm cursor-pointer">
-                                  {zipcode}
-                                </label>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                        {filters.zipcodes.length > 0 && (
-                          <div className="text-xs text-gray-600">
-                            {filters.zipcodes.length} zipcode{filters.zipcodes.length !== 1 ? 's' : ''} selected
-                          </div>
-                        )}
-                      </div>
-
-                      <Button onClick={fetchProperties} className="w-full">
-                        Apply Filters
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                     <Button onClick={fetchProperties} size="sm" className="h-8">
+                       Apply Filters
+                     </Button>
+                   </div>
+                 </CardContent>
+               </Card>
 
                 
-                {/* Enhanced Property Selection Card */}
+                {/* Property Selection Card */}
                 <Card className="flex-1 min-h-0 flex flex-col">
-                  <CardHeader className="pb-3 flex-shrink-0">
+                  <CardHeader className="pb-2 flex-shrink-0">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-lg">
                       Available Properties ({filteredAndPaginatedProperties.totalCount})
@@ -791,7 +725,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                   </div>
                 </CardHeader>
                 <CardContent className="flex-1 min-h-0 p-0">
-                  <ScrollArea className="h-[400px] w-full pointer-events-auto">
+                  <ScrollArea className="h-[500px] w-full pointer-events-auto">
                     <div className="space-y-2 p-6">
                       {loading ? (
                         <div className="text-center py-8">
