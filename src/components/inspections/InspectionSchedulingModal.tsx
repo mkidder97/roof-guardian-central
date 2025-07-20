@@ -663,9 +663,53 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                       </SelectContent>
                     </Select>
 
-                     <Button onClick={fetchProperties} size="sm" className="h-8">
-                       Apply Filters
-                     </Button>
+                    {/* Compact Zipcode Filter */}
+                    <div className="relative">
+                      <Select 
+                        value={filters.zipcodes.length === 0 ? "all" : "custom"}
+                        onValueChange={(value) => {
+                          if (value === "all") {
+                            setFilters(prev => ({ ...prev, zipcodes: [] }));
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="h-8">
+                          <SelectValue placeholder="Zipcodes" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Zipcodes</SelectItem>
+                          <SelectItem value="custom">
+                            {filters.zipcodes.length > 0 ? `${filters.zipcodes.length} selected` : "Select specific"}
+                          </SelectItem>
+                          <div className="p-2 border-t">
+                            <div className="max-h-32 overflow-y-auto space-y-1">
+                              {availableZipcodes.map((zipcode) => (
+                                <div key={zipcode} className="flex items-center space-x-2">
+                                  <Checkbox
+                                    id={`zipcode-${zipcode}`}
+                                    checked={filters.zipcodes.includes(zipcode)}
+                                    onCheckedChange={(checked) => {
+                                      if (checked) {
+                                        setFilters(prev => ({ ...prev, zipcodes: [...prev.zipcodes, zipcode] }));
+                                      } else {
+                                        setFilters(prev => ({ ...prev, zipcodes: prev.zipcodes.filter(z => z !== zipcode) }));
+                                      }
+                                    }}
+                                  />
+                                  <label htmlFor={`zipcode-${zipcode}`} className="text-sm cursor-pointer">
+                                    {zipcode}
+                                  </label>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <Button onClick={fetchProperties} size="sm" className="h-8">
+                      Apply Filters
+                    </Button>
                    </div>
                  </CardContent>
                </Card>
