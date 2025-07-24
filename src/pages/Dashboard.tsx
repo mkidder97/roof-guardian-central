@@ -16,8 +16,9 @@ import { BudgetsTab } from "@/components/dashboard/BudgetsTab";
 import { MaintenanceTab } from "@/components/dashboard/MaintenanceTab";
 import { PropertyManagersTab } from "@/components/dashboard/PropertyManagersTab";
 import { CampaignTracker } from "@/components/dashboard/CampaignTracker";
+import { HistoricalInspectionUploader } from "@/components/admin/HistoricalInspectionUploader";
 import { useNavigate } from "react-router-dom";
-import { Brain } from "lucide-react";
+import { Brain, Upload } from "lucide-react";
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("portfolio");
@@ -107,6 +108,11 @@ export default function Dashboard() {
                     Inspector Tools
                   </TabsTrigger>
                 )}
+                {userRole === 'super_admin' && (
+                  <TabsTrigger value="historical-upload" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-500">
+                    Historical Upload
+                  </TabsTrigger>
+                )}
               </TabsList>
 
               <TabsContent value="portfolio" className="mt-0">
@@ -194,6 +200,14 @@ export default function Dashboard() {
                         </div>
                       </div>
                     </div>
+                  </div>
+                </TabsContent>
+              )}
+              
+              {userRole === 'super_admin' && (
+                <TabsContent value="historical-upload" className="mt-0">
+                  <div className="p-6">
+                    <HistoricalInspectionUploader />
                   </div>
                 </TabsContent>
               )}

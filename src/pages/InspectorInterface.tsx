@@ -15,8 +15,11 @@ import {
   TrendingUp,
   MapPin,
   Clock,
-  DollarSign
+  DollarSign,
+  Loader2
 } from "lucide-react";
+import { InspectorIntelligenceService } from "@/lib/inspectorIntelligenceService";
+import { useToast } from "@/hooks/use-toast";
 
 interface InspectionBriefing {
   property: {
@@ -56,10 +59,14 @@ interface InspectionBriefing {
 
 const InspectorInterface = () => {
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [selectedProperty, setSelectedProperty] = useState<string | null>(null);
   const [briefing, setBriefing] = useState<InspectionBriefing | null>(null);
   const [isRecording, setIsRecording] = useState(false);
   const [voiceNotes, setVoiceNotes] = useState<string[]>([]);
+  const [availableProperties, setAvailableProperties] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [loadingBriefing, setLoadingBriefing] = useState(false);
 
   // Mock data for demo - this would come from your API/database
   const mockBriefing: InspectionBriefing = {
@@ -143,12 +150,72 @@ const InspectorInterface = () => {
     ]
   };
 
+  // Load available properties on component mount
   useEffect(() => {
-    // Simulate loading briefing data
-    if (selectedProperty) {
-      setBriefing(mockBriefing);
-    }
-  }, [selectedProperty]);
+    const loadProperties = async () => {
+      setLoading(true);
+      try {
+        const properties = await InspectorIntelligenceService.getAvailableProperties();
+        
+        // Get property summaries with critical issue counts
+        const propertiesWithSummary = await Promise.all(
+          properties.slice(0, 10).map(async (property) => {
+            const summary = await InspectorIntelligenceService.getPropertySummary(property.id);
+            return summary || {
+              id: property.id,
+              name: property.property_name,
+              roofType: property.roof_type || 'Unknown',
+              squareFootage: property.roof_area || 0,
+              lastInspectionDate: property.last_inspection_date,
+              criticalIssues: 0,
+              status: 'good'
+            };
+          })
+        );
+        
+        setAvailableProperties(propertiesWithSummary);
+      } catch (error) {
+        console.error('Error loading properties:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load properties",
+          variant: "destructive"
+        });
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadProperties();
+  }, [toast]);
+
+  // Load briefing data when property is selected
+  useEffect(() => {
+    const loadBriefing = async () => {
+      if (!selectedProperty) return;
+      
+      setLoadingBriefing(true);
+      try {
+        const briefingData = await InspectorIntelligenceService.generateInspectionBriefing(selectedProperty);
+        if (briefingData) {
+          setBriefing(briefingData);
+        } else {
+          throw new Error('Failed to generate briefing');
+        }
+      } catch (error) {
+        console.error('Error loading briefing:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load inspection briefing",
+          variant: "destructive"
+        });
+      } finally {
+        setLoadingBriefing(false);
+      }
+    };
+
+    loadBriefing();
+  }, [selectedProperty, toast]);
 
   const handleVoiceNote = () => {
     setIsRecording(!isRecording);
@@ -195,26 +262,76 @@ const InspectorInterface = () => {
               <CardDescription>Choose a property to view pre-inspection intelligence</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="grid gap-4">
-                <Card 
-                  className="cursor-pointer hover:border-primary transition-colors"
-                  onClick={() => setSelectedProperty("1")}
-                >
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <h3 className="font-semibold">Prologis Dallas Distribution Center</h3>
-                        <p className="text-sm text-muted-foreground">Modified Bitumen • 150,000 sq ft</p>
-                        <p className="text-sm text-muted-foreground">Last inspected: Oct 15, 2024</p>
-                      </div>
-                      <Badge variant="destructive">3 Critical Issues</Badge>
+              {loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                  <span className="ml-2">Loading properties...</span>
+                </div>
+              ) : (
+                <div className="grid gap-4 max-h-96 overflow-y-auto">
+                  {availableProperties.map((property) => (
+                    <Card 
+                      key={property.id}
+                      className="cursor-pointer hover:border-primary transition-colors"
+                      onClick={() => setSelectedProperty(property.id)}
+                    >
+                      <CardContent className="p-4">
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <h3 className="font-semibold">{property.name}</h3>
+                            <p className="text-sm text-muted-foreground">
+                              {property.roofType} • {property.squareFootage.toLocaleString()} sq ft
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              Last inspected: {property.lastInspectionDate 
+                                ? new Date(property.lastInspectionDate).toLocaleDateString()
+                                : 'Never'
+                              }
+                            </p>
+                          </div>
+                          <div className="flex flex-col items-end gap-1">
+                            {property.criticalIssues > 0 && (
+                              <Badge variant="destructive">
+                                {property.criticalIssues} Critical Issue{property.criticalIssues > 1 ? 's' : ''}
+                              </Badge>
+                            )}
+                            <Badge 
+                              variant={
+                                property.status === 'critical' ? 'destructive' :
+                                property.status === 'overdue' ? 'destructive' :
+                                property.status === 'attention' ? 'secondary' : 'outline'
+                              }
+                            >
+                              {property.status === 'critical' ? 'Critical' :
+                               property.status === 'overdue' ? 'Overdue' :
+                               property.status === 'attention' ? 'Needs Attention' : 'Good'}
+                            </Badge>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  ))}
+                  {availableProperties.length === 0 && !loading && (
+                    <div className="text-center py-8">
+                      <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-500">No properties available for inspection</p>
                     </div>
-                  </CardContent>
-                </Card>
+                  )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        ) : loadingBriefing ? (
+          // Loading briefing
+          <Card>
+            <CardContent className="p-8">
+              <div className="flex items-center justify-center">
+                <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                <span className="ml-2">Generating inspection briefing...</span>
               </div>
             </CardContent>
           </Card>
-        ) : briefing && (
+        ) : briefing ? (
           // Pre-Inspection Intelligence
           <div className="space-y-6">
             {/* Property Header */}
@@ -447,6 +564,27 @@ const InspectorInterface = () => {
               </TabsContent>
             </Tabs>
           </div>
+        ) : (
+          // Error state when briefing failed to load
+          <Card>
+            <CardContent className="p-8">
+              <div className="text-center">
+                <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold mb-2">Failed to Load Briefing</h3>
+                <p className="text-gray-600 mb-4">
+                  We couldn't generate the inspection briefing for this property.
+                </p>
+                <div className="space-x-2">
+                  <Button onClick={() => setSelectedProperty(null)} variant="outline">
+                    Select Different Property
+                  </Button>
+                  <Button onClick={() => window.location.reload()}>
+                    Retry
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
         )}
       </div>
     </div>
