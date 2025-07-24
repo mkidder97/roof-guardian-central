@@ -45,8 +45,8 @@ export function PropertyManagersTab() {
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("managers");
   const [searchTerm, setSearchTerm] = useState("");
-  const [regionFilter, setRegionFilter] = useState("");
-  const [marketFilter, setMarketFilter] = useState("");
+  const [regionFilter, setRegionFilter] = useState("all");
+  const [marketFilter, setMarketFilter] = useState("all");
   const [availableRegions, setAvailableRegions] = useState<string[]>([]);
   const [availableMarkets, setAvailableMarkets] = useState<string[]>([]);
   
@@ -322,8 +322,8 @@ export function PropertyManagersTab() {
     const matchesSearch = manager.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          manager.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          manager.company.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRegion = !regionFilter || manager.region === regionFilter;
-    const matchesMarket = !marketFilter || manager.market === marketFilter;
+    const matchesRegion = !regionFilter || regionFilter === "all" || manager.region === regionFilter;
+    const matchesMarket = !marketFilter || marketFilter === "all" || manager.market === marketFilter;
     
     return matchesSearch && matchesRegion && matchesMarket;
   });
@@ -332,8 +332,8 @@ export function PropertyManagersTab() {
     const matchesSearch = property.property_name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          property.address.toLowerCase().includes(searchTerm.toLowerCase()) ||
                          property.city.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesRegion = !regionFilter || property.region === regionFilter;
-    const matchesMarket = !marketFilter || property.market === marketFilter;
+    const matchesRegion = !regionFilter || regionFilter === "all" || property.region === regionFilter;
+    const matchesMarket = !marketFilter || marketFilter === "all" || property.market === marketFilter;
     
     return matchesSearch && matchesRegion && matchesMarket;
   });
@@ -530,7 +530,7 @@ export function PropertyManagersTab() {
                 <SelectValue placeholder="Filter by region" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Regions</SelectItem>
+                <SelectItem value="all">All Regions</SelectItem>
                 {availableRegions.map(region => (
                   <SelectItem key={region} value={region}>{region}</SelectItem>
                 ))}
@@ -541,7 +541,7 @@ export function PropertyManagersTab() {
                 <SelectValue placeholder="Filter by market" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">All Markets</SelectItem>
+                <SelectItem value="all">All Markets</SelectItem>
                 {availableMarkets.map(market => (
                   <SelectItem key={market} value={market}>{market}</SelectItem>
                 ))}
@@ -551,8 +551,8 @@ export function PropertyManagersTab() {
               variant="outline" 
               onClick={() => {
                 setSearchTerm("");
-                setRegionFilter("");
-                setMarketFilter("");
+                setRegionFilter("all");
+                setMarketFilter("all");
               }}
             >
               Clear Filters
