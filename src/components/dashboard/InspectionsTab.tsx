@@ -4,7 +4,9 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, FileDown, Calendar, User, Building, Loader2 } from "lucide-react";
+import { Search, Plus, FileDown, Calendar, User, Building, Loader2, Brain } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/contexts/AuthContext";
 import { InspectionSchedulingModal } from "@/components/inspections/InspectionSchedulingModal";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
@@ -37,6 +39,8 @@ export function InspectionsTab() {
   const [inspections, setInspections] = useState<Inspection[]>([]);
   const [filteredInspections, setFilteredInspections] = useState<Inspection[]>([]);
   const [loading, setLoading] = useState(true);
+  const navigate = useNavigate();
+  const { userRole } = useAuth();
 
   useEffect(() => {
     fetchInspections();
@@ -224,6 +228,17 @@ export function InspectionsTab() {
         </div>
         
         <div className="flex items-center space-x-3">
+          {userRole === 'inspector' && (
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => navigate('/inspector')}
+              className="bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100"
+            >
+              <Brain className="h-4 w-4 mr-2" />
+              Inspector Intelligence
+            </Button>
+          )}
           <Button variant="outline" size="sm" onClick={exportData}>
             <FileDown className="h-4 w-4 mr-2" />
             Export
