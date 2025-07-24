@@ -219,7 +219,11 @@ export function HistoricalInspectionUploader() {
           f.id === file.id ? { 
             ...f, 
             status: 'matched',
-            matchedProperty,
+            matchedProperty: {
+              id: matchedProperty.id,
+              name: matchedProperty.property_name,
+              address: matchedProperty.address
+            },
             extractedData
           } : f
         ));
