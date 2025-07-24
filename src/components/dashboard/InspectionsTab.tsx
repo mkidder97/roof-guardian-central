@@ -228,7 +228,7 @@ export function InspectionsTab() {
         </div>
         
         <div className="flex items-center space-x-3">
-          {userRole === 'inspector' && (
+          {(userRole === 'inspector' || userRole === 'super_admin') && (
             <Button 
               variant="outline" 
               size="sm"

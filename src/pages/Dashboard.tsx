@@ -103,7 +103,7 @@ export default function Dashboard() {
                     Accounts
                   </TabsTrigger>
                 )}
-                {userRole === 'inspector' && (
+                {(userRole === 'inspector' || userRole === 'super_admin') && (
                   <TabsTrigger value="inspector-tools" className="data-[state=active]:bg-white data-[state=active]:border-b-2 data-[state=active]:border-blue-500">
                     Inspector Tools
                   </TabsTrigger>
@@ -164,7 +164,7 @@ export default function Dashboard() {
                 </TabsContent>
               )}
               
-              {userRole === 'inspector' && (
+              {(userRole === 'inspector' || userRole === 'super_admin') && (
                 <TabsContent value="inspector-tools" className="mt-0">
                   <div className="p-6">
                     <div className="max-w-4xl mx-auto">
