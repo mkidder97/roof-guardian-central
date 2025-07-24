@@ -161,7 +161,7 @@ const InspectorInterface = () => {
   const getSeverityColor = (severity: string) => {
     switch (severity) {
       case 'high': return 'destructive';
-      case 'medium': return 'warning';
+      case 'medium': return 'outline';
       case 'low': return 'secondary';
       default: return 'default';
     }
