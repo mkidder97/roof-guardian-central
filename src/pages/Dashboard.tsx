@@ -16,7 +16,6 @@ import { BudgetsTab } from "@/components/dashboard/BudgetsTab";
 import { MaintenanceTab } from "@/components/dashboard/MaintenanceTab";
 import { PropertyManagersTab } from "@/components/dashboard/PropertyManagersTab";
 import { CampaignTracker } from "@/components/dashboard/CampaignTracker";
-import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { Brain } from "lucide-react";
 
