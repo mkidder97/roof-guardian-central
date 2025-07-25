@@ -37,6 +37,8 @@ import { CampaignTracker } from "@/components/dashboard/CampaignTracker";
 import { WorkOrdersTab } from "@/components/dashboard/WorkOrdersTab";
 import { HistoricalInspectionUploader } from "@/components/admin/HistoricalInspectionUploader";
 import { AccountsTab } from "@/components/dashboard/AccountsTab";
+import { RiskAnalysisDashboard } from "@/components/analytics/RiskAnalysisDashboard";
+import { AdvancedAnalyticsDashboard } from "@/components/analytics/AdvancedAnalyticsDashboard";
 
 interface DashboardStats {
   totalProperties: number;
@@ -51,7 +53,12 @@ export function UnifiedDashboard() {
   const { user, userRole, signOut } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('overview');
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  
+  // Initialize sidebar state based on screen size
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    return window.innerWidth < 1024; // Collapsed on mobile/tablet
+  });
+  
   const [darkMode, setDarkMode] = useState(false);
   const [dashboardStats, setDashboardStats] = useState<DashboardStats>({
     totalProperties: 0,
@@ -64,6 +71,21 @@ export function UnifiedDashboard() {
 
   // Command palette
   const { open: commandPaletteOpen, setOpen: setCommandPaletteOpen } = useCommandPalette();
+
+  // Handle responsive sidebar
+  useEffect(() => {
+    const handleResize = () => {
+      const isLargeScreen = window.innerWidth >= 1024;
+      if (isLargeScreen && sidebarCollapsed) {
+        setSidebarCollapsed(false);
+      } else if (!isLargeScreen && !sidebarCollapsed) {
+        setSidebarCollapsed(true);
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, [sidebarCollapsed]);
 
   // Load dashboard statistics
   useEffect(() => {
@@ -131,6 +153,11 @@ export function UnifiedDashboard() {
       return;
     }
     setActiveTab(tab);
+    
+    // Close sidebar on mobile after navigation
+    if (window.innerWidth < 1024) {
+      setSidebarCollapsed(true);
+    }
   };
 
   const renderTabContent = () => {
@@ -147,6 +174,10 @@ export function UnifiedDashboard() {
         return <WorkOrdersTab />;
       case 'search':
         return <SmartSearchTab />;
+      case 'risk-analysis':
+        return <RiskAnalysisDashboard />;
+      case 'analytics':
+        return <AdvancedAnalyticsDashboard />;
       case 'historical-upload':
         return <HistoricalInspectionUploader />;
       case 'accounts':
@@ -158,35 +189,58 @@ export function UnifiedDashboard() {
 
   return (
     <div className="h-screen flex bg-background">
+      {/* Mobile Menu Overlay */}
+      {!sidebarCollapsed && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden"
+          onClick={() => setSidebarCollapsed(true)}
+        />
+      )}
+
       {/* Sidebar */}
-      <UnifiedSidebar
-        activeTab={activeTab}
-        onTabChange={handleTabChange}
-        userRole={userRole}
-        collapsed={sidebarCollapsed}
-        onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
-      />
+      <div className={cn(
+        "fixed lg:static inset-y-0 left-0 z-50 transition-transform duration-300 ease-in-out",
+        sidebarCollapsed ? "-translate-x-full lg:translate-x-0" : "translate-x-0"
+      )}>
+        <UnifiedSidebar
+          activeTab={activeTab}
+          onTabChange={handleTabChange}
+          userRole={userRole}
+          collapsed={false}
+          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+        />
+      </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex-1 flex flex-col overflow-hidden lg:ml-0">
         {/* Top Header */}
         <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
-          <div className="flex h-16 items-center justify-between px-6">
+          <div className="flex h-16 items-center justify-between px-4 lg:px-6">
             <div className="flex items-center gap-4">
-              <h1 className="text-xl font-semibold">
+              {/* Mobile menu button */}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="lg:hidden"
+                onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+              >
+                <Menu className="h-5 w-5" />
+              </Button>
+              
+              <h1 className="text-lg lg:text-xl font-semibold truncate">
                 {getTabTitle(activeTab)}
               </h1>
               {activeTab === 'search' && (
-                <Badge variant="secondary" className="flex items-center gap-1">
+                <Badge variant="secondary" className="hidden sm:flex items-center gap-1">
                   <Sparkles className="h-3 w-3" />
                   AI-Powered
                 </Badge>
               )}
             </div>
 
-            <div className="flex items-center gap-2">
-              {/* Quick Stats */}
-              <div className="hidden md:flex items-center gap-4 mr-4">
+            <div className="flex items-center gap-1 lg:gap-2">
+              {/* Quick Stats - Desktop Only */}
+              <div className="hidden xl:flex items-center gap-4 mr-4">
                 <div className="flex items-center gap-2 text-sm">
                   <div className="h-2 w-2 rounded-full bg-green-500"></div>
                   <span className="text-muted-foreground">{dashboardStats.totalProperties} Properties</span>
@@ -203,37 +257,40 @@ export function UnifiedDashboard() {
                 )}
               </div>
 
-              {/* Actions */}
+              {/* Actions - Mobile Optimized */}
               <NotificationCenter />
               
               <Button 
                 variant="ghost" 
                 size="sm"
                 onClick={() => setDarkMode(!darkMode)}
+                className="hidden sm:flex"
               >
                 {darkMode ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
               </Button>
 
-              <Button variant="ghost" size="sm">
+              <Button variant="ghost" size="sm" className="hidden sm:flex">
                 <Settings className="h-4 w-4" />
               </Button>
 
+              {/* User Menu - Responsive */}
               <div className="flex items-center gap-2 ml-2 pl-2 border-l">
-                <div className="text-sm">
-                  <div className="font-medium">{user?.email}</div>
+                <div className="hidden sm:block text-sm">
+                  <div className="font-medium truncate max-w-32">{user?.email}</div>
                   <div className="text-xs text-muted-foreground capitalize">{userRole}</div>
                 </div>
                 <Button variant="ghost" size="sm" onClick={handleSignOut}>
                   <LogOut className="h-4 w-4" />
+                  <span className="sr-only">Sign out</span>
                 </Button>
               </div>
             </div>
           </div>
           
-          {/* Quick Action Bar */}
-          <div className="border-b px-6 py-2 bg-muted/30">
+          {/* Quick Action Bar - Mobile Responsive */}
+          <div className="border-b px-4 lg:px-6 py-2 bg-muted/30">
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 lg:gap-4">
                 <Button 
                   variant="ghost" 
                   size="sm" 
@@ -241,11 +298,12 @@ export function UnifiedDashboard() {
                   className="text-xs"
                 >
                   <Command className="h-3 w-3 mr-1" />
-                  Press ⌘K for quick actions
+                  <span className="hidden sm:inline">Press ⌘K for quick actions</span>
+                  <span className="sm:hidden">Quick actions</span>
                 </Button>
               </div>
               
-              <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              <div className="hidden md:flex items-center gap-2 text-xs text-muted-foreground">
                 <div className="flex items-center gap-1">
                   <Sparkles className="h-3 w-3 text-yellow-500" />
                   <span>AI-Powered Dashboard</span>
@@ -256,12 +314,18 @@ export function UnifiedDashboard() {
                   <span>Real-time Updates</span>
                 </div>
               </div>
+              
+              {/* Mobile status indicators */}
+              <div className="flex md:hidden items-center gap-1">
+                <Sparkles className="h-3 w-3 text-yellow-500" />
+                <Zap className="h-3 w-3 text-green-500" />
+              </div>
             </div>
           </div>
         </header>
 
-        {/* Tab Content */}
-        <main className="flex-1 overflow-auto p-6">
+        {/* Tab Content - Mobile Responsive */}
+        <main className="flex-1 overflow-auto p-3 sm:p-4 lg:p-6">
           {renderTabContent()}
         </main>
       </div>
@@ -293,40 +357,41 @@ function EnhancedOverviewTab({ stats }: { stats: DashboardStats }) {
   const { setOpen: setCommandPaletteOpen } = useCommandPalette();
   return (
     <div className="space-y-6">
-      {/* Welcome Section */}
-      <div className="flex items-center justify-between">
+      {/* Welcome Section - Mobile Responsive */}
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Welcome back!</h2>
-          <p className="text-muted-foreground">
+          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight">Welcome back!</h2>
+          <p className="text-muted-foreground text-sm sm:text-base">
             Here's what's happening with your portfolio today.
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <Button size="sm" onClick={() => setCommandPaletteOpen(true)}>
             <Command className="h-4 w-4 mr-2" />
-            Quick Actions
+            <span className="hidden sm:inline">Quick Actions</span>
+            <span className="sm:hidden">Actions</span>
           </Button>
-          <Button size="sm">
+          <Button size="sm" className="hidden sm:flex">
             <TrendingUp className="h-4 w-4 mr-2" />
             View Analytics
           </Button>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" className="hidden md:flex">
             Export Report
           </Button>
         </div>
       </div>
 
-      {/* Quick Stats Grid */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {/* Quick Stats Grid - Mobile Responsive */}
+      <div className="grid gap-3 sm:gap-4 grid-cols-2 lg:grid-cols-4">
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Properties</CardTitle>
-            <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
-              <CheckCircle className="h-4 w-4 text-blue-500" />
+            <CardTitle className="text-xs sm:text-sm font-medium">Total Properties</CardTitle>
+            <div className="h-6 w-6 sm:h-8 sm:w-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+              <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-blue-500" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.totalProperties}</div>
+            <div className="text-xl sm:text-2xl font-bold">{stats.totalProperties}</div>
             <p className="text-xs text-muted-foreground">
               Active portfolio size
             </p>
@@ -335,13 +400,13 @@ function EnhancedOverviewTab({ stats }: { stats: DashboardStats }) {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Active Inspections</CardTitle>
-            <div className="h-8 w-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
-              <Clock className="h-4 w-4 text-orange-500" />
+            <CardTitle className="text-xs sm:text-sm font-medium">Active Inspections</CardTitle>
+            <div className="h-6 w-6 sm:h-8 sm:w-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
+              <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-orange-500" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.activeInspections}</div>
+            <div className="text-xl sm:text-2xl font-bold">{stats.activeInspections}</div>
             <p className="text-xs text-muted-foreground">
               In progress or scheduled
             </p>
@@ -350,13 +415,13 @@ function EnhancedOverviewTab({ stats }: { stats: DashboardStats }) {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Pending Work Orders</CardTitle>
-            <div className="h-8 w-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
-              <AlertTriangle className="h-4 w-4 text-purple-500" />
+            <CardTitle className="text-xs sm:text-sm font-medium">Pending Work Orders</CardTitle>
+            <div className="h-6 w-6 sm:h-8 sm:w-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
+              <AlertTriangle className="h-3 w-3 sm:h-4 sm:w-4 text-purple-500" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.pendingWorkOrders}</div>
+            <div className="text-xl sm:text-2xl font-bold">{stats.pendingWorkOrders}</div>
             <p className="text-xs text-muted-foreground">
               Awaiting assignment
             </p>
@@ -365,13 +430,13 @@ function EnhancedOverviewTab({ stats }: { stats: DashboardStats }) {
 
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Campaign Progress</CardTitle>
-            <div className="h-8 w-8 rounded-lg bg-green-500/10 flex items-center justify-center">
-              <TrendingUp className="h-4 w-4 text-green-500" />
+            <CardTitle className="text-xs sm:text-sm font-medium">Campaign Progress</CardTitle>
+            <div className="h-6 w-6 sm:h-8 sm:w-8 rounded-lg bg-green-500/10 flex items-center justify-center">
+              <TrendingUp className="h-3 w-3 sm:h-4 sm:w-4 text-green-500" />
             </div>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{stats.campaignProgress}%</div>
+            <div className="text-xl sm:text-2xl font-bold">{stats.campaignProgress}%</div>
             <p className="text-xs text-muted-foreground">
               Average completion
             </p>
@@ -379,8 +444,8 @@ function EnhancedOverviewTab({ stats }: { stats: DashboardStats }) {
         </Card>
       </div>
 
-      {/* Main Content - Fallback to original overview */}
-      <div className="grid gap-6 lg:grid-cols-2">
+      {/* Main Content - Mobile Responsive */}
+      <div className="grid gap-4 sm:gap-6 lg:grid-cols-2">
         <Card>
           <CardHeader>
             <CardTitle>Recent Activity</CardTitle>
@@ -467,6 +532,8 @@ function getTabTitle(tab: string): string {
     campaigns: 'Campaigns',
     'work-orders': 'Work Orders',
     search: 'Smart Search',
+    analytics: 'Advanced Analytics',
+    'risk-analysis': 'AI Risk Analysis',
     'historical-upload': 'Historical Upload',
     accounts: 'User Accounts'
   };
