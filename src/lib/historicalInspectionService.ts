@@ -1,60 +1,118 @@
 import { supabase } from '@/integrations/supabase/client';
+import { uploadRoofFile } from '@/lib/fileUpload';
+import { RealPDFParser, ExtractedPDFData } from './realPdfParser';
+import { PropertyMatcher, PropertyMatch } from './propertyMatcher';
 import type { Database } from '@/integrations/supabase/types';
 
 type InspectionInsert = Database['public']['Tables']['inspections']['Insert'];
 type InspectionReportInsert = Database['public']['Tables']['inspection_reports']['Insert'];
 
-interface ExtractedInspectionData {
-  inspectionDate: string;
-  inspector?: string;
-  findings: string[];
-  issues: Array<{
-    location: string;
-    severity: 'high' | 'medium' | 'low';
-    type: string;
-    description?: string;
-    estimatedCost?: number;
-    recurrenceCount?: number;
-  }>;
-  recommendations: string[];
-  totalEstimatedCost?: number;
-  photos?: Array<{
-    location: string;
-    description: string;
-  }>;
-  weatherConditions?: string;
-  roofCondition?: string;
-  urgentItems?: string[];
-}
-
-interface StoredInspectionResult {
+export interface StoredInspectionResult {
   inspectionId: string;
   reportId: string;
+  fileUrl: string;
+  propertyMatch: PropertyMatch | null;
+  extractedData: ExtractedPDFData;
   success: boolean;
   error?: string;
 }
 
+export interface ProcessedPDFResult {
+  success: boolean;
+  propertyMatch: PropertyMatch | null;
+  extractedData: ExtractedPDFData;
+  storedResult?: StoredInspectionResult;
+  error?: string;
+  fileName: string;
+}
+
 export class HistoricalInspectionService {
+  /**
+   * Process PDF file: extract data, match property, and store if match found
+   */
+  static async processPDFFile(pdfFile: File): Promise<ProcessedPDFResult> {
+    try {
+      console.log('Processing PDF file:', pdfFile.name);
+      
+      // 1. Extract data from PDF using real PDF parser
+      const extractedData = await RealPDFParser.extractPDFData(pdfFile);
+      console.log('Extracted property name:', extractedData.propertyName);
+      
+      // 2. Find matching property in database
+      const propertyMatch = await PropertyMatcher.findBestMatch(
+        extractedData.propertyName,
+        extractedData.address
+      );
+      
+      if (!propertyMatch) {
+        console.log('No property match found for:', extractedData.propertyName);
+        return {
+          success: false,
+          propertyMatch: null,
+          extractedData,
+          fileName: pdfFile.name,
+          error: `Could not match property "${extractedData.propertyName}" to any existing property in database`
+        };
+      }
+      
+      console.log(`Found property match: ${propertyMatch.property_name} (confidence: ${propertyMatch.confidence})`);
+      
+      // 3. Store the inspection data
+      const storedResult = await this.storeHistoricalInspection(
+        propertyMatch.id,
+        extractedData,
+        pdfFile
+      );
+      
+      return {
+        success: storedResult.success,
+        propertyMatch,
+        extractedData,
+        storedResult,
+        fileName: pdfFile.name,
+        error: storedResult.error
+      };
+      
+    } catch (error) {
+      console.error('Error processing PDF file:', error);
+      return {
+        success: false,
+        propertyMatch: null,
+        extractedData: {} as ExtractedPDFData,
+        fileName: pdfFile.name,
+        error: error instanceof Error ? error.message : 'Unknown error processing PDF'
+      };
+    }
+  }
   
   /**
-   * Store extracted inspection data in the database
+   * Store historical inspection data extracted from PDF
    */
   static async storeHistoricalInspection(
     roofId: string,
-    extractedData: ExtractedInspectionData,
-    pdfUrl: string
+    extractedData: ExtractedPDFData,
+    pdfFile: File
   ): Promise<StoredInspectionResult> {
     try {
-      // First, create the inspection record
+      console.log('Storing historical inspection for roof:', roofId);
+      
+      // 1. Upload PDF file to storage
+      const fileUploadResult = await uploadRoofFile(pdfFile, roofId);
+      if (!fileUploadResult.success || !fileUploadResult.data) {
+        throw new Error('Failed to upload PDF file');
+      }
+      
+      // 2. Parse inspection date
+      const inspectionDate = this.parseInspectionDate(extractedData.reportDate);
+      
+      // 3. Create inspection record
       const inspectionData: InspectionInsert = {
         roof_id: roofId,
-        scheduled_date: extractedData.inspectionDate,
-        completed_date: extractedData.inspectionDate, // Historical data is already completed
-        inspection_type: 'annual', // Default type, could be enhanced to detect from PDF
+        inspection_type: this.normalizeInspectionType(extractedData.reportType),
+        completed_date: inspectionDate,
         status: 'completed',
-        notes: `Historical inspection uploaded from PDF. ${extractedData.findings.slice(0, 2).join('. ')}`,
-        weather_conditions: extractedData.weatherConditions || null,
-        inspector_id: null // Could be enhanced to map inspector names to IDs
+        notes: `Historical inspection imported from PDF: ${pdfFile.name}\nInspection Company: ${extractedData.inspectionCompany}`,
+        weather_conditions: null
       };
 
       const { data: inspection, error: inspectionError } = await supabase
@@ -62,21 +120,23 @@ export class HistoricalInspectionService {
         .insert(inspectionData)
         .select()
         .single();
-
-      if (inspectionError) {
-        throw new Error(`Failed to create inspection: ${inspectionError.message}`);
+      
+      if (inspectionError || !inspection) {
+        throw new Error(`Failed to create inspection record: ${inspectionError?.message}`);
       }
-
-      // Create the inspection report
+      
+      // 4. Create inspection report with extracted findings
+      const findings = this.generateFindings(extractedData);
+      const recommendations = this.generateRecommendations(extractedData);
+      
       const reportData: InspectionReportInsert = {
         inspection_id: inspection.id,
-        findings: this.formatFindings(extractedData),
-        recommendations: this.formatRecommendations(extractedData),
-        estimated_cost: extractedData.totalEstimatedCost || null,
-        priority_level: this.determinePriorityLevel(extractedData.issues),
-        report_url: pdfUrl,
+        findings,
+        recommendations,
+        estimated_cost: 0, // Will be updated if cost estimates are found in PDF
+        priority_level: this.determinePriorityLevel(extractedData),
         status: 'completed',
-        photos_urls: extractedData.photos?.map(p => p.description) || null
+        report_url: fileUploadResult.data.publicUrl
       };
 
       const { data: report, error: reportError } = await supabase
@@ -84,87 +144,299 @@ export class HistoricalInspectionService {
         .insert(reportData)
         .select()
         .single();
-
-      if (reportError) {
-        throw new Error(`Failed to create inspection report: ${reportError.message}`);
+      
+      if (reportError || !report) {
+        throw new Error(`Failed to create inspection report: ${reportError?.message}`);
       }
-
-      // Update the roof's last inspection date
-      await supabase
-        .from('roofs')
-        .update({ 
-          last_inspection_date: extractedData.inspectionDate,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', roofId);
-
+      
+      // 5. Update roof information with extracted data
+      await this.updateRoofInformation(roofId, extractedData, inspectionDate);
+      
+      console.log('Successfully stored historical inspection:', inspection.id);
+      
       return {
         inspectionId: inspection.id,
         reportId: report.id,
+        fileUrl: fileUploadResult.data.publicUrl,
+        propertyMatch: null,
+        extractedData,
         success: true
       };
-
+      
     } catch (error) {
       console.error('Error storing historical inspection:', error);
       return {
         inspectionId: '',
         reportId: '',
+        fileUrl: '',
+        propertyMatch: null,
+        extractedData,
         success: false,
-        error: error instanceof Error ? error.message : 'Unknown error occurred'
+        error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
   }
-
+  
   /**
-   * Format findings for database storage
+   * Update roof information with extracted data from PDF
    */
-  private static formatFindings(data: ExtractedInspectionData): string {
-    const formattedFindings = [
-      `GENERAL FINDINGS:`,
-      ...data.findings.map(finding => `• ${finding}`),
-      ``,
-      `IDENTIFIED ISSUES:`,
-      ...data.issues.map(issue => 
-        `• ${issue.location}: ${issue.type} (${issue.severity.toUpperCase()})${
-          issue.estimatedCost ? ` - Est. Cost: $${issue.estimatedCost.toLocaleString()}` : ''
-        }`
-      )
-    ];
-
-    return formattedFindings.join('\n');
-  }
-
-  /**
-   * Format recommendations for database storage
-   */
-  private static formatRecommendations(data: ExtractedInspectionData): string {
-    const formattedRecs = [
-      `RECOMMENDATIONS:`,
-      ...data.recommendations.map(rec => `• ${rec}`),
-    ];
-
-    if (data.urgentItems && data.urgentItems.length > 0) {
-      formattedRecs.push(
-        ``,
-        `URGENT ACTIONS REQUIRED:`,
-        ...data.urgentItems.map(item => `• ${item}`)
-      );
+  private static async updateRoofInformation(
+    roofId: string,
+    extractedData: ExtractedPDFData,
+    inspectionDate: string
+  ): Promise<void> {
+    const updateData: any = {
+      last_inspection_date: inspectionDate,
+      updated_at: new Date().toISOString()
+    };
+    
+    // Update roof specifications if extracted from PDF
+    if (extractedData.roofArea > 0) {
+      updateData.roof_area = extractedData.roofArea;
+      updateData.roof_area_unit = 'sq ft';
     }
-
-    return formattedRecs.join('\n');
+    
+    if (extractedData.roofSystem) {
+      updateData.roof_system = extractedData.roofSystem;
+    }
+    
+    if (extractedData.systemDescription) {
+      updateData.roof_system_description = extractedData.systemDescription;
+    }
+    
+    if (extractedData.manufacturer) {
+      updateData.manufacturer = extractedData.manufacturer;
+    }
+    
+    if (extractedData.installingContractor) {
+      updateData.installing_contractor = extractedData.installingContractor;
+    }
+    
+    if (extractedData.repairingContractor) {
+      updateData.repair_contractor = extractedData.repairingContractor;
+    }
+    
+    if (extractedData.drainageSystem) {
+      updateData.drainage_system = extractedData.drainageSystem;
+    }
+    
+    if (extractedData.flashingDetail) {
+      updateData.flashing_detail = extractedData.flashingDetail;
+    }
+    
+    if (extractedData.perimeterDetail) {
+      updateData.perimeter_detail = extractedData.perimeterDetail;
+    }
+    
+    if (extractedData.propertyManager) {
+      updateData.property_manager_name = extractedData.propertyManager;
+    }
+    
+    if (extractedData.propertyManagerPhone) {
+      updateData.property_manager_phone = extractedData.propertyManagerPhone;
+    }
+    
+    if (extractedData.market) {
+      updateData.market = extractedData.market;
+    }
+    
+    await supabase
+      .from('roofs')
+      .update(updateData)
+      .eq('id', roofId);
+    
+    console.log('Updated roof information with extracted data');
   }
-
+  
   /**
-   * Determine overall priority level based on issues
+   * Parse inspection date from various formats
    */
-  private static determinePriorityLevel(issues: ExtractedInspectionData['issues']): string {
-    if (issues.some(issue => issue.severity === 'high')) {
+  private static parseInspectionDate(dateString: string): string {
+    if (!dateString) return new Date().toISOString().split('T')[0];
+    
+    try {
+      // Try to parse various date formats
+      let date: Date;
+      
+      // Format: "MARCH 14, 2025"
+      if (dateString.match(/[A-Z]+ \d{1,2},? \d{4}/i)) {
+        date = new Date(dateString);
+      }
+      // Format: "03/14/2025" or "3-14-2025"
+      else if (dateString.match(/\d{1,2}[-\/]\d{1,2}[-\/]\d{4}/)) {
+        date = new Date(dateString);
+      }
+      // Format: "2025-03-14"
+      else if (dateString.match(/\d{4}-\d{1,2}-\d{1,2}/)) {
+        date = new Date(dateString);
+      }
+      else {
+        date = new Date(dateString);
+      }
+      
+      // Validate date
+      if (isNaN(date.getTime())) {
+        console.warn('Invalid date format:', dateString);
+        return new Date().toISOString().split('T')[0];
+      }
+      
+      return date.toISOString().split('T')[0];
+      
+    } catch (error) {
+      console.warn('Error parsing date:', dateString, error);
+      return new Date().toISOString().split('T')[0];
+    }
+  }
+  
+  /**
+   * Normalize inspection type from PDF
+   */
+  private static normalizeInspectionType(reportType: string): string {
+    const type = reportType.toLowerCase();
+    
+    if (type.includes('storm') || type.includes('damage')) return 'storm_damage';
+    if (type.includes('annual')) return 'annual';
+    if (type.includes('quarterly')) return 'quarterly';
+    if (type.includes('monthly')) return 'monthly';
+    if (type.includes('emergency')) return 'emergency';
+    if (type.includes('routine')) return 'routine';
+    
+    return 'annual'; // Default
+  }
+  
+  /**
+   * Determine priority level from extracted data
+   */
+  private static determinePriorityLevel(extractedData: ExtractedPDFData): string {
+    const reportType = extractedData.reportType.toLowerCase();
+    
+    if (reportType.includes('storm') || reportType.includes('emergency')) {
       return 'high';
     }
-    if (issues.some(issue => issue.severity === 'medium')) {
+    
+    if (reportType.includes('damage')) {
       return 'medium';
     }
+    
     return 'low';
+  }
+  
+  /**
+   * Generate findings text from extracted data
+   */
+  private static generateFindings(extractedData: ExtractedPDFData): string {
+    const findings: string[] = [];
+    
+    findings.push(`INSPECTION DETAILS:`);
+    findings.push(`• Report Type: ${extractedData.reportType}`);
+    findings.push(`• Report Date: ${extractedData.reportDate}`);
+    findings.push(`• Inspection Company: ${extractedData.inspectionCompany}`);
+    findings.push(`• Property: ${extractedData.propertyName}`);
+    
+    if (extractedData.address) {
+      findings.push(`• Address: ${extractedData.address}`);
+    }
+    
+    findings.push('');
+    findings.push(`ROOF SPECIFICATIONS:`);
+    
+    if (extractedData.roofArea > 0) {
+      findings.push(`• Roof Area: ${extractedData.roofArea.toLocaleString()} sq ft`);
+    }
+    
+    if (extractedData.roofSystem) {
+      findings.push(`• Roof System: ${extractedData.roofSystem}`);
+    }
+    
+    if (extractedData.systemDescription) {
+      findings.push(`• System Description: ${extractedData.systemDescription}`);
+    }
+    
+    if (extractedData.manufacturer) {
+      findings.push(`• Manufacturer: ${extractedData.manufacturer}`);
+    }
+    
+    if (extractedData.drainageSystem) {
+      findings.push(`• Drainage System: ${extractedData.drainageSystem}`);
+    }
+    
+    if (extractedData.flashingDetail) {
+      findings.push(`• Flashing Detail: ${extractedData.flashingDetail}`);
+    }
+    
+    if (extractedData.perimeterDetail) {
+      findings.push(`• Perimeter Detail: ${extractedData.perimeterDetail}`);
+    }
+    
+    if (extractedData.warranty) {
+      findings.push(`• Warranty Status: ${extractedData.warranty}`);
+    }
+    
+    if (extractedData.warrantyExpiration) {
+      findings.push(`• Warranty Expiration: ${extractedData.warrantyExpiration}`);
+    }
+    
+    findings.push('');
+    findings.push(`CONTRACTOR INFORMATION:`);
+    
+    if (extractedData.installingContractor) {
+      findings.push(`• Installing Contractor: ${extractedData.installingContractor}`);
+    }
+    
+    if (extractedData.repairingContractor) {
+      findings.push(`• Repairing Contractor: ${extractedData.repairingContractor}`);
+    }
+    
+    if (extractedData.client) {
+      findings.push(`• Client: ${extractedData.client}`);
+    }
+    
+    if (extractedData.propertyManager) {
+      findings.push(`• Property Manager: ${extractedData.propertyManager}`);
+      
+      if (extractedData.propertyManagerPhone) {
+        findings.push(`• PM Phone: ${extractedData.propertyManagerPhone}`);
+      }
+    }
+    
+    return findings.join('\n');
+  }
+  
+  /**
+   * Generate recommendations from extracted data
+   */
+  private static generateRecommendations(extractedData: ExtractedPDFData): string {
+    const recommendations: string[] = [];
+    
+    recommendations.push('RECOMMENDATIONS:');
+    recommendations.push('• Review complete PDF report for detailed findings and photos');
+    
+    if (extractedData.reportType.toLowerCase().includes('storm')) {
+      recommendations.push('• Assess storm damage thoroughly and prioritize critical repairs');
+      recommendations.push('• Document all damage with photos for insurance claims if applicable');
+      recommendations.push('• Consider emergency repairs for any active leaks or safety hazards');
+    }
+    
+    if (extractedData.installingContractor) {
+      recommendations.push(`• Contact installing contractor for warranty information: ${extractedData.installingContractor}`);
+    }
+    
+    if (extractedData.repairingContractor) {
+      recommendations.push(`• Contact repairing contractor for maintenance: ${extractedData.repairingContractor}`);
+    }
+    
+    if (extractedData.warranty && extractedData.warranty.toLowerCase() !== 'no') {
+      recommendations.push('• Verify warranty coverage for any identified issues');
+    }
+    
+    recommendations.push('• Schedule follow-up inspection as needed based on findings');
+    recommendations.push('• Update maintenance records with inspection findings');
+    
+    if (extractedData.roofArea > 0) {
+      recommendations.push(`• Confirm roof area measurement: ${extractedData.roofArea.toLocaleString()} sq ft`);
+    }
+    
+    return recommendations.join('\n');
   }
 
   /**

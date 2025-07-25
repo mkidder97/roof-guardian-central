@@ -17,31 +17,17 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { uploadRoofFile } from "@/lib/fileStorage";
-import { parsePDFInspectionReport } from "@/lib/pdfParser";
-import { HistoricalInspectionService } from "@/lib/historicalInspectionService";
+import { HistoricalInspectionService, ProcessedPDFResult } from "@/lib/historicalInspectionService";
+import { PropertyMatch } from "@/lib/propertyMatcher";
+import { ExtractedPDFData } from "@/lib/realPdfParser";
 
 interface UploadedFile {
   file: File;
   id: string;
   status: 'pending' | 'processing' | 'matched' | 'failed';
-  matchedProperty?: {
-    id: string;
-    name: string;
-    address: string;
-  };
-  extractedData?: {
-    inspectionDate: string;
-    findings: string[];
-    issues: Array<{
-      location: string;
-      severity: 'high' | 'medium' | 'low';
-      type: string;
-      estimatedCost?: number;
-    }>;
-    recommendations: string[];
-    totalEstimatedCost?: number;
-  };
+  matchedProperty?: PropertyMatch;
+  extractedData?: ExtractedPDFData;
+  processedResult?: ProcessedPDFResult;
   error?: string;
 }
 
@@ -129,42 +115,9 @@ export function HistoricalInspectionUploader() {
     setUploadedFiles(prev => prev.filter(f => f.id !== fileId));
   };
 
-  const matchPropertyByName = (filename: string): Property | undefined => {
-    // Extract property name from filename (assumes format like "Property Name - Inspection 2024.pdf")
-    const cleanName = filename
-      .replace(/\.pdf$/i, '')
-      .replace(/\s*-\s*(inspection|report|2024|2023).*$/i, '')
-      .trim()
-      .toLowerCase();
+  // Removed - now using PropertyMatcher from real PDF parser
 
-    return properties.find(prop => 
-      prop.property_name.toLowerCase().includes(cleanName) ||
-      cleanName.includes(prop.property_name.toLowerCase()) ||
-      prop.address.toLowerCase().includes(cleanName)
-    );
-  };
-
-  const extractPDFData = async (file: File): Promise<UploadedFile['extractedData']> => {
-    try {
-      const parsedData = await parsePDFInspectionReport(file);
-      
-      return {
-        inspectionDate: parsedData.inspectionDate,
-        findings: parsedData.findings,
-        issues: parsedData.issues.map(issue => ({
-          location: issue.location,
-          severity: issue.severity,
-          type: issue.type,
-          estimatedCost: issue.estimatedCost
-        })),
-        recommendations: parsedData.recommendations,
-        totalEstimatedCost: parsedData.totalEstimatedCost
-      };
-    } catch (error) {
-      console.error('Error extracting PDF data:', error);
-      throw error;
-    }
-  };
+  // Removed - now using RealPDFParser through HistoricalInspectionService
 
   const processFiles = async () => {
     if (uploadedFiles.length === 0) return;
@@ -181,52 +134,24 @@ export function HistoricalInspectionUploader() {
           f.id === file.id ? { ...f, status: 'processing' } : f
         ));
 
-        // Match property
-        const matchedProperty = matchPropertyByName(file.file.name);
-        if (!matchedProperty) {
-          throw new Error('Could not match file to property');
+        // Process PDF using the new real PDF parser and property matcher
+        const processedResult = await HistoricalInspectionService.processPDFFile(file.file);
+        
+        if (processedResult.success && processedResult.propertyMatch) {
+          // Update file status to matched
+          setUploadedFiles(prev => prev.map(f => 
+            f.id === file.id ? { 
+              ...f, 
+              status: 'matched',
+              matchedProperty: processedResult.propertyMatch!,
+              extractedData: processedResult.extractedData,
+              processedResult
+            } : f
+          ));
+        } else {
+          // Processing failed or no property match
+          throw new Error(processedResult.error || 'Processing failed');
         }
-
-        // Extract data from PDF
-        const extractedData = await extractPDFData(file.file);
-
-        // Upload PDF to storage
-        const { data: uploadData, error: uploadError } = await uploadRoofFile(
-          matchedProperty.id, 
-          file.file, 
-          {
-            file_type: 'inspection_report',
-            is_public: false
-          }
-        );
-
-        if (uploadError) throw uploadError;
-
-        // Store extracted data in database
-        const parsedData = await parsePDFInspectionReport(file.file);
-        const storageResult = await HistoricalInspectionService.storeHistoricalInspection(
-          matchedProperty.id,
-          parsedData,
-          uploadData.file_url || ''
-        );
-
-        if (!storageResult.success) {
-          throw new Error(`Failed to store inspection data: ${storageResult.error}`);
-        }
-
-        // Update file status
-        setUploadedFiles(prev => prev.map(f => 
-          f.id === file.id ? { 
-            ...f, 
-            status: 'matched',
-            matchedProperty: {
-              id: matchedProperty.id,
-              name: matchedProperty.property_name,
-              address: matchedProperty.address
-            },
-            extractedData
-          } : f
-        ));
 
       } catch (error) {
         console.error(`Error processing file ${file.file.name}:`, error);
@@ -371,7 +296,10 @@ export function HistoricalInspectionUploader() {
                             {file.matchedProperty && (
                               <div className="flex items-center gap-1 text-sm text-green-600 mb-2">
                                 <Building2 className="h-3 w-3" />
-                                <span>{file.matchedProperty.name}</span>
+                                <span>{file.matchedProperty.property_name}</span>
+                                <Badge variant="outline" className="ml-2 text-xs">
+                                  {Math.round(file.matchedProperty.confidence * 100)}% match
+                                </Badge>
                               </div>
                             )}
 
@@ -380,18 +308,18 @@ export function HistoricalInspectionUploader() {
                                 <div className="flex items-center gap-4">
                                   <div className="flex items-center gap-1">
                                     <Calendar className="h-3 w-3" />
-                                    <span>{file.extractedData.inspectionDate}</span>
+                                    <span>{file.extractedData.reportDate || 'Date not found'}</span>
                                   </div>
-                                  {file.extractedData.totalEstimatedCost && (
+                                  {file.extractedData.roofArea > 0 && (
                                     <div className="flex items-center gap-1">
-                                      <DollarSign className="h-3 w-3" />
-                                      <span>${file.extractedData.totalEstimatedCost.toLocaleString()}</span>
+                                      <Building2 className="h-3 w-3" />
+                                      <span>{file.extractedData.roofArea.toLocaleString()} sq ft</span>
                                     </div>
                                   )}
                                 </div>
                                 <div className="text-xs text-gray-600">
-                                  {file.extractedData.issues.length} issues found, 
-                                  {file.extractedData.findings.length} findings
+                                  {file.extractedData.reportType} • {file.extractedData.inspectionCompany}
+                                  {file.extractedData.roofSystem && ` • ${file.extractedData.roofSystem}`}
                                 </div>
                               </div>
                             )}
