@@ -36,7 +36,13 @@ export class HistoricalInspectionService {
       
       // 1. Extract data from PDF using real PDF parser
       const extractedData = await RealPDFParser.extractPDFData(pdfFile);
-      console.log('Extracted property name:', extractedData.propertyName);
+      console.log('📄 PDF Processing:', {
+        filename: pdfFile.name,
+        extractedPropertyName: extractedData.propertyName,
+        extractedAddress: extractedData.address,
+        roofArea: extractedData.roofArea,
+        reportType: extractedData.reportType
+      });
       
       // 2. Find matching property in database
       const propertyMatch = await PropertyMatcher.findBestMatch(
@@ -45,13 +51,29 @@ export class HistoricalInspectionService {
       );
       
       if (!propertyMatch) {
-        console.log('No property match found for:', extractedData.propertyName);
+        console.log('❌ No property match found for:', {
+          extractedName: extractedData.propertyName,
+          extractedAddress: extractedData.address,
+          filename: pdfFile.name
+        });
+        
+        // Get potential matches for better error message
+        const potentialMatches = await PropertyMatcher.getPotentialMatches(
+          extractedData.propertyName,
+          extractedData.address,
+          3
+        );
+        
+        const errorMsg = potentialMatches.length > 0 
+          ? `Could not match property "${extractedData.propertyName}" to database. Closest matches: ${potentialMatches.map(m => `${m.property_name} (${Math.round(m.confidence * 100)}%)`).join(', ')}`
+          : `Could not match property "${extractedData.propertyName}" to any existing property in database. Extracted from: ${pdfFile.name}`;
+          
         return {
           success: false,
           propertyMatch: null,
           extractedData,
           fileName: pdfFile.name,
-          error: `Could not match property "${extractedData.propertyName}" to any existing property in database`
+          error: errorMsg
         };
       }
       

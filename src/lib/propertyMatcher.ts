@@ -72,6 +72,13 @@ export class PropertyMatcher {
         return bestMatch;
       }
       
+      // 5. Keyword-based matching (very low confidence but catches more cases)
+      bestMatch = this.findKeywordMatch(extractedPropertyName, properties);
+      if (bestMatch) {
+        console.log('Found keyword match:', bestMatch.property_name, 'confidence:', bestMatch.confidence);
+        return bestMatch;
+      }
+      
       console.log('No matches found for property:', extractedPropertyName);
       return null;
       
@@ -145,7 +152,7 @@ export class PropertyMatcher {
   private static findFuzzyMatch(
     extractedName: string,
     properties: any[],
-    minConfidence: number = 0.7
+    minConfidence: number = 0.5  // Lowered from 0.7 to 0.5 for better matches
   ): PropertyMatch | null {
     const normalizedExtracted = this.normalizeString(extractedName);
     let bestMatch: PropertyMatch | null = null;
@@ -178,7 +185,7 @@ export class PropertyMatcher {
   private static findPartialMatch(
     extractedName: string,
     properties: any[],
-    minConfidence: number = 0.6
+    minConfidence: number = 0.4  // Lowered from 0.6 to 0.4 for better matches
   ): PropertyMatch | null {
     const normalizedExtracted = this.normalizeString(extractedName);
     const extractedWords = normalizedExtracted.split(' ').filter(word => word.length > 2);
@@ -269,6 +276,55 @@ export class PropertyMatcher {
       .replace(/[^\w\s]/g, '') // Remove punctuation
       .replace(/\s+/g, ' ')    // Normalize spaces
       .trim();
+  }
+  
+  /**
+   * Find keyword-based match (lowest confidence, catches edge cases)
+   */
+  private static findKeywordMatch(
+    extractedName: string,
+    properties: any[],
+    minConfidence: number = 0.3
+  ): PropertyMatch | null {
+    const normalizedExtracted = this.normalizeString(extractedName);
+    const extractedKeywords = normalizedExtracted
+      .split(' ')
+      .filter(word => word.length > 3) // Only meaningful words
+      .slice(0, 3); // Take first 3 keywords
+    
+    if (extractedKeywords.length === 0) return null;
+    
+    let bestMatch: PropertyMatch | null = null;
+    let bestScore = 0;
+    
+    for (const property of properties) {
+      const normalizedProperty = this.normalizeString(property.property_name);
+      
+      // Count how many keywords are found in property name
+      let keywordMatches = 0;
+      for (const keyword of extractedKeywords) {
+        if (normalizedProperty.includes(keyword)) {
+          keywordMatches++;
+        }
+      }
+      
+      const confidence = keywordMatches / extractedKeywords.length;
+      
+      if (confidence > bestScore && confidence >= minConfidence) {
+        bestScore = confidence;
+        bestMatch = {
+          id: property.id,
+          property_name: property.property_name,
+          address: property.address,
+          city: property.city,
+          state: property.state,
+          confidence,
+          matchType: 'partial'
+        };
+      }
+    }
+    
+    return bestMatch;
   }
   
   /**

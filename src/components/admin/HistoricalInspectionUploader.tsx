@@ -5,6 +5,8 @@ import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { 
   Upload, 
   FileText, 
@@ -47,6 +49,9 @@ export function HistoricalInspectionUploader() {
   const [isProcessing, setIsProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [isDragOver, setIsDragOver] = useState(false);
+  const [showManualMatchDialog, setShowManualMatchDialog] = useState(false);
+  const [selectedFileForManualMatch, setSelectedFileForManualMatch] = useState<UploadedFile | null>(null);
+  const [manualSelectedPropertyId, setManualSelectedPropertyId] = useState<string>('');
 
   // Load properties on component mount
   useEffect(() => {
@@ -118,6 +123,98 @@ export function HistoricalInspectionUploader() {
   // Removed - now using PropertyMatcher from real PDF parser
 
   // Removed - now using RealPDFParser through HistoricalInspectionService
+
+  const handleManualPropertyMatch = async () => {
+    if (!selectedFileForManualMatch || !manualSelectedPropertyId) return;
+
+    try {
+      // Find the selected property
+      const selectedProperty = properties.find(p => p.id === manualSelectedPropertyId);
+      if (!selectedProperty) {
+        toast({
+          title: "Error",
+          description: "Selected property not found",
+          variant: "destructive"
+        });
+        return;
+      }
+
+      // Update the file to processing status
+      setUploadedFiles(prev => prev.map(f => 
+        f.id === selectedFileForManualMatch.id ? { ...f, status: 'processing' as const } : f
+      ));
+
+      // Store the inspection with the manually selected property
+      const storedResult = await HistoricalInspectionService.storeHistoricalInspection(
+        selectedProperty.id,
+        selectedFileForManualMatch.extractedData || {} as ExtractedPDFData,
+        selectedFileForManualMatch.file
+      );
+
+      if (storedResult.success) {
+        // Update file status to matched
+        setUploadedFiles(prev => prev.map(f => 
+          f.id === selectedFileForManualMatch.id ? { 
+            ...f, 
+            status: 'matched' as const,
+            matchedProperty: {
+              id: selectedProperty.id,
+              property_name: selectedProperty.property_name,
+              address: selectedProperty.address,
+              city: selectedProperty.city,
+              state: selectedProperty.state,
+              confidence: 1.0, // Manual selection is 100% confidence
+              matchType: 'manual' as const
+            },
+            error: undefined
+          } : f
+        ));
+
+        toast({
+          title: "Success",
+          description: `Successfully processed ${selectedFileForManualMatch.file.name} with ${selectedProperty.property_name}`,
+        });
+      } else {
+        // Update file status back to failed with new error
+        setUploadedFiles(prev => prev.map(f => 
+          f.id === selectedFileForManualMatch.id ? { 
+            ...f, 
+            status: 'failed' as const,
+            error: storedResult.error || 'Failed to store inspection data'
+          } : f
+        ));
+
+        toast({
+          title: "Error",
+          description: storedResult.error || 'Failed to process file',
+          variant: "destructive"
+        });
+      }
+
+    } catch (error) {
+      console.error('Error in manual property matching:', error);
+      
+      // Update file status back to failed
+      setUploadedFiles(prev => prev.map(f => 
+        f.id === selectedFileForManualMatch.id ? { 
+          ...f, 
+          status: 'failed' as const,
+          error: error instanceof Error ? error.message : 'Processing failed'
+        } : f
+      ));
+
+      toast({
+        title: "Error",
+        description: "Failed to process file with selected property",
+        variant: "destructive"
+      });
+    } finally {
+      // Close dialog and reset state
+      setShowManualMatchDialog(false);
+      setSelectedFileForManualMatch(null);
+      setManualSelectedPropertyId('');
+    }
+  };
 
   const processFiles = async () => {
     if (uploadedFiles.length === 0) return;
@@ -329,6 +426,20 @@ export function HistoricalInspectionUploader() {
                                 <AlertTriangle className="h-4 w-4" />
                                 <AlertTitle>Error</AlertTitle>
                                 <AlertDescription>{file.error}</AlertDescription>
+                                {file.status === 'failed' && file.error.includes('Could not match property') && (
+                                  <div className="mt-2">
+                                    <Button 
+                                      size="sm" 
+                                      variant="outline"
+                                      onClick={() => {
+                                        setSelectedFileForManualMatch(file);
+                                        setShowManualMatchDialog(true);
+                                      }}
+                                    >
+                                      Select Property Manually
+                                    </Button>
+                                  </div>
+                                )}
                               </Alert>
                             )}
                           </div>
@@ -389,6 +500,66 @@ export function HistoricalInspectionUploader() {
           </CardContent>
         </Card>
       )}
+
+      {/* Manual Property Selection Dialog */}
+      <Dialog open={showManualMatchDialog} onOpenChange={setShowManualMatchDialog}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Manual Property Selection</DialogTitle>
+          </DialogHeader>
+          
+          {selectedFileForManualMatch && (
+            <div className="space-y-4">
+              <div className="p-4 bg-gray-50 rounded-lg">
+                <h4 className="font-medium mb-2">Failed File:</h4>
+                <p className="text-sm">{selectedFileForManualMatch.file.name}</p>
+                {selectedFileForManualMatch.extractedData && (
+                  <p className="text-sm text-gray-600 mt-1">
+                    Extracted Property: "{selectedFileForManualMatch.extractedData.propertyName}"
+                  </p>
+                )}
+              </div>
+              
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Select Correct Property:
+                </label>
+                <Select value={manualSelectedPropertyId} onValueChange={setManualSelectedPropertyId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Choose a property..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {properties.map((property) => (
+                      <SelectItem key={property.id} value={property.id}>
+                        {property.property_name} - {property.address}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+          
+          <DialogFooter>
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowManualMatchDialog(false);
+                setSelectedFileForManualMatch(null);
+                setManualSelectedPropertyId('');
+              }}
+            >
+              Cancel
+            </Button>
+            <Button 
+              onClick={() => handleManualPropertyMatch()}
+              disabled={!manualSelectedPropertyId}
+            >
+              Process with Selected Property
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
