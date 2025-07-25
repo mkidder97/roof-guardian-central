@@ -65,15 +65,13 @@ const AppRoutes: React.FC = () => {
 
 const App: React.FC = () => {
   return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <Toaster />
-        <Sonner />
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
-      </AuthProvider>
-    </QueryClientProvider>
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="text-center space-y-4">
+        <div className="text-2xl font-bold">RoofMind Dashboard</div>
+        <div className="text-muted-foreground">System temporarily in maintenance mode</div>
+        <div className="text-sm text-gray-500">App will be restored shortly</div>
+      </div>
+    </div>
   );
 };
 
