@@ -1,17 +1,6 @@
 import React from "react";
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
-import { AuthProvider, useAuth } from "./contexts/AuthContext";
-import Dashboard from "./pages/Dashboard";
-import { UnifiedDashboard } from "./pages/UnifiedDashboard";
-import AuthPage from "./components/auth/AuthPage";
-import NotFound from "./pages/NotFound";
-import InspectorInterface from "./pages/InspectorInterface";
 
-const queryClient = new QueryClient();
+// Temporarily disabled
 
 const TestComponent: React.FC = () => {
   const [count, setCount] = React.useState(0);
