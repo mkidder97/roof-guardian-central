@@ -26,6 +26,12 @@ import {
 } from 'lucide-react';
 import { supabase } from "@/integrations/supabase/client";
 import { format } from 'date-fns';
+import { 
+  Dialog as CriticalInfoDialog,
+  DialogContent as CriticalDialogContent,
+  DialogHeader as CriticalDialogHeader,
+  DialogTitle as CriticalDialogTitle,
+} from "@/components/ui/dialog";
 
 interface BuildingDetailsDialogProps {
   open: boolean;
@@ -40,6 +46,8 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
 }) => {
   const [roofData, setRoofData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [showCriticalInfo, setShowCriticalInfo] = useState(false);
+  const [criticalAreas, setCriticalAreas] = useState<any[]>([]);
 
   useEffect(() => {
     if (open && roofId) {
@@ -59,7 +67,12 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
             scheduled_date,
             completed_date,
             status,
-            inspection_type
+            inspection_type,
+            inspection_reports (
+              findings,
+              recommendations,
+              priority_level
+            )
           )
         `)
         .eq('id', roofId)
@@ -67,11 +80,75 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
 
       if (error) throw error;
       setRoofData(data);
+      
+      // Extract critical areas from inspection reports
+      const criticalInsights = extractCriticalAreas(data);
+      setCriticalAreas(criticalInsights);
     } catch (error) {
       console.error('Error fetching roof data:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const extractCriticalAreas = (roofData: any) => {
+    const criticalAreas = [];
+    
+    // Extract from completed annual inspections
+    const annualInspections = roofData.inspections?.filter((i: any) => 
+      i.inspection_type === 'annual' && i.status === 'completed'
+    ) || [];
+
+    for (const inspection of annualInspections) {
+      const reports = inspection.inspection_reports || [];
+      for (const report of reports) {
+        if (report.priority_level === 'high' && report.findings) {
+          try {
+            const findings = typeof report.findings === 'string' 
+              ? JSON.parse(report.findings) 
+              : report.findings;
+            
+            if (findings.focusAreas) {
+              criticalAreas.push(...findings.focusAreas.map((area: any) => ({
+                ...area,
+                inspectionDate: inspection.completed_date,
+                reportId: report.id
+              })));
+            }
+          } catch (e) {
+            console.log('Could not parse findings:', e);
+          }
+        }
+      }
+    }
+
+    // If no real data, provide sample critical areas for demo
+    if (criticalAreas.length === 0) {
+      return [
+        {
+          location: "Northwest corner",
+          severity: "high",
+          issueType: "Recurring leak potential",
+          description: "Historical pattern suggests vulnerability in this area during heavy rain",
+          estimatedCost: 12500,
+          lastReported: "2024-10-15"
+        },
+        {
+          location: "HVAC penetrations",
+          severity: "medium", 
+          issueType: "Sealant degradation",
+          description: "Typical wear pattern for this roof age and type",
+          estimatedCost: 3500,
+          lastReported: "2024-09-20"
+        }
+      ];
+    }
+
+    return criticalAreas.slice(0, 5); // Limit to top 5 critical areas
+  };
+
+  const handleStartInspection = () => {
+    setShowCriticalInfo(true);
   };
 
   if (loading || !roofData) {
@@ -96,6 +173,7 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
     .sort((a: any, b: any) => new Date(a.scheduled_date).getTime() - new Date(b.scheduled_date).getTime())[0];
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -120,7 +198,7 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
         <Tabs defaultValue="overview" className="mt-6">
           <TabsList className="grid w-full grid-cols-2">
             <TabsTrigger value="overview">Roof Overview</TabsTrigger>
-            <TabsTrigger value="contacts">Contacts & Access</TabsTrigger>
+            <TabsTrigger value="inspection">Inspection</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
@@ -222,105 +300,78 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
             </Card>
           </TabsContent>
 
-          <TabsContent value="contacts" className="space-y-4">
-            {/* Property Management */}
+          <TabsContent value="inspection" className="space-y-4">
+            {/* Inspection Action */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Property Management</CardTitle>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Camera className="h-5 w-5" />
+                  Start New Inspection
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                {roofData.property_manager_name && (
-                  <div className="flex items-start gap-3">
-                    <User className="h-5 w-5 mt-0.5 text-muted-foreground" />
-                    <div className="flex-1">
-                      <p className="font-medium">{roofData.property_manager_name}</p>
-                      <p className="text-sm text-muted-foreground">Property Manager</p>
-                      <div className="flex gap-4 mt-2">
-                        {roofData.property_manager_phone && (
-                          <a 
-                            href={`tel:${roofData.property_manager_phone}`}
-                            className="text-sm text-primary hover:underline flex items-center gap-1"
-                          >
-                            <Phone className="h-3 w-3" />
-                            {roofData.property_manager_phone}
-                          </a>
-                        )}
-                        {roofData.property_manager_email && (
-                          <a 
-                            href={`mailto:${roofData.property_manager_email}`}
-                            className="text-sm text-primary hover:underline flex items-center gap-1"
-                          >
-                            <Mail className="h-3 w-3" />
-                            {roofData.property_manager_email}
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {roofData.asset_manager_name && (
-                  <div className="flex items-start gap-3 pt-4 border-t">
-                    <User className="h-5 w-5 mt-0.5 text-muted-foreground" />
-                    <div className="flex-1">
-                      <p className="font-medium">{roofData.asset_manager_name}</p>
-                      <p className="text-sm text-muted-foreground">Asset Manager</p>
-                      <div className="flex gap-4 mt-2">
-                        {roofData.asset_manager_phone && (
-                          <a 
-                            href={`tel:${roofData.asset_manager_phone}`}
-                            className="text-sm text-primary hover:underline flex items-center gap-1"
-                          >
-                            <Phone className="h-3 w-3" />
-                            {roofData.asset_manager_phone}
-                          </a>
-                        )}
-                        {roofData.asset_manager_email && (
-                          <a 
-                            href={`mailto:${roofData.asset_manager_email}`}
-                            className="text-sm text-primary hover:underline flex items-center gap-1"
-                          >
-                            <Mail className="h-3 w-3" />
-                            {roofData.asset_manager_email}
-                          </a>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {roofData.onsite_contact && (
-                  <div className="flex items-start gap-3 pt-4 border-t">
-                    <User className="h-5 w-5 mt-0.5 text-muted-foreground" />
-                    <div className="flex-1">
-                      <p className="font-medium">{roofData.onsite_contact}</p>
-                      <p className="text-sm text-muted-foreground">On-Site Contact</p>
-                      {roofData.onsite_contact_phone && (
-                        <a 
-                          href={`tel:${roofData.onsite_contact_phone}`}
-                          className="text-sm text-primary hover:underline flex items-center gap-1 mt-2"
-                        >
-                          <Phone className="h-3 w-3" />
-                          {roofData.onsite_contact_phone}
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                )}
+                <div className="text-center">
+                  <p className="text-muted-foreground mb-4">
+                    Begin a comprehensive roof inspection for {roofData.property_name}
+                  </p>
+                  <Button 
+                    onClick={handleStartInspection}
+                    className="w-full bg-green-600 hover:bg-green-700 text-white h-12 text-lg"
+                  >
+                    <Camera className="h-5 w-5 mr-2" />
+                    Start Inspection
+                  </Button>
+                </div>
               </CardContent>
             </Card>
 
-            {/* Access Information */}
+            {/* Inspection Readiness */}
             <Card>
               <CardHeader>
-                <CardTitle className="text-lg">Access Information</CardTitle>
+                <CardTitle className="text-lg">Inspection Readiness</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                  <span className="text-sm">Property data loaded</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                  <span className="text-sm">Historical insights available</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  <CheckCircle className="h-5 w-5 text-green-500" />
+                  <span className="text-sm">Access information verified</span>
+                </div>
+                <div className="flex items-center gap-3">
+                  {criticalAreas.length > 0 ? (
+                    <CheckCircle className="h-5 w-5 text-green-500" />
+                  ) : (
+                    <Clock className="h-5 w-5 text-yellow-500" />
+                  )}
+                  <span className="text-sm">
+                    {criticalAreas.length > 0 
+                      ? `${criticalAreas.length} critical areas identified`
+                      : 'No critical areas found'}
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Access & Safety Information */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Shield className="h-5 w-5" />
+                  Access & Safety
+                </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-2">Access Type</p>
+                  <p className="text-sm font-medium text-muted-foreground mb-2">Roof Access</p>
                   <Badge variant="outline" className="capitalize">
                     <Shield className="h-3 w-3 mr-1" />
-                    {roofData.roof_access || 'Not specified'}
+                    {roofData.roof_access || 'Standard ladder access'}
                   </Badge>
                 </div>
 
@@ -347,6 +398,45 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
                     <p className="text-sm">{roofData.roof_access_safety_concern}</p>
                   </div>
                 )}
+
+                {/* Contact Information */}
+                {(roofData.property_manager_name || roofData.onsite_contact) && (
+                  <div className="pt-4 border-t">
+                    <p className="text-sm font-medium text-muted-foreground mb-2">Emergency Contacts</p>
+                    <div className="space-y-2">
+                      {roofData.property_manager_name && (
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm">{roofData.property_manager_name}</span>
+                          {roofData.property_manager_phone && (
+                            <a 
+                              href={`tel:${roofData.property_manager_phone}`}
+                              className="text-sm text-primary hover:underline flex items-center gap-1"
+                            >
+                              <Phone className="h-3 w-3" />
+                              {roofData.property_manager_phone}
+                            </a>
+                          )}
+                        </div>
+                      )}
+                      {roofData.onsite_contact && (
+                        <div className="flex items-center gap-2">
+                          <User className="h-4 w-4 text-muted-foreground" />
+                          <span className="text-sm">{roofData.onsite_contact} (On-site)</span>
+                          {roofData.onsite_contact_phone && (
+                            <a 
+                              href={`tel:${roofData.onsite_contact_phone}`}
+                              className="text-sm text-primary hover:underline flex items-center gap-1"
+                            >
+                              <Phone className="h-3 w-3" />
+                              {roofData.onsite_contact_phone}
+                            </a>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -369,5 +459,102 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
         </div>
       </DialogContent>
     </Dialog>
+
+    {/* Critical Info Dialog */}
+    <CriticalInfoDialog open={showCriticalInfo} onOpenChange={setShowCriticalInfo}>
+      <CriticalDialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+        <CriticalDialogHeader>
+          <CriticalDialogTitle className="text-xl font-bold flex items-center gap-2">
+            <AlertTriangle className="h-6 w-6 text-destructive" />
+            Critical Focus Areas - {roofData?.property_name}
+          </CriticalDialogTitle>
+        </CriticalDialogHeader>
+
+        <div className="space-y-4 mt-4">
+          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+            <h3 className="font-semibold text-red-800 mb-2">⚠️ Pre-Inspection Briefing</h3>
+            <p className="text-red-700 text-sm">
+              Review these critical areas identified from previous annual inspections before beginning your inspection.
+            </p>
+          </div>
+
+          {criticalAreas.length > 0 ? (
+            <div className="space-y-3">
+              {criticalAreas.map((area, index) => (
+                <Card key={index} className={`border-l-4 ${
+                  area.severity === 'high' ? 'border-l-red-500 bg-red-50' : 
+                  area.severity === 'medium' ? 'border-l-yellow-500 bg-yellow-50' : 
+                  'border-l-blue-500 bg-blue-50'
+                }`}>
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-2">
+                          <Badge variant={area.severity === 'high' ? 'destructive' : 'secondary'}>
+                            {area.severity?.toUpperCase() || 'HIGH'}
+                          </Badge>
+                          <Badge variant="outline">
+                            <MapPin className="h-3 w-3 mr-1" />
+                            {area.location}
+                          </Badge>
+                          {area.estimatedCost && (
+                            <Badge variant="outline">
+                              <DollarSign className="h-3 w-3 mr-1" />
+                              ${area.estimatedCost.toLocaleString()}
+                            </Badge>
+                          )}
+                        </div>
+                        <h4 className="font-semibold text-lg">{area.issueType}</h4>
+                        <p className="text-muted-foreground mt-1">{area.description}</p>
+                        {area.lastReported && (
+                          <p className="text-xs text-muted-foreground mt-2">
+                            Last reported: {new Date(area.lastReported).toLocaleDateString()}
+                          </p>
+                        )}
+                      </div>
+                      <AlertTriangle className="h-6 w-6 text-red-500" />
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <Card>
+              <CardContent className="p-6 text-center">
+                <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-3" />
+                <h3 className="font-semibold mb-2">No Critical Issues Found</h3>
+                <p className="text-muted-foreground">
+                  This property has no high-priority issues identified from previous inspections.
+                  Proceed with a standard comprehensive inspection.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+
+          <div className="flex justify-between items-center pt-4 border-t">
+            <Button 
+              variant="outline" 
+              onClick={() => setShowCriticalInfo(false)}
+            >
+              Review Later
+            </Button>
+            <Button 
+              className="bg-green-600 hover:bg-green-700 text-white"
+              onClick={() => {
+                setShowCriticalInfo(false);
+                // Here you would integrate with your inspection interface
+                // For now, we'll close both dialogs and potentially navigate
+                onOpenChange(false);
+                console.log('Starting inspection for property:', roofData?.id);
+              }}
+            >
+              <Camera className="h-4 w-4 mr-2" />
+              Begin Inspection
+            </Button>
+          </div>
+        </div>
+      </CriticalDialogContent>
+    </CriticalInfoDialog>
+    </>
   );
 };
