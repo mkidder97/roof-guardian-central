@@ -4,6 +4,8 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogOverlay,
+  DialogPortal,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -179,7 +181,11 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-screen h-screen max-w-none max-h-none m-0 rounded-none overflow-y-auto">
+      <DialogPortal>
+        <DialogOverlay className="bg-white" />
+        <DialogContent className="fixed inset-0 z-50 w-screen h-screen max-w-none max-h-none m-0 p-6 border-0 rounded-none bg-white translate-x-0 translate-y-0 overflow-y-auto"
+          style={{ left: 0, top: 0, transform: 'none' }}
+        >
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold flex items-center gap-2">
             <Building2 className="h-6 w-6" />
@@ -461,12 +467,17 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
             View Full Details
           </Button>
         </div>
-      </DialogContent>
+        </DialogContent>
+      </DialogPortal>
     </Dialog>
 
     {/* Critical Info Dialog */}
     <CriticalInfoDialog open={showCriticalInfo} onOpenChange={setShowCriticalInfo}>
-      <CriticalDialogContent className="w-screen h-screen max-w-none max-h-none m-0 rounded-none overflow-y-auto">
+      <DialogPortal>
+        <DialogOverlay className="bg-white" />
+        <CriticalDialogContent className="fixed inset-0 z-50 w-screen h-screen max-w-none max-h-none m-0 p-6 border-0 rounded-none bg-white translate-x-0 translate-y-0 overflow-y-auto"
+          style={{ left: 0, top: 0, transform: 'none' }}
+        >
         <CriticalDialogHeader>
           <CriticalDialogTitle className="text-xl font-bold flex items-center gap-2">
             <AlertTriangle className="h-6 w-6 text-destructive" />
@@ -558,7 +569,8 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
             </Button>
           </div>
         </div>
-      </CriticalDialogContent>
+        </CriticalDialogContent>
+      </DialogPortal>
     </CriticalInfoDialog>
     </>
   );
