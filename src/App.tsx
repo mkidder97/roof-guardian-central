@@ -50,9 +50,11 @@ const App = () => {
           <div className="min-h-screen flex items-center justify-center">
             <div className="text-center space-y-4">
               <div className="text-2xl font-bold text-primary">RoofMind</div>
-              <div className="text-muted-foreground">Testing with AuthProvider added back...</div>
+              <div className="text-muted-foreground">Testing with Toaster components added...</div>
             </div>
           </div>
+          <Toaster />
+          <Sonner />
         </BrowserRouter>
       </AuthProvider>
     </QueryClientProvider>
