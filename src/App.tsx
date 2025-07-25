@@ -36,7 +36,14 @@ const AppRoutes: React.FC = () => {
   const { user, loading } = useAuth();
 
   if (loading) {
-    return <TestComponent />;
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="text-2xl font-bold text-primary">RoofMind</div>
+          <div className="text-muted-foreground">Loading...</div>
+        </div>
+      </div>
+    );
   }
 
   if (!user) {
@@ -45,10 +52,13 @@ const AppRoutes: React.FC = () => {
 
   return (
     <Routes>
-      <Route path="/" element={<TestComponent />} />
+      <Route path="/" element={<UnifiedDashboard />} />
+      <Route path="/dashboard" element={<UnifiedDashboard />} />
+      <Route path="/legacy" element={<Dashboard />} />
+      <Route path="/auth" element={<AuthPage />} />
+      <Route path="/inspector" element={<InspectorInterface />} />
       <Route path="/test" element={<TestComponent />} />
-      <Route path="/unified" element={<UnifiedDashboard />} />
-      <Route path="*" element={<TestComponent />} />
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 };
@@ -57,9 +67,13 @@ const App: React.FC = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <BrowserRouter>
-          <AppRoutes />
-        </BrowserRouter>
+        <TooltipProvider>
+          <Toaster />
+          <Sonner />
+          <BrowserRouter>
+            <AppRoutes />
+          </BrowserRouter>
+        </TooltipProvider>
       </AuthProvider>
     </QueryClientProvider>
   );
