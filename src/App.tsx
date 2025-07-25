@@ -33,9 +33,21 @@ const TestComponent: React.FC = () => {
 };
 
 const AppRoutes: React.FC = () => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return <TestComponent />;
+  }
+
+  if (!user) {
+    return <AuthPage />;
+  }
+
   return (
     <Routes>
       <Route path="/" element={<TestComponent />} />
+      <Route path="/test" element={<TestComponent />} />
+      <Route path="/unified" element={<UnifiedDashboard />} />
       <Route path="*" element={<TestComponent />} />
     </Routes>
   );
