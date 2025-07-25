@@ -283,6 +283,7 @@ export function PropertyDetailsDialog({
               <CommentSystem 
                 entityType="property" 
                 entityId={property.id}
+                showHeader={false}
               />
             </TabsContent>
 

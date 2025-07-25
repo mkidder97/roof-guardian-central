@@ -3,36 +3,15 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Roof Guardian Central - Intelligent Roof Management</title>
-    <meta name="description" content="Professional roof inspection and management platform with offline capabilities" />
-    <meta name="author" content="Roof Guardian Central" />
+    <title>RoofMind - Intelligent Roof Management</title>
+    <meta name="description" content="Intelligent Roof Management System" />
+    <meta name="author" content="RoofMind" />
 
-    <!-- PWA Manifest -->
-    <link rel="manifest" href="/manifest.json" />
-    
-    <!-- Mobile-first meta tags -->
-    <meta name="mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-capable" content="yes" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="apple-mobile-web-app-title" content="Roof Guardian" />
-    
-    <!-- Theme colors -->
-    <meta name="theme-color" content="#1f2937" />
-    <meta name="msapplication-navbutton-color" content="#1f2937" />
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
-
-    <!-- Favicon and icons -->
-    <link rel="icon" type="image/png" sizes="32x32" href="/icon-32x32.png" />
-    <link rel="icon" type="image/png" sizes="16x16" href="/icon-16x16.png" />
-    <link rel="apple-touch-icon" href="/icon-192x192.png" />
-    
-    <!-- Open Graph -->
-    <meta property="og:title" content="Roof Guardian Central - Intelligent Roof Management" />
-    <meta property="og:description" content="Professional roof inspection and management platform with offline capabilities" />
+    <meta property="og:title" content="RoofMind - Intelligent Roof Management" />
+    <meta property="og:description" content="Intelligent Roof Management System" />
     <meta property="og:type" content="website" />
     <meta property="og:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
 
-    <!-- Twitter -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:site" content="@lovable_dev" />
     <meta name="twitter:image" content="https://lovable.dev/opengraph-image-p98pqg.png" />
@@ -41,59 +20,5 @@
   <body>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    
-    <!-- Service Worker Registration -->
-    <script>
-      if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-          navigator.serviceWorker.register('/sw.js')
-            .then((registration) => {
-              console.log('[SW] Service worker registered successfully:', registration.scope);
-              
-              // Register for background sync
-              if ('sync' in registration) {
-                console.log('[SW] Background sync supported');
-              }
-              
-              // Handle updates
-              registration.addEventListener('updatefound', () => {
-                const newWorker = registration.installing;
-                if (newWorker) {
-                  newWorker.addEventListener('statechange', () => {
-                    if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                      // New content is available, prompt user to refresh
-                      if (confirm('New version available! Refresh to update?')) {
-                        window.location.reload();
-                      }
-                    }
-                  });
-                }
-              });
-            })
-            .catch((error) => {
-              console.error('[SW] Service worker registration failed:', error);
-            });
-        });
-      } else {
-        console.log('[SW] Service workers not supported');
-      }
-      
-      // Handle app install prompt
-      let deferredPrompt;
-      window.addEventListener('beforeinstallprompt', (e) => {
-        e.preventDefault();
-        deferredPrompt = e;
-        
-        // Show custom install button or banner
-        const installEvent = new CustomEvent('showInstallPrompt', { detail: e });
-        window.dispatchEvent(installEvent);
-      });
-      
-      // Handle app installed
-      window.addEventListener('appinstalled', () => {
-        console.log('[PWA] App was installed');
-        deferredPrompt = null;
-      });
-    </script>
   </body>
 </html>

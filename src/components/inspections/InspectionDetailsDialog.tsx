@@ -280,6 +280,7 @@ export function InspectionDetailsDialog({
               <CommentSystem 
                 entityType="inspection" 
                 entityId={inspection.id}
+                showHeader={false}
               />
             </TabsContent>
 

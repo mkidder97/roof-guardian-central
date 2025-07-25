@@ -16,9 +16,7 @@ import {
   BarChart3,
   Calendar,
   UserCog,
-  BrainCircuit,
-  TrendingUp,
-  Brain
+  BrainCircuit
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -96,25 +94,6 @@ export function UnifiedSidebar({
           id: 'search',
           label: 'Smart Search',
           icon: Search,
-          badge: 'AI'
-        }
-      ]
-    },
-    {
-      id: 'analytics',
-      label: 'Analytics & Intelligence',
-      icon: BarChart3,
-      children: [
-        {
-          id: 'analytics',
-          label: 'Advanced Analytics',
-          icon: TrendingUp,
-          badge: 'NEW'
-        },
-        {
-          id: 'risk-analysis',
-          label: 'AI Risk Analysis',
-          icon: Brain,
           badge: 'AI'
         }
       ]

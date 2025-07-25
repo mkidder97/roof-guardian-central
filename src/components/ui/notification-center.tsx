@@ -120,7 +120,7 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
         (payload) => {
           handleNewNotification({
             title: 'Inspection Updated',
-            message: `Inspection status changed`,
+            message: `Inspection status changed to ${payload.new?.status}`,
             type: 'info',
             category: 'inspection'
           });
@@ -135,7 +135,7 @@ export function NotificationCenter({ className }: NotificationCenterProps) {
         (payload) => {
           handleNewNotification({
             title: 'Work Order Updated',
-            message: `Work order status changed`,
+            message: `Work order status changed to ${payload.new?.status}`,
             type: 'info',
             category: 'work_order'
           });

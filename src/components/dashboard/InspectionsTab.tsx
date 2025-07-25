@@ -4,13 +4,11 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, FileDown, Calendar, User, Building, Loader2, Brain, MessageCircle, Eye, WifiOff } from "lucide-react";
+import { Search, Plus, FileDown, Calendar, User, Building, Loader2, Brain, MessageCircle, Eye } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { InspectionSchedulingModal } from "@/components/inspections/InspectionSchedulingModal";
 import { InspectionDetailsDialog } from "@/components/inspections/InspectionDetailsDialog";
-import { OfflineIndicator } from "@/components/offline/OfflineIndicator";
-import { useOffline } from "@/hooks/useOffline";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 
@@ -46,18 +44,10 @@ export function InspectionsTab() {
   const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const navigate = useNavigate();
   const { userRole } = useAuth();
-  const { isOnline, isInitialized, getOfflineData } = useOffline();
 
   useEffect(() => {
     fetchInspections();
   }, []);
-
-  useEffect(() => {
-    // Refetch when offline status changes
-    if (isInitialized) {
-      fetchInspections();
-    }
-  }, [isOnline, isInitialized]);
 
   useEffect(() => {
     filterInspections();
@@ -67,47 +57,25 @@ export function InspectionsTab() {
     try {
       setLoading(true);
       
-      if (isOnline) {
-        // Try to fetch from online database
-        const { data: inspectionsData, error } = await supabase
-          .from('inspections')
-          .select(`
-            *,
-            roofs!roof_id(property_name),
-            users!inspector_id(first_name, last_name)
-          `)
-          .order('scheduled_date', { ascending: false });
-          
-        if (error) {
-          console.error('Error fetching inspections:', error);
-          // Fall back to offline data if online fetch fails
-          await loadOfflineInspections();
-          return;
-        }
+      const { data: inspectionsData, error } = await supabase
+        .from('inspections')
+        .select(`
+          *,
+          roofs!roof_id(property_name),
+          users!inspector_id(first_name, last_name)
+        `)
+        .order('scheduled_date', { ascending: false });
         
-        setInspections((inspectionsData as unknown as Inspection[]) || []);
-      } else {
-        // Load offline data when offline
-        await loadOfflineInspections();
+      if (error) {
+        console.error('Error fetching inspections:', error);
+        return;
       }
+      
+      setInspections((inspectionsData as unknown as Inspection[]) || []);
     } catch (error) {
       console.error('Error fetching inspections:', error);
-      // Try to load offline data as fallback
-      await loadOfflineInspections();
     } finally {
       setLoading(false);
-    }
-  };
-
-  const loadOfflineInspections = async () => {
-    try {
-      if (isInitialized) {
-        const offlineInspections = await getOfflineData('inspection');
-        setInspections(offlineInspections || []);
-      }
-    } catch (error) {
-      console.error('Error loading offline inspections:', error);
-      setInspections([]);
     }
   };
 
@@ -152,36 +120,23 @@ export function InspectionsTab() {
 
   const getStatusBadge = (inspection: Inspection) => {
     const status = getInspectionStatus(inspection);
-    const isOfflineData = (inspection as any).offline;
     
-    return (
-      <div className="flex items-center gap-2">
-        {(() => {
-          switch (status) {
-            case "scheduled":
-              return <Badge variant="outline" className="bg-blue-100 text-blue-800">Scheduled</Badge>;
-            case "in-progress":
-              return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">In Progress</Badge>;
-            case "completed":
-              return <Badge variant="default" className="bg-green-100 text-green-800">Completed</Badge>;
-            case "past-due":
-              return <Badge variant="destructive">Past Due</Badge>;
-            case "cancelled":
-              return <Badge variant="outline" className="bg-gray-100 text-gray-800">Cancelled</Badge>;
-            case "draft":
-              return <Badge variant="outline" className="bg-gray-100 text-gray-800">Draft</Badge>;
-            default:
-              return <Badge variant="outline">{status}</Badge>;
-          }
-        })()}
-        {isOfflineData && (
-          <Badge variant="secondary" className="bg-orange-100 text-orange-800 text-xs">
-            <WifiOff className="h-3 w-3 mr-1" />
-            Offline
-          </Badge>
-        )}
-      </div>
-    );
+    switch (status) {
+      case "scheduled":
+        return <Badge variant="outline" className="bg-blue-100 text-blue-800">Scheduled</Badge>;
+      case "in-progress":
+        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">In Progress</Badge>;
+      case "completed":
+        return <Badge variant="default" className="bg-green-100 text-green-800">Completed</Badge>;
+      case "past-due":
+        return <Badge variant="destructive">Past Due</Badge>;
+      case "cancelled":
+        return <Badge variant="outline" className="bg-gray-100 text-gray-800">Cancelled</Badge>;
+      case "draft":
+        return <Badge variant="outline" className="bg-gray-100 text-gray-800">Draft</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
   };
 
   const getPriorityBadge = (inspection: Inspection) => {
@@ -273,9 +228,6 @@ export function InspectionsTab() {
               <SelectItem value="past-due">Past Due</SelectItem>
             </SelectContent>
           </Select>
-          
-          {/* Offline Indicator */}
-          <OfflineIndicator />
         </div>
         
         <div className="flex items-center space-x-3">

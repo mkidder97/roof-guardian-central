@@ -10,103 +10,62 @@ export function AccountsTab() {
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
 
-  // Real company team members
+  // Mock data
   const accounts = [
     {
       id: "1",
-      first_name: "Jordan",
-      last_name: "Bigger",
-      email: "jordan.bigger@roofguardian.com",
-      role: "manager",
-      title: "COO",
-      phone: "(555) 200-1001",
+      first_name: "John",
+      last_name: "Smith",
+      email: "john.smith@roofcontroller.com",
+      role: "admin",
+      phone: "(555) 100-1001",
       is_active: true,
-      last_login: "2025-01-25 08:15",
-      permissions: ["full_access", "analytics", "risk_analysis", "team_management"]
+      last_login: "2024-01-17 09:30",
+      permissions: ["full_access"]
     },
     {
       id: "2",
-      first_name: "Sam",
-      last_name: "Decelles", 
-      email: "sam.decelles@roofguardian.com",
-      role: "manager",
-      title: "Operational Manager",
-      phone: "(555) 200-1002",
+      first_name: "Sarah",
+      last_name: "Johnson",
+      email: "sarah.johnson@roofcontroller.com",
+      role: "inspector",
+      phone: "(555) 100-1002",
       is_active: true,
-      last_login: "2025-01-25 09:30",
-      permissions: ["inspections", "reports", "clients", "vendors", "work_orders", "campaigns"]
+      last_login: "2024-01-17 14:15",
+      permissions: ["inspections", "reports"]
     },
     {
       id: "3",
-      first_name: "Mandy",
-      last_name: "Mccord",
-      email: "mandy.mccord@roofguardian.com", 
-      role: "admin",
-      title: "Office Manager",
-      phone: "(555) 200-1003",
+      first_name: "Mike",
+      last_name: "Davis",
+      email: "mike.davis@roofcontroller.com",
+      role: "inspector",
+      phone: "(555) 100-1003",
       is_active: true,
-      last_login: "2025-01-25 07:45",
-      permissions: ["full_access", "user_management", "system_settings", "billing"]
+      last_login: "2024-01-16 16:45",
+      permissions: ["inspections", "reports"]
     },
     {
       id: "4",
-      first_name: "Jennifer",
-      last_name: "Eckles",
-      email: "jennifer.eckles@roofguardian.com",
-      role: "admin", 
-      title: "Travel and Logistics Coordinator",
-      phone: "(555) 200-1004",
+      first_name: "Emily",
+      last_name: "Chen",
+      email: "emily.chen@roofcontroller.com",
+      role: "manager",
+      phone: "(555) 100-1004",
       is_active: true,
-      last_login: "2025-01-24 16:20",
-      permissions: ["inspections", "scheduling", "logistics", "travel_coordination"]
+      last_login: "2024-01-17 11:20",
+      permissions: ["inspections", "reports", "clients", "vendors"]
     },
     {
       id: "5",
-      first_name: "Jeremy",
-      last_name: "Ragsdale",
-      email: "jeremy.ragsdale@roofguardian.com",
+      first_name: "Robert",
+      last_name: "Wilson",
+      email: "robert.wilson@roofcontroller.com",
       role: "inspector",
-      title: "Inspector",
-      phone: "(555) 200-1005", 
-      is_active: true,
-      last_login: "2025-01-25 06:00",
-      permissions: ["inspections", "reports", "field_app", "offline_access"]
-    },
-    {
-      id: "6", 
-      first_name: "Justin",
-      last_name: "Barnette",
-      email: "justin.barnette@roofguardian.com",
-      role: "inspector",
-      title: "Inspector", 
-      phone: "(555) 200-1006",
-      is_active: true,
-      last_login: "2025-01-24 14:30",
-      permissions: ["inspections", "reports", "field_app", "offline_access"]
-    },
-    {
-      id: "7",
-      first_name: "Scott",
-      last_name: "Anderson", 
-      email: "scott.anderson@roofguardian.com",
-      role: "admin",
-      title: "Client Services",
-      phone: "(555) 200-1007",
-      is_active: true,
-      last_login: "2025-01-25 10:15", 
-      permissions: ["full_access", "client_communication", "scheduling", "user_management"]
-    },
-    {
-      id: "8",
-      first_name: "Bill",
-      last_name: "Ricci",
-      email: "bill.ricci@roofguardian.com", 
-      role: "inspector",
-      title: "Project Manager",
-      phone: "(555) 200-1008",
-      is_active: true,
-      last_login: "2025-01-25 11:45",
-      permissions: ["inspections", "reports", "project_management", "work_orders"]
+      phone: "(555) 100-1005",
+      is_active: false,
+      last_login: "2024-01-10 13:30",
+      permissions: ["inspections"]
     }
   ];
 
@@ -183,7 +142,6 @@ export function AccountsTab() {
           <TableHeader>
             <TableRow className="bg-gray-50">
               <TableHead className="font-semibold">Name</TableHead>
-              <TableHead className="font-semibold">Title</TableHead>
               <TableHead className="font-semibold">Email</TableHead>
               <TableHead className="font-semibold">Role</TableHead>
               <TableHead className="font-semibold">Phone</TableHead>
@@ -201,9 +159,6 @@ export function AccountsTab() {
                     <User className="h-4 w-4 mr-2 text-gray-400" />
                     <span className="font-medium">{account.first_name} {account.last_name}</span>
                   </div>
-                </TableCell>
-                <TableCell>
-                  <span className="text-sm text-gray-600">{account.title}</span>
                 </TableCell>
                 <TableCell>{account.email}</TableCell>
                 <TableCell>{getRoleBadge(account.role)}</TableCell>
