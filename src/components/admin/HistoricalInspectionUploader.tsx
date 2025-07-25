@@ -164,7 +164,7 @@ export function HistoricalInspectionUploader() {
               city: selectedProperty.city,
               state: selectedProperty.state,
               confidence: 1.0, // Manual selection is 100% confidence
-              matchType: 'exact' as const
+              matchType: 'manual' as const
             },
             error: undefined
           } : f

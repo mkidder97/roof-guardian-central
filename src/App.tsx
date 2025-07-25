@@ -1,5 +1,6 @@
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { AuthProvider, useAuth } from "./contexts/AuthContext";
@@ -34,23 +35,26 @@ const AppRoutes = () => {
       <Route path="/" element={<UnifiedDashboard />} />
       <Route path="/dashboard" element={<UnifiedDashboard />} />
       <Route path="/legacy" element={<Dashboard />} />
-      <Route path="/inspector" element={<InspectorInterface />} />
       <Route path="/auth" element={<AuthPage />} />
+      <Route path="/inspector" element={<InspectorInterface />} />
+      {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
 };
 
-const App = () => {
-  return (
-    <QueryClientProvider client={queryClient}>
-      <AuthProvider>
+const App = () => (
+  <QueryClientProvider client={queryClient}>
+    <AuthProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
         <BrowserRouter>
           <AppRoutes />
         </BrowserRouter>
-      </AuthProvider>
-    </QueryClientProvider>
-  );
-};
+      </TooltipProvider>
+    </AuthProvider>
+  </QueryClientProvider>
+);
 
 export default App;

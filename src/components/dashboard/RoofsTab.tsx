@@ -4,10 +4,9 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, FileDown, Calendar, MapPin, Upload, Eye, MessageCircle } from "lucide-react";
+import { Search, Plus, FileDown, Calendar, MapPin, Upload } from "lucide-react";
 import { ExcelImportDialog } from "@/components/excel/ExcelImportDialog";
 import { RoofDetailModal } from "./RoofDetailModal";
-import { PropertyDetailsDialog } from "@/components/properties/PropertyDetailsDialog";
 import { InspectionSchedulingModal } from "@/components/inspections/InspectionSchedulingModal";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -18,8 +17,6 @@ export function RoofsTab() {
   const [schedulingModalOpen, setSchedulingModalOpen] = useState(false);
   const [selectedRoof, setSelectedRoof] = useState<any>(null);
   const [detailModalOpen, setDetailModalOpen] = useState(false);
-  const [propertyDetailsOpen, setPropertyDetailsOpen] = useState(false);
-  const [selectedProperty, setSelectedProperty] = useState<any>(null);
   const [roofs, setRoofs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -213,24 +210,11 @@ export function RoofsTab() {
                         variant="outline" 
                         size="sm"
                         onClick={() => {
-                          setSelectedProperty(roof);
-                          setPropertyDetailsOpen(true);
-                        }}
-                        title="View property details with comments"
-                      >
-                        <Eye className="h-3 w-3 mr-1" />
-                        Details
-                      </Button>
-                      <Button 
-                        variant="outline" 
-                        size="sm"
-                        onClick={() => {
                           setSelectedRoof(roof);
                           setDetailModalOpen(true);
                         }}
-                        title="View roof specifications"
                       >
-                        View Roof
+                        View
                       </Button>
                       <Button variant="outline" size="sm">Edit</Button>
                     </div>
@@ -277,12 +261,6 @@ export function RoofsTab() {
           }}
         />
       )}
-
-      <PropertyDetailsDialog
-        open={propertyDetailsOpen}
-        onOpenChange={setPropertyDetailsOpen}
-        property={selectedProperty}
-      />
     </div>
   );
 }
