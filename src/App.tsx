@@ -49,8 +49,6 @@ const App: React.FC = () => {
     <React.StrictMode>
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <Toaster />
-          <Sonner />
           <BrowserRouter>
             <AppRoutes />
           </BrowserRouter>
