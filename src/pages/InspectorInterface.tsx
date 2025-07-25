@@ -19,6 +19,7 @@ import {
   Loader2
 } from "lucide-react";
 import { InspectorIntelligenceService } from "@/lib/inspectorIntelligenceService";
+import { ActiveInspectionInterface } from "@/components/inspection/ActiveInspectionInterface";
 import { useToast } from "@/hooks/use-toast";
 
 interface InspectionBriefing {
@@ -67,6 +68,7 @@ const InspectorInterface = () => {
   const [availableProperties, setAvailableProperties] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingBriefing, setLoadingBriefing] = useState(false);
+  const [activeInspection, setActiveInspection] = useState<{propertyId: string; propertyName: string} | null>(null);
 
   // Mock data for demo - this would come from your API/database
   const mockBriefing: InspectionBriefing = {
@@ -233,6 +235,38 @@ const InspectorInterface = () => {
       default: return 'default';
     }
   };
+
+  const handleStartInspection = (propertyId: string, propertyName: string) => {
+    setActiveInspection({ propertyId, propertyName });
+  };
+
+  const handleCompleteInspection = (inspectionData: any) => {
+    console.log('Inspection completed:', inspectionData);
+    setActiveInspection(null);
+    setSelectedProperty(null);
+    toast({
+      title: "Inspection Completed",
+      description: `Inspection for ${inspectionData.propertyName} has been saved`,
+    });
+  };
+
+  const handleCancelInspection = () => {
+    if (confirm('Are you sure you want to cancel this inspection? Any unsaved data will be lost.')) {
+      setActiveInspection(null);
+    }
+  };
+
+  // If there's an active inspection, show the inspection interface
+  if (activeInspection) {
+    return (
+      <ActiveInspectionInterface
+        propertyId={activeInspection.propertyId}
+        propertyName={activeInspection.propertyName}
+        onComplete={handleCompleteInspection}
+        onCancel={handleCancelInspection}
+      />
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -544,20 +578,30 @@ const InspectorInterface = () => {
                     <CardTitle>Quick Actions</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button variant="outline">
-                        <FileText className="h-4 w-4 mr-2" />
-                        Generate Report
+                    <div className="space-y-3">
+                      <Button 
+                        className="w-full bg-green-600 hover:bg-green-700 text-white"
+                        size="lg"
+                        onClick={() => handleStartInspection(briefing.property.id, briefing.property.name)}
+                      >
+                        <Camera className="h-5 w-5 mr-2" />
+                        Start Inspection
                       </Button>
-                      <Button variant="outline">
-                        Request Repair Quote
-                      </Button>
-                      <Button variant="outline">
-                        Schedule Follow-up
-                      </Button>
-                      <Button variant="outline">
-                        Export Findings
-                      </Button>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button variant="outline">
+                          <FileText className="h-4 w-4 mr-2" />
+                          Generate Report
+                        </Button>
+                        <Button variant="outline">
+                          Request Repair Quote
+                        </Button>
+                        <Button variant="outline">
+                          Schedule Follow-up
+                        </Button>
+                        <Button variant="outline">
+                          Export Findings
+                        </Button>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>
