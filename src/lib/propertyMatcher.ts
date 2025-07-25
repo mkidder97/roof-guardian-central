@@ -7,7 +7,7 @@ export interface PropertyMatch {
   city: string;
   state: string;
   confidence: number;
-  matchType: 'exact' | 'fuzzy' | 'address' | 'partial';
+  matchType: 'exact' | 'fuzzy' | 'address' | 'partial' | 'manual';
 }
 
 export class PropertyMatcher {
