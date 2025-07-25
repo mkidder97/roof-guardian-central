@@ -1,6 +1,6 @@
 import React from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { UnifiedSidebar } from "@/components/layout/UnifiedSidebar";
+import { SimpleSidebar } from "@/components/layout/SimpleSidebar";
 import { useAuth } from "@/contexts/AuthContext";
 
 export function UnifiedDashboard() {
@@ -8,7 +8,7 @@ export function UnifiedDashboard() {
 
   return (
     <div className="min-h-screen bg-background flex">
-      <UnifiedSidebar 
+      <SimpleSidebar 
         activeTab="overview" 
         onTabChange={() => {}} 
         userRole={userRole || 'inspector'} 
