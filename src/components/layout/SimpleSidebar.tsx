@@ -27,6 +27,7 @@ export function SimpleSidebar({ activeTab, onTabChange, userRole }: SimpleSideba
     { id: 'inspections', label: 'Inspections', icon: FileText },
     { id: 'campaigns', label: 'Campaigns', icon: ClipboardList },
     { id: 'workorders', label: 'Work Orders', icon: Wrench },
+    { id: 'accounts', label: 'Accounts', icon: Settings },
   ];
 
   return (

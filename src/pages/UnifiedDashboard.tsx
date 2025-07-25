@@ -1,35 +1,48 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SimpleSidebar } from "@/components/layout/SimpleSidebar";
 import { useAuth } from "@/contexts/AuthContext";
 
+// Import all the dashboard tab components
+import { PortfolioOverviewTab } from "@/components/dashboard/PortfolioOverviewTab";
+import { RoofsTab } from "@/components/dashboard/RoofsTab";
+import { InspectionsTab } from "@/components/dashboard/InspectionsTab";
+import { CampaignTracker } from "@/components/dashboard/CampaignTracker";
+import { WorkOrdersTab } from "@/components/dashboard/WorkOrdersTab";
+import { AccountsTab } from "@/components/dashboard/AccountsTab";
+
 export function UnifiedDashboard() {
   const { user, userRole } = useAuth();
+  const [activeTab, setActiveTab] = useState('overview');
+
+  const renderActiveTab = () => {
+    switch (activeTab) {
+      case 'overview':
+        return <PortfolioOverviewTab />;
+      case 'roofs':
+        return <RoofsTab />;
+      case 'inspections':
+        return <InspectionsTab />;
+      case 'campaigns':
+        return <CampaignTracker />;
+      case 'workorders':
+        return <WorkOrdersTab />;
+      case 'accounts':
+        return <AccountsTab />;
+      default:
+        return <PortfolioOverviewTab />;
+    }
+  };
 
   return (
     <div className="min-h-screen bg-background flex">
       <SimpleSidebar 
-        activeTab="overview" 
-        onTabChange={() => {}} 
+        activeTab={activeTab} 
+        onTabChange={setActiveTab} 
         userRole={userRole || 'inspector'} 
       />
-      <div className="flex-1 p-6">
-        <Card>
-          <CardHeader>
-            <CardTitle>RoofMind Dashboard</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <p>Welcome back, {user?.email}!</p>
-              <p className="text-muted-foreground">
-                Testing with UnifiedSidebar added...
-              </p>
-              <div className="text-sm text-green-600">
-                ✓ Basic dashboard structure working
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      <div className="flex-1 overflow-auto">
+        {renderActiveTab()}
       </div>
     </div>
   );

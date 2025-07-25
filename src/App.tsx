@@ -33,14 +33,8 @@ const AppRoutes = () => {
     <Routes>
       <Route path="/" element={<UnifiedDashboard />} />
       <Route path="/dashboard" element={<UnifiedDashboard />} />
-      <Route path="/test" element={
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center space-y-4">
-            <div className="text-2xl font-bold text-primary">Test Route</div>
-            <div className="text-muted-foreground">Fallback working route</div>
-          </div>
-        </div>
-      } />
+      <Route path="/legacy" element={<Dashboard />} />
+      <Route path="/inspector" element={<InspectorInterface />} />
       <Route path="/auth" element={<AuthPage />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
