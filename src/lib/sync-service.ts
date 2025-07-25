@@ -1,3 +1,4 @@
+import { useState, useEffect, useCallback } from 'react';
 import offlineStorage from './offline-storage';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -262,12 +263,32 @@ const syncService = new SyncService();
 
 // React hook for using sync service
 export function useSyncService() {
+  const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [queuedActions, setQueuedActions] = useState(0);
+
+  useEffect(() => {
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  const sync = useCallback(() => syncService.sync(), []);
+  const processQueue = useCallback(() => syncService.processQueue(), []);
+  const canShowNotifications = useCallback(() => syncService.canShowNotifications(), []);
+
   return {
-    isOnline: navigator.onLine,
-    queuedActions: 0, // This would be updated in real implementation
-    sync: () => syncService.sync(),
-    processQueue: () => syncService.processQueue(),
-    canShowNotifications: () => syncService.canShowNotifications()
+    isOnline,
+    queuedActions,
+    sync,
+    processQueue,
+    canShowNotifications
   };
 }
 

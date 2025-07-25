@@ -1,3 +1,5 @@
+import { useCallback } from 'react';
+
 // IndexedDB wrapper for offline storage
 class OfflineStorage {
   private dbName = 'RoofGuardianOffline';
@@ -381,16 +383,26 @@ const offlineStorage = new OfflineStorage();
 
 // React hook for using offline storage
 export function useOfflineStorage() {
+  const saveInspection = useCallback((data: any) => offlineStorage.saveInspection(data), []);
+  const syncInspections = useCallback(() => offlineStorage.syncInspections(), []);
+  const getInspections = useCallback(() => offlineStorage.getInspections(), []);
+  const saveComment = useCallback((data: any) => offlineStorage.saveComment(data), []);
+  const getComments = useCallback((entityType: string, entityId: string) => offlineStorage.getComments(entityType, entityId), []);
+  const addToSyncQueue = useCallback((action: string, data: any) => offlineStorage.addToSyncQueue(action, data), []);
+  const getSyncQueue = useCallback(() => offlineStorage.getSyncQueue(), []);
+  const clearSyncQueue = useCallback(() => offlineStorage.clearSyncQueue(), []);
+  const clearAllData = useCallback(() => offlineStorage.clearAllData(), []);
+
   return {
-    saveInspection: (data: any) => offlineStorage.saveInspection(data),
-    syncInspections: () => offlineStorage.syncInspections(),
-    getInspections: () => offlineStorage.getInspections(),
-    saveComment: (data: any) => offlineStorage.saveComment(data),
-    getComments: (entityType: string, entityId: string) => offlineStorage.getComments(entityType, entityId),
-    addToSyncQueue: (action: string, data: any) => offlineStorage.addToSyncQueue(action, data),
-    getSyncQueue: () => offlineStorage.getSyncQueue(),
-    clearSyncQueue: () => offlineStorage.clearSyncQueue(),
-    clearAllData: () => offlineStorage.clearAllData()
+    saveInspection,
+    syncInspections,
+    getInspections,
+    saveComment,
+    getComments,
+    addToSyncQueue,
+    getSyncQueue,
+    clearSyncQueue,
+    clearAllData
   };
 }
 
