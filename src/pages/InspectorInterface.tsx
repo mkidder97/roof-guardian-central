@@ -651,6 +651,7 @@ const InspectorInterface = () => {
           open={showBuildingDetails}
           onOpenChange={handleBuildingDetailsClose}
           roofId={selectedBuildingId}
+          onStartInspection={handleStartInspection}
         />
       )}
     </div>

@@ -39,12 +39,14 @@ interface BuildingDetailsDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   roofId: string;
+  onStartInspection?: (propertyId: string, propertyName: string) => void;
 }
 
 export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
   open,
   onOpenChange,
-  roofId
+  roofId,
+  onStartInspection
 }) => {
   const [roofData, setRoofData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
@@ -177,7 +179,7 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-screen h-screen max-w-none max-h-none m-0 rounded-none overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl font-bold flex items-center gap-2">
             <Building2 className="h-6 w-6" />
@@ -464,7 +466,7 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
 
     {/* Critical Info Dialog */}
     <CriticalInfoDialog open={showCriticalInfo} onOpenChange={setShowCriticalInfo}>
-      <CriticalDialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <CriticalDialogContent className="w-screen h-screen max-w-none max-h-none m-0 rounded-none overflow-y-auto">
         <CriticalDialogHeader>
           <CriticalDialogTitle className="text-xl font-bold flex items-center gap-2">
             <AlertTriangle className="h-6 w-6 text-destructive" />
@@ -544,10 +546,11 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
               className="bg-green-600 hover:bg-green-700 text-white"
               onClick={() => {
                 setShowCriticalInfo(false);
-                // Here you would integrate with your inspection interface
-                // For now, we'll close both dialogs and potentially navigate
                 onOpenChange(false);
-                console.log('Starting inspection for property:', roofData?.id);
+                // Start the actual inspection
+                if (onStartInspection && roofData) {
+                  onStartInspection(roofData.id, roofData.property_name);
+                }
               }}
             >
               <Camera className="h-4 w-4 mr-2" />
