@@ -13,30 +13,33 @@ import InspectorInterface from "./pages/InspectorInterface";
 
 const queryClient = new QueryClient();
 
-const TestComponent: React.FC = () => {
-  const [count, setCount] = React.useState(0);
-  
-  return (
-    <div className="min-h-screen flex items-center justify-center">
-      <div className="text-center space-y-4">
-        <div className="text-2xl font-bold text-primary">Test Component</div>
-        <div className="text-muted-foreground">Count: {count}</div>
-        <button 
-          onClick={() => setCount(c => c + 1)}
-          className="px-4 py-2 bg-blue-500 text-white rounded"
-        >
-          Increment
-        </button>
-      </div>
-    </div>
-  );
-};
-
 const AppRoutes: React.FC = () => {
+  const { user, loading } = useAuth();
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <div className="text-2xl font-bold text-primary">RoofMind</div>
+          <div className="text-muted-foreground">Loading...</div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <AuthPage />;
+  }
+
   return (
     <Routes>
-      <Route path="/" element={<TestComponent />} />
-      <Route path="*" element={<TestComponent />} />
+      <Route path="/" element={<UnifiedDashboard />} />
+      <Route path="/dashboard" element={<UnifiedDashboard />} />
+      <Route path="/legacy" element={<Dashboard />} />
+      <Route path="/auth" element={<AuthPage />} />
+      <Route path="/inspector" element={<InspectorInterface />} />
+      {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+      <Route path="*" element={<NotFound />} />
     </Routes>
   );
 };
@@ -44,9 +47,11 @@ const AppRoutes: React.FC = () => {
 const App: React.FC = () => {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
+      <AuthProvider>
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+      </AuthProvider>
     </QueryClientProvider>
   );
 };
