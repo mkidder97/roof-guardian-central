@@ -379,4 +379,19 @@ class OfflineStorage {
 // Singleton instance
 const offlineStorage = new OfflineStorage();
 
+// React hook for using offline storage
+export const useOfflineStorage = () => {
+  return {
+    saveInspection: (data: any) => offlineStorage.saveInspection(data),
+    syncInspections: () => offlineStorage.syncInspections(),
+    getInspections: () => offlineStorage.getInspections(),
+    saveComment: (data: any) => offlineStorage.saveComment(data),
+    getComments: (entityType: string, entityId: string) => offlineStorage.getComments(entityType, entityId),
+    addToSyncQueue: (action: string, data: any) => offlineStorage.addToSyncQueue(action, data),
+    getSyncQueue: () => offlineStorage.getSyncQueue(),
+    clearSyncQueue: () => offlineStorage.clearSyncQueue(),
+    clearAllData: () => offlineStorage.clearAllData()
+  };
+};
+
 export default offlineStorage;

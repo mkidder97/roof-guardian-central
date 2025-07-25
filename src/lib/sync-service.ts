@@ -260,4 +260,15 @@ class SyncService {
 // Singleton instance
 const syncService = new SyncService();
 
+// React hook for using sync service
+export const useSyncService = () => {
+  return {
+    isOnline: navigator.onLine,
+    queuedActions: 0, // This would be updated in real implementation
+    sync: () => syncService.sync(),
+    processQueue: () => syncService.processQueue(),
+    canShowNotifications: () => syncService.canShowNotifications()
+  };
+};
+
 export default syncService;
