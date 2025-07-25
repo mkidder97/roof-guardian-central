@@ -418,6 +418,16 @@ export function HistoricalInspectionUploader() {
                                   {file.extractedData.reportType} • {file.extractedData.inspectionCompany}
                                   {file.extractedData.roofSystem && ` • ${file.extractedData.roofSystem}`}
                                 </div>
+                                {file.extractedData.inspectionTypeClassification && file.extractedData.inspectionTypeClassification.primaryType !== 'unknown' && (
+                                  <div className="flex items-center gap-2 mt-1">
+                                    <Badge variant="secondary" className="text-xs">
+                                      Type: {file.extractedData.inspectionTypeClassification.primaryType.replace('_', ' ')}
+                                    </Badge>
+                                    <span className="text-xs text-gray-500">
+                                      {Math.round(file.extractedData.inspectionTypeClassification.confidence * 100)}% confidence
+                                    </span>
+                                  </div>
+                                )}
                               </div>
                             )}
 

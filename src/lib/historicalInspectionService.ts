@@ -28,6 +28,73 @@ export interface ProcessedPDFResult {
 
 export class HistoricalInspectionService {
   /**
+   * Check if a PDF file has already been uploaded for a property
+   */
+  static async checkForDuplicateUpload(
+    propertyId: string, 
+    fileName: string, 
+    fileSize: number,
+    reportDate?: string,
+    inspectionType?: string
+  ): Promise<{isDuplicate: boolean; existingFile?: any}> {
+    try {
+      // Check by filename and property
+      const { data: existingByName } = await supabase
+        .from('roof_files')
+        .select('*')
+        .eq('roof_id', propertyId)
+        .eq('file_name', fileName)
+        .eq('file_type', 'inspection_report')
+        .single();
+
+      if (existingByName) {
+        console.log('Found duplicate by filename:', fileName);
+        return { isDuplicate: true, existingFile: existingByName };
+      }
+
+      // Check by file size and property (in case filename was changed)
+      const { data: existingBySize } = await supabase
+        .from('roof_files')
+        .select('*')
+        .eq('roof_id', propertyId)
+        .eq('file_size', fileSize)
+        .eq('file_type', 'inspection_report');
+
+      if (existingBySize && existingBySize.length > 0) {
+        console.log('Found duplicate by file size:', fileSize);
+        return { isDuplicate: true, existingFile: existingBySize[0] };
+      }
+
+      // Check by inspection date and type if provided
+      if (reportDate) {
+        let query = supabase
+          .from('inspections')
+          .select('*, inspection_reports(*)')
+          .eq('roof_id', propertyId)
+          .eq('completed_date', reportDate)
+          .eq('status', 'completed');
+        
+        // Also check by inspection type if provided
+        if (inspectionType && inspectionType !== 'unknown') {
+          query = query.eq('inspection_type', inspectionType);
+        }
+        
+        const { data: existingByDate } = await query;
+
+        if (existingByDate && existingByDate.length > 0) {
+          console.log('Found duplicate by date/type:', reportDate, inspectionType);
+          return { isDuplicate: true, existingFile: existingByDate[0] };
+        }
+      }
+
+      return { isDuplicate: false };
+    } catch (error) {
+      console.error('Error checking for duplicate upload:', error);
+      return { isDuplicate: false }; // On error, allow upload to proceed
+    }
+  }
+
+  /**
    * Process PDF file: extract data, match property, and store if match found
    */
   static async processPDFFile(pdfFile: File): Promise<ProcessedPDFResult> {
@@ -77,7 +144,38 @@ export class HistoricalInspectionService {
         };
       }
       
-      console.log(`Found property match: ${propertyMatch.property_name} (confidence: ${propertyMatch.confidence})`);
+      console.log(`✅ Found property match: ${propertyMatch.property_name} (confidence: ${propertyMatch.confidence})`);
+      
+      // 2.5. Check for duplicate uploads before processing
+      const inspectionDate = this.parseInspectionDate(extractedData.reportDate);
+      const inspectionType = this.normalizeInspectionType(
+        extractedData.reportType, 
+        extractedData.inspectionTypeClassification
+      );
+      
+      const duplicateCheck = await this.checkForDuplicateUpload(
+        propertyMatch.id,
+        pdfFile.name,
+        pdfFile.size,
+        inspectionDate,
+        inspectionType
+      );
+
+      if (duplicateCheck.isDuplicate) {
+        console.log('⚠️ Duplicate upload detected:', {
+          filename: pdfFile.name,
+          property: propertyMatch.property_name,
+          existingFile: duplicateCheck.existingFile
+        });
+        
+        return {
+          success: false,
+          propertyMatch,
+          extractedData,
+          fileName: pdfFile.name,
+          error: `⚠️ Duplicate Upload: This inspection report for "${propertyMatch.property_name}" has already been uploaded. Original file uploaded on ${duplicateCheck.existingFile?.created_at ? new Date(duplicateCheck.existingFile.created_at).toLocaleDateString() : 'unknown date'}.`
+        };
+      }
       
       // 3. Store the inspection data
       const storedResult = await this.storeHistoricalInspection(
@@ -133,10 +231,10 @@ export class HistoricalInspectionService {
       // 3. Create inspection record
       const inspectionData: InspectionInsert = {
         roof_id: roofId,
-        inspection_type: this.normalizeInspectionType(extractedData.reportType),
+        inspection_type: this.normalizeInspectionType(extractedData.reportType, extractedData.inspectionTypeClassification),
         completed_date: inspectionDate,
         status: 'completed',
-        notes: `Historical inspection imported from PDF: ${pdfFile.name}\nInspection Company: ${extractedData.inspectionCompany}`,
+        notes: `Historical inspection imported from PDF: ${pdfFile.name}\nInspection Company: ${extractedData.inspectionCompany}\nInspection Type: ${extractedData.inspectionTypeClassification.primaryType} (${Math.round(extractedData.inspectionTypeClassification.confidence * 100)}% confidence)`,
         weather_conditions: null
       };
 
@@ -314,9 +412,30 @@ export class HistoricalInspectionService {
   }
   
   /**
-   * Normalize inspection type from PDF
+   * Normalize inspection type from PDF using classification results
    */
-  private static normalizeInspectionType(reportType: string): string {
+  private static normalizeInspectionType(
+    reportType: string, 
+    classification?: ExtractedPDFData['inspectionTypeClassification']
+  ): string {
+    // Use classification if available and confident
+    if (classification && classification.confidence > 0.3) {
+      switch (classification.primaryType) {
+        case 'storm':
+          return 'storm_damage';
+        case 'annual':
+          return 'annual';
+        case 'due_diligence':
+          return 'pre_purchase'; // Map to existing database type
+        case 'survey':
+          return 'routine'; // Map survey to routine inspection
+        default:
+          // Fall through to legacy logic
+          break;
+      }
+    }
+    
+    // Legacy fallback logic
     const type = reportType.toLowerCase();
     
     if (type.includes('storm') || type.includes('damage')) return 'storm_damage';
@@ -354,6 +473,9 @@ export class HistoricalInspectionService {
     
     findings.push(`INSPECTION DETAILS:`);
     findings.push(`• Report Type: ${extractedData.reportType}`);
+    if (extractedData.inspectionTypeClassification && extractedData.inspectionTypeClassification.primaryType !== 'unknown') {
+      findings.push(`• Inspection Classification: ${extractedData.inspectionTypeClassification.primaryType} (${Math.round(extractedData.inspectionTypeClassification.confidence * 100)}% confidence)`);
+    }
     findings.push(`• Report Date: ${extractedData.reportDate}`);
     findings.push(`• Inspection Company: ${extractedData.inspectionCompany}`);
     findings.push(`• Property: ${extractedData.propertyName}`);
@@ -436,10 +558,25 @@ export class HistoricalInspectionService {
     recommendations.push('RECOMMENDATIONS:');
     recommendations.push('• Review complete PDF report for detailed findings and photos');
     
-    if (extractedData.reportType.toLowerCase().includes('storm')) {
+    // Use classification for more accurate recommendations
+    const inspectionType = extractedData.inspectionTypeClassification?.primaryType || 'unknown';
+    
+    if (inspectionType === 'storm' || extractedData.reportType.toLowerCase().includes('storm')) {
       recommendations.push('• Assess storm damage thoroughly and prioritize critical repairs');
       recommendations.push('• Document all damage with photos for insurance claims if applicable');
       recommendations.push('• Consider emergency repairs for any active leaks or safety hazards');
+    }
+    
+    if (inspectionType === 'due_diligence') {
+      recommendations.push('• Review findings carefully for property acquisition decision');
+      recommendations.push('• Obtain cost estimates for all identified repairs');
+      recommendations.push('• Consider warranty implications for upcoming transaction');
+    }
+    
+    if (inspectionType === 'survey') {
+      recommendations.push('• Document current roof condition for baseline comparison');
+      recommendations.push('• Plan maintenance schedule based on survey findings');
+      recommendations.push('• Budget for identified future repair needs');
     }
     
     if (extractedData.installingContractor) {

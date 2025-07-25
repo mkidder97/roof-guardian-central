@@ -17,6 +17,13 @@ export interface ExtractedPDFData {
   reportDate: string;
   inspectionCompany: string;
   
+  // Advanced Inspection Classification
+  inspectionTypeClassification: {
+    primaryType: 'annual' | 'storm' | 'due_diligence' | 'survey' | 'unknown';
+    confidence: number;
+    indicators: string[];
+  };
+  
   // Roof Specifications
   roofArea: number;
   roofSystem: string;
@@ -207,6 +214,7 @@ export class RealPDFParser {
       reportType,
       reportDate,
       inspectionCompany,
+      inspectionTypeClassification: this.classifyInspectionType(fullText, reportType),
       roofArea,
       roofSystem,
       systemDescription,
@@ -269,7 +277,116 @@ export class RealPDFParser {
       warranty: '',
       warrantyExpiration: '',
       installingContractor: '',
-      repairingContractor: ''
+      repairingContractor: '',
+      inspectionTypeClassification: {
+        primaryType: 'unknown',
+        confidence: 0,
+        indicators: []
+      }
+    };
+  }
+  
+  /**
+   * Classify inspection type based on content analysis
+   */
+  private static classifyInspectionType(text: string, reportType: string): ExtractedPDFData['inspectionTypeClassification'] {
+    const lowerText = text.toLowerCase();
+    const lowerReportType = reportType.toLowerCase();
+    const indicators: string[] = [];
+    
+    // Define patterns for each inspection type
+    const typePatterns = {
+      storm: {
+        keywords: ['storm', 'hurricane', 'hail', 'wind damage', 'storm damage', 'weather event', 'catastrophic', 'emergency'],
+        weight: 3
+      },
+      annual: {
+        keywords: ['annual', 'yearly', 'routine', 'scheduled', 'preventive', 'maintenance', 'regular'],
+        weight: 2
+      },
+      due_diligence: {
+        keywords: ['due diligence', 'acquisition', 'purchase', 'transaction', 'assessment', 'property condition', 'pca', 'buyer'],
+        weight: 3
+      },
+      survey: {
+        keywords: ['survey', 'condition survey', 'roof survey', 'assessment survey', 'comprehensive survey', 'detailed survey'],
+        weight: 2
+      }
+    };
+    
+    // Score each type
+    const scores: Record<string, number> = {
+      storm: 0,
+      annual: 0,
+      due_diligence: 0,
+      survey: 0
+    };
+    
+    // Check patterns in both report type and full text
+    for (const [type, pattern] of Object.entries(typePatterns)) {
+      for (const keyword of pattern.keywords) {
+        // Check in report type (higher weight)
+        if (lowerReportType.includes(keyword)) {
+          scores[type] += pattern.weight * 2;
+          indicators.push(`Report type contains "${keyword}"`);
+        }
+        // Check in full text
+        if (lowerText.includes(keyword)) {
+          scores[type] += pattern.weight;
+          const count = (lowerText.match(new RegExp(keyword, 'g')) || []).length;
+          if (count > 1) {
+            scores[type] += pattern.weight * (count - 1) * 0.5;
+            indicators.push(`Found "${keyword}" ${count} times in document`);
+          }
+        }
+      }
+    }
+    
+    // Additional context-based scoring
+    if (lowerText.includes('damage assessment') || lowerText.includes('storm event')) {
+      scores.storm += 5;
+      indicators.push('Contains damage assessment or storm event references');
+    }
+    
+    if (lowerText.match(/\d{4}\s*annual\s*inspection/i)) {
+      scores.annual += 5;
+      indicators.push('Contains year + annual inspection pattern');
+    }
+    
+    if (lowerText.includes('property acquisition') || lowerText.includes('real estate transaction')) {
+      scores.due_diligence += 5;
+      indicators.push('Contains acquisition or transaction references');
+    }
+    
+    if (lowerText.includes('roof condition survey') || lowerText.includes('comprehensive roof survey')) {
+      scores.survey += 5;
+      indicators.push('Contains roof survey terminology');
+    }
+    
+    // Find the type with highest score
+    let bestType: 'annual' | 'storm' | 'due_diligence' | 'survey' | 'unknown' = 'unknown';
+    let bestScore = 0;
+    
+    for (const [type, score] of Object.entries(scores)) {
+      if (score > bestScore) {
+        bestScore = score;
+        bestType = type as any;
+      }
+    }
+    
+    // Calculate confidence (0-1 scale)
+    const maxPossibleScore = 30; // Approximate maximum score
+    const confidence = Math.min(1, bestScore / maxPossibleScore);
+    
+    // If confidence is too low, mark as unknown
+    if (confidence < 0.2 || bestScore === 0) {
+      bestType = 'unknown';
+    }
+    
+    return {
+      primaryType: bestType,
+      confidence: bestScore > 0 ? confidence : 0,
+      indicators: indicators.slice(0, 5) // Keep top 5 indicators
     };
   }
 }
