@@ -1,5 +1,3 @@
-import { useCallback } from 'react';
-
 // IndexedDB wrapper for offline storage
 class OfflineStorage {
   private dbName = 'RoofGuardianOffline';
@@ -380,30 +378,5 @@ class OfflineStorage {
 
 // Singleton instance
 const offlineStorage = new OfflineStorage();
-
-// React hook for using offline storage
-export function useOfflineStorage() {
-  const saveInspection = useCallback((data: any) => offlineStorage.saveInspection(data), []);
-  const updateInspection = useCallback((id: string, updates: any) => offlineStorage.updateInspection(id, updates), []);
-  const getInspections = useCallback(() => offlineStorage.getInspections(), []);
-  const saveComment = useCallback((data: any) => offlineStorage.saveComment(data), []);
-  const getComments = useCallback((entityType: string, entityId: string) => offlineStorage.getComments(entityType, entityId), []);
-  const savePhoto = useCallback((photo: { id: string; file: File; inspection_id: string }) => offlineStorage.savePhoto(photo), []);
-  const getSyncQueue = useCallback(() => offlineStorage.getSyncQueue(), []);
-  const clearSyncQueue = useCallback(() => offlineStorage.clearSyncQueue(), []);
-  const clearAll = useCallback(() => offlineStorage.clearAll(), []);
-
-  return {
-    saveInspection,
-    updateInspection,
-    getInspections,
-    saveComment,
-    getComments,
-    savePhoto,
-    getSyncQueue,
-    clearSyncQueue,
-    clearAll
-  };
-}
 
 export default offlineStorage;

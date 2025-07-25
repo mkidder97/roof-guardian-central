@@ -7,7 +7,7 @@ import { UnifiedSidebar } from "@/components/layout/UnifiedSidebar";
 import { SmartSearchTab } from "@/components/dashboard/SmartSearchTab";
 import { DashboardWidgets } from "@/components/dashboard/DashboardWidgets";
 import { CommandPalette, useCommandPalette } from "@/components/ui/command-palette";
-
+import { NotificationCenter } from "@/components/ui/notification-center";
 import { useAuth } from "@/contexts/AuthContext";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
@@ -259,10 +259,7 @@ export function UnifiedDashboard() {
               </div>
 
               {/* Actions - Mobile Optimized */}
-              {/* Notifications placeholder */}
-              <Button variant="ghost" size="sm">
-                <Bell className="h-4 w-4" />
-              </Button>
+              <NotificationCenter />
               
               <Button 
                 variant="ghost" 
