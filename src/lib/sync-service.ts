@@ -273,22 +273,36 @@ export function useSyncService() {
     window.addEventListener('online', handleOnline);
     window.addEventListener('offline', handleOffline);
 
+    // Update queue length periodically
+    const updateQueueLength = async () => {
+      try {
+        const status = await syncService.getSyncStatus();
+        setQueuedActions(status.queueLength);
+      } catch (error) {
+        console.error('Failed to get sync status:', error);
+      }
+    };
+
+    updateQueueLength();
+    const interval = setInterval(updateQueueLength, 10000); // Every 10 seconds
+
     return () => {
       window.removeEventListener('online', handleOnline);
       window.removeEventListener('offline', handleOffline);
+      clearInterval(interval);
     };
   }, []);
 
-  const sync = useCallback(() => Promise.resolve(), []);
-  const processQueue = useCallback(() => Promise.resolve(), []);
-  const canShowNotifications = useCallback(() => true, []);
+  const sync = useCallback(() => syncService.startSync(), []);
+  const forceSync = useCallback(() => syncService.forcSync(), []);
+  const getSyncStatus = useCallback(() => syncService.getSyncStatus(), []);
 
   return {
     isOnline,
     queuedActions,
     sync,
-    processQueue,
-    canShowNotifications
+    forceSync,
+    getSyncStatus
   };
 }
 

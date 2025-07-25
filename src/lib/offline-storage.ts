@@ -384,25 +384,25 @@ const offlineStorage = new OfflineStorage();
 // React hook for using offline storage
 export function useOfflineStorage() {
   const saveInspection = useCallback((data: any) => offlineStorage.saveInspection(data), []);
-  const syncInspections = useCallback(() => Promise.resolve(), []);
+  const updateInspection = useCallback((id: string, updates: any) => offlineStorage.updateInspection(id, updates), []);
   const getInspections = useCallback(() => offlineStorage.getInspections(), []);
   const saveComment = useCallback((data: any) => offlineStorage.saveComment(data), []);
   const getComments = useCallback((entityType: string, entityId: string) => offlineStorage.getComments(entityType, entityId), []);
-  const addToSyncQueue = useCallback(async (action: string, data: any) => {}, []);
+  const savePhoto = useCallback((photo: { id: string; file: File; inspection_id: string }) => offlineStorage.savePhoto(photo), []);
   const getSyncQueue = useCallback(() => offlineStorage.getSyncQueue(), []);
   const clearSyncQueue = useCallback(() => offlineStorage.clearSyncQueue(), []);
-  const clearAllData = useCallback(() => offlineStorage.clearAll(), []);
+  const clearAll = useCallback(() => offlineStorage.clearAll(), []);
 
   return {
     saveInspection,
-    syncInspections,
+    updateInspection,
     getInspections,
     saveComment,
     getComments,
-    addToSyncQueue,
+    savePhoto,
     getSyncQueue,
     clearSyncQueue,
-    clearAllData
+    clearAll
   };
 }
 
