@@ -18,9 +18,31 @@ export function UnifiedDashboard() {
   const renderActiveTab = () => {
     switch (activeTab) {
       case 'overview':
-        return <PortfolioOverviewTab />;
+        return (
+          <div className="p-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Portfolio Overview</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p>Portfolio overview content (temporarily simplified)</p>
+              </CardContent>
+            </Card>
+          </div>
+        );
       case 'roofs':
-        return <RoofsTab />;
+        return (
+          <div className="p-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Properties</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p>Properties content (temporarily simplified)</p>
+              </CardContent>
+            </Card>
+          </div>
+        );
       case 'inspections':
         return <InspectionsTab />;
       case 'campaigns':
@@ -30,7 +52,18 @@ export function UnifiedDashboard() {
       case 'accounts':
         return <AccountsTab />;
       default:
-        return <PortfolioOverviewTab />;
+        return (
+          <div className="p-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Dashboard</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p>Welcome to RoofMind</p>
+              </CardContent>
+            </Card>
+          </div>
+        );
     }
   };
 
