@@ -380,7 +380,7 @@ class OfflineStorage {
 const offlineStorage = new OfflineStorage();
 
 // React hook for using offline storage
-export const useOfflineStorage = () => {
+export function useOfflineStorage() {
   return {
     saveInspection: (data: any) => offlineStorage.saveInspection(data),
     syncInspections: () => offlineStorage.syncInspections(),
@@ -392,6 +392,6 @@ export const useOfflineStorage = () => {
     clearSyncQueue: () => offlineStorage.clearSyncQueue(),
     clearAllData: () => offlineStorage.clearAllData()
   };
-};
+}
 
 export default offlineStorage;

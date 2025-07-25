@@ -261,7 +261,7 @@ class SyncService {
 const syncService = new SyncService();
 
 // React hook for using sync service
-export const useSyncService = () => {
+export function useSyncService() {
   return {
     isOnline: navigator.onLine,
     queuedActions: 0, // This would be updated in real implementation
@@ -269,6 +269,6 @@ export const useSyncService = () => {
     processQueue: () => syncService.processQueue(),
     canShowNotifications: () => syncService.canShowNotifications()
   };
-};
+}
 
 export default syncService;
