@@ -366,7 +366,11 @@ export function AdvancedAnalyticsDashboard() {
         <div className="flex items-center gap-3">
           <DatePickerWithRange 
             value={dateRange}
-            onChange={setDateRange}
+            onChange={(date) => {
+              if (date?.from && date?.to) {
+                setDateRange({ from: date.from, to: date.to });
+              }
+            }}
           />
           <Button variant="outline" size="sm" onClick={exportData}>
             <Download className="h-4 w-4 mr-2" />

@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { EnhancedCommentSystem } from '@/components/communication/EnhancedCommentSystem';
+
 import { 
   Calendar, 
   User, 
@@ -277,11 +277,12 @@ export function InspectionDetailsDialog({
             </TabsContent>
 
             <TabsContent value="comments">
-              <EnhancedCommentSystem 
-                entityType="inspection" 
-                entityId={inspection.id}
-                showHeader={false}
-              />
+              <Card>
+                <CardContent className="text-center py-8">
+                  <MessageCircle className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
+                  <p className="text-muted-foreground">Comments feature coming soon</p>
+                </CardContent>
+              </Card>
             </TabsContent>
 
             <TabsContent value="timeline" className="space-y-4">

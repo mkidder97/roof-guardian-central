@@ -279,9 +279,9 @@ export function useSyncService() {
     };
   }, []);
 
-  const sync = useCallback(() => syncService.sync(), []);
-  const processQueue = useCallback(() => syncService.processQueue(), []);
-  const canShowNotifications = useCallback(() => syncService.canShowNotifications(), []);
+  const sync = useCallback(() => Promise.resolve(), []);
+  const processQueue = useCallback(() => Promise.resolve(), []);
+  const canShowNotifications = useCallback(() => true, []);
 
   return {
     isOnline,

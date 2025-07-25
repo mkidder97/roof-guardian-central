@@ -256,6 +256,87 @@ export type Database = {
         }
         Relationships: []
       }
+      comment_mentions: {
+        Row: {
+          comment_id: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          comment_id: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          comment_id?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      comment_reactions: {
+        Row: {
+          comment_id: string
+          created_at: string
+          id: string
+          reaction_type: string
+          user_id: string
+        }
+        Insert: {
+          comment_id: string
+          created_at?: string
+          id?: string
+          reaction_type?: string
+          user_id: string
+        }
+        Update: {
+          comment_id?: string
+          created_at?: string
+          id?: string
+          reaction_type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      comments: {
+        Row: {
+          author_id: string
+          content: string
+          created_at: string
+          entity_id: string
+          entity_type: string
+          id: string
+          is_deleted: boolean
+          parent_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          author_id: string
+          content: string
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          is_deleted?: boolean
+          parent_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string
+          content?: string
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          is_deleted?: boolean
+          parent_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       file_categories: {
         Row: {
           color: string | null
@@ -771,6 +852,7 @@ export type Database = {
           asset_manager_email: string | null
           asset_manager_name: string | null
           asset_manager_phone: string | null
+          capital_budget: number | null
           capital_budget_actual: string | null
           capital_budget_category: string | null
           capital_budget_completed: string | null
@@ -829,6 +911,7 @@ export type Database = {
           roof_access_location: string | null
           roof_access_requirements: string | null
           roof_access_safety_concern: string | null
+          roof_age: number | null
           roof_area: number | null
           roof_area_unit: string | null
           roof_category: string | null
@@ -861,6 +944,7 @@ export type Database = {
           asset_manager_email?: string | null
           asset_manager_name?: string | null
           asset_manager_phone?: string | null
+          capital_budget?: number | null
           capital_budget_actual?: string | null
           capital_budget_category?: string | null
           capital_budget_completed?: string | null
@@ -919,6 +1003,7 @@ export type Database = {
           roof_access_location?: string | null
           roof_access_requirements?: string | null
           roof_access_safety_concern?: string | null
+          roof_age?: number | null
           roof_area?: number | null
           roof_area_unit?: string | null
           roof_category?: string | null
@@ -951,6 +1036,7 @@ export type Database = {
           asset_manager_email?: string | null
           asset_manager_name?: string | null
           asset_manager_phone?: string | null
+          capital_budget?: number | null
           capital_budget_actual?: string | null
           capital_budget_category?: string | null
           capital_budget_completed?: string | null
@@ -1009,6 +1095,7 @@ export type Database = {
           roof_access_location?: string | null
           roof_access_requirements?: string | null
           roof_access_safety_concern?: string | null
+          roof_age?: number | null
           roof_area?: number | null
           roof_area_unit?: string | null
           roof_category?: string | null
