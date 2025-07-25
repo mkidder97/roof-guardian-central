@@ -21,6 +21,7 @@ import {
 import { InspectorIntelligenceService } from "@/lib/inspectorIntelligenceService";
 import { ActiveInspectionInterface } from "@/components/inspection/ActiveInspectionInterface";
 import { useToast } from "@/hooks/use-toast";
+import { BuildingDetailsDialog } from "@/components/inspector/BuildingDetailsDialog";
 
 interface InspectionBriefing {
   property: {
@@ -69,6 +70,8 @@ const InspectorInterface = () => {
   const [loading, setLoading] = useState(false);
   const [loadingBriefing, setLoadingBriefing] = useState(false);
   const [activeInspection, setActiveInspection] = useState<{propertyId: string; propertyName: string} | null>(null);
+  const [showBuildingDetails, setShowBuildingDetails] = useState(false);
+  const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null);
 
   // Mock data for demo - this would come from your API/database
   const mockBriefing: InspectionBriefing = {
@@ -256,6 +259,16 @@ const InspectorInterface = () => {
     }
   };
 
+  const handleBuildingClick = (propertyId: string) => {
+    setSelectedBuildingId(propertyId);
+    setShowBuildingDetails(true);
+  };
+
+  const handleBuildingDetailsClose = () => {
+    setShowBuildingDetails(false);
+    setSelectedBuildingId(null);
+  };
+
   // If there's an active inspection, show the inspection interface
   if (activeInspection) {
     return (
@@ -307,7 +320,7 @@ const InspectorInterface = () => {
                     <Card 
                       key={property.id}
                       className="cursor-pointer hover:border-primary transition-colors"
-                      onClick={() => setSelectedProperty(property.id)}
+                      onClick={() => handleBuildingClick(property.id)}
                     >
                       <CardContent className="p-4">
                         <div className="flex items-center justify-between">
@@ -631,6 +644,15 @@ const InspectorInterface = () => {
           </Card>
         )}
       </div>
+
+      {/* Building Details Dialog */}
+      {selectedBuildingId && (
+        <BuildingDetailsDialog
+          open={showBuildingDetails}
+          onOpenChange={handleBuildingDetailsClose}
+          roofId={selectedBuildingId}
+        />
+      )}
     </div>
   );
 };
