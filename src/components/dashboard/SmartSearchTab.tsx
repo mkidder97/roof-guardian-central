@@ -208,6 +208,25 @@ export function SmartSearchTab() {
     }
   ];
 
+  // Helper function for relevance calculation
+  const calculateRelevance = (query: string, fields: (string | null | undefined)[]): number => {
+    let score = 0;
+    const queryWords = query.split(' ').filter(word => word.length > 0);
+    
+    fields.forEach(field => {
+      if (!field) return;
+      const fieldLower = field.toLowerCase();
+      
+      queryWords.forEach(word => {
+        if (fieldLower.includes(word)) {
+          score += fieldLower.startsWith(word) ? 10 : 5;
+        }
+      });
+    });
+    
+    return score;
+  };
+
   // Load data for active filter
   const { data: searchData, isLoading } = useQuery({
     queryKey: ['search', activeFilter],
@@ -319,23 +338,6 @@ export function SmartSearchTab() {
     });
   }, []);
 
-  const calculateRelevance = (query: string, fields: (string | null | undefined)[]): number => {
-    let score = 0;
-    const queryWords = query.split(' ').filter(word => word.length > 0);
-    
-    fields.forEach(field => {
-      if (!field) return;
-      const fieldLower = field.toLowerCase();
-      
-      queryWords.forEach(word => {
-        if (fieldLower.includes(word)) {
-          score += fieldLower.startsWith(word) ? 10 : 5;
-        }
-      });
-    });
-    
-    return score;
-  };
 
   // Action handlers
   const exportItem = (item: any) => {
