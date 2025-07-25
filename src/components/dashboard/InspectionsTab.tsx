@@ -4,10 +4,11 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, FileDown, Calendar, User, Building, Loader2, Brain } from "lucide-react";
+import { Search, Plus, FileDown, Calendar, User, Building, Loader2, Brain, MessageCircle, Eye } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { InspectionSchedulingModal } from "@/components/inspections/InspectionSchedulingModal";
+import { InspectionDetailsDialog } from "@/components/inspections/InspectionDetailsDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 
@@ -39,6 +40,8 @@ export function InspectionsTab() {
   const [inspections, setInspections] = useState<Inspection[]>([]);
   const [filteredInspections, setFilteredInspections] = useState<Inspection[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedInspection, setSelectedInspection] = useState<Inspection | null>(null);
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
   const navigate = useNavigate();
   const { userRole } = useAuth();
 
@@ -332,7 +335,17 @@ export function InspectionsTab() {
                 <TableCell>{inspection.weather_conditions || 'Not Recorded'}</TableCell>
                 <TableCell>
                   <div className="flex space-x-2">
-                    <Button variant="outline" size="sm">View</Button>
+                    <Button 
+                      variant="outline" 
+                      size="sm"
+                      onClick={() => {
+                        setSelectedInspection(inspection);
+                        setDetailsDialogOpen(true);
+                      }}
+                    >
+                      <Eye className="h-3 w-3 mr-1" />
+                      View
+                    </Button>
                     <Button variant="outline" size="sm">Edit</Button>
                     {getInspectionStatus(inspection) === "completed" && (
                       <Button variant="outline" size="sm">Report</Button>
@@ -359,6 +372,12 @@ export function InspectionsTab() {
       <InspectionSchedulingModal
         open={schedulingModalOpen}
         onOpenChange={setSchedulingModalOpen}
+      />
+
+      <InspectionDetailsDialog
+        open={detailsDialogOpen}
+        onOpenChange={setDetailsDialogOpen}
+        inspection={selectedInspection}
       />
     </div>
   );
