@@ -852,7 +852,6 @@ export type Database = {
           asset_manager_email: string | null
           asset_manager_name: string | null
           asset_manager_phone: string | null
-          capital_budget: number | null
           capital_budget_actual: string | null
           capital_budget_category: string | null
           capital_budget_completed: string | null
@@ -911,7 +910,6 @@ export type Database = {
           roof_access_location: string | null
           roof_access_requirements: string | null
           roof_access_safety_concern: string | null
-          roof_age: number | null
           roof_area: number | null
           roof_area_unit: string | null
           roof_category: string | null
@@ -944,7 +942,6 @@ export type Database = {
           asset_manager_email?: string | null
           asset_manager_name?: string | null
           asset_manager_phone?: string | null
-          capital_budget?: number | null
           capital_budget_actual?: string | null
           capital_budget_category?: string | null
           capital_budget_completed?: string | null
@@ -1003,7 +1000,6 @@ export type Database = {
           roof_access_location?: string | null
           roof_access_requirements?: string | null
           roof_access_safety_concern?: string | null
-          roof_age?: number | null
           roof_area?: number | null
           roof_area_unit?: string | null
           roof_category?: string | null
@@ -1036,7 +1032,6 @@ export type Database = {
           asset_manager_email?: string | null
           asset_manager_name?: string | null
           asset_manager_phone?: string | null
-          capital_budget?: number | null
           capital_budget_actual?: string | null
           capital_budget_category?: string | null
           capital_budget_completed?: string | null
@@ -1095,7 +1090,6 @@ export type Database = {
           roof_access_location?: string | null
           roof_access_requirements?: string | null
           roof_access_safety_concern?: string | null
-          roof_age?: number | null
           roof_area?: number | null
           roof_area_unit?: string | null
           roof_category?: string | null
