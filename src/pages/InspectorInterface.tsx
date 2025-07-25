@@ -237,7 +237,12 @@ const InspectorInterface = () => {
   };
 
   const handleStartInspection = (propertyId: string, propertyName: string) => {
+    console.log('Starting inspection for:', propertyId, propertyName);
     setActiveInspection({ propertyId, propertyName });
+    toast({
+      title: "Loading Streamlined Interface",
+      description: "Launching field-optimized inspection interface...",
+    });
   };
 
   const handleCompleteInspection = (inspectionData: any) => {

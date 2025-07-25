@@ -106,11 +106,32 @@ export function ActiveInspectionInterface({
     }
   };
 
-  return (
-    <StreamlinedInspectionInterface
-      projectInfo={mockProjectInfo}
-      onComplete={handleCompleteInspection}
-      onCancel={onCancel}
-    />
-  );
+  try {
+    return (
+      <StreamlinedInspectionInterface
+        projectInfo={mockProjectInfo}
+        onComplete={handleCompleteInspection}
+        onCancel={onCancel}
+      />
+    );
+  } catch (error) {
+    console.error('Error loading StreamlinedInspectionInterface:', error);
+    return (
+      <div className="min-h-screen bg-background p-4">
+        <div className="max-w-md mx-auto mt-20">
+          <Card className="border-red-200">
+            <CardContent className="p-6 text-center">
+              <h2 className="text-xl font-bold mb-4">Loading Inspection Interface...</h2>
+              <p className="text-muted-foreground mb-4">
+                The streamlined inspection interface is loading. If this persists, please refresh the page.
+              </p>
+              <Button onClick={() => window.location.reload()}>
+                Refresh Page
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    );
+  }
 }
