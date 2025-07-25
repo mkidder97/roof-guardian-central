@@ -45,14 +45,16 @@ const AppRoutes = () => {
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center space-y-4">
-            <div className="text-2xl font-bold text-primary">RoofMind</div>
-            <div className="text-muted-foreground">Testing without AuthProvider and Toasters...</div>
+      <AuthProvider>
+        <BrowserRouter>
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="text-center space-y-4">
+              <div className="text-2xl font-bold text-primary">RoofMind</div>
+              <div className="text-muted-foreground">Testing with AuthProvider added back...</div>
+            </div>
           </div>
-        </div>
-      </BrowserRouter>
+        </BrowserRouter>
+      </AuthProvider>
     </QueryClientProvider>
   );
 };
