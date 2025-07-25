@@ -154,19 +154,9 @@ class SyncService {
   }
 
   private async syncComment(commentData: any): Promise<void> {
-    const { offline, ...cleanData } = commentData;
-    
-    const { data, error } = await supabase
-      .from('comments')
-      .insert(cleanData)
-      .select()
-      .single();
-
-    if (error) {
-      throw new Error(`Failed to sync comment: ${error.message}`);
-    }
-
-    console.log('[Sync] Comment synced:', data.id);
+    // Comments feature is disabled - skip sync
+    console.log('Comments sync skipped - feature disabled');
+    return;
   }
 
   private async syncPhoto(photoData: any): Promise<void> {

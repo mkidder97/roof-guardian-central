@@ -214,7 +214,7 @@ export class RealPDFParser {
       reportType,
       reportDate,
       inspectionCompany,
-      inspectionTypeClassification: this.classifyInspectionType(fullText, reportType),
+      inspectionTypeClassification: this.classifyInspectionType(text, reportType),
       roofArea,
       roofSystem,
       systemDescription,

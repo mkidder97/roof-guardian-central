@@ -10,7 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { EnhancedCommentSystem } from '@/components/communication/EnhancedCommentSystem';
+import { CommentSystem } from '@/components/communication/CommentSystem';
 import { 
   Building2, 
   MapPin, 
@@ -280,10 +280,9 @@ export function PropertyDetailsDialog({
             </TabsContent>
 
             <TabsContent value="comments">
-              <EnhancedCommentSystem 
+              <CommentSystem 
                 entityType="property" 
                 entityId={property.id}
-                showHeader={false}
               />
             </TabsContent>
 
