@@ -7,6 +7,7 @@ import { AuthProvider, useAuth } from "./contexts/AuthContext";
 import Dashboard from "./pages/Dashboard";
 import AuthPage from "./components/auth/AuthPage";
 import NotFound from "./pages/NotFound";
+import InspectorInterface from "./pages/InspectorInterface";
 
 const queryClient = new QueryClient();
 
@@ -32,6 +33,7 @@ const AppRoutes = () => {
     <Routes>
       <Route path="/" element={<Dashboard />} />
       <Route path="/auth" element={<AuthPage />} />
+      <Route path="/inspector" element={<InspectorInterface />} />
       {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
       <Route path="*" element={<NotFound />} />
     </Routes>
