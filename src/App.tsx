@@ -31,12 +31,15 @@ const AppRoutes = () => {
 
   return (
     <Routes>
-      <Route path="/" element={<UnifiedDashboard />} />
-      <Route path="/dashboard" element={<UnifiedDashboard />} />
-      <Route path="/legacy" element={<Dashboard />} />
+      <Route path="/" element={
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="text-center space-y-4">
+            <div className="text-2xl font-bold text-primary">RoofMind Dashboard</div>
+            <div className="text-muted-foreground">App is working! Now testing individual routes...</div>
+          </div>
+        </div>
+      } />
       <Route path="/auth" element={<AuthPage />} />
-      <Route path="/inspector" element={<InspectorInterface />} />
-      {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
       <Route path="*" element={<NotFound />} />
     </Routes>
   );
