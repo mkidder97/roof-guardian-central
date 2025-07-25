@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { uploadRoofFile } from '@/lib/fileUpload';
+import { uploadRoofFile } from '@/lib/fileStorage';
 import { RealPDFParser, ExtractedPDFData } from './realPdfParser';
 import { PropertyMatcher, PropertyMatch } from './propertyMatcher';
 import type { Database } from '@/integrations/supabase/types';
@@ -97,8 +97,11 @@ export class HistoricalInspectionService {
       console.log('Storing historical inspection for roof:', roofId);
       
       // 1. Upload PDF file to storage
-      const fileUploadResult = await uploadRoofFile(pdfFile, roofId);
-      if (!fileUploadResult.success || !fileUploadResult.data) {
+      const fileUploadResult = await uploadRoofFile(roofId, pdfFile, {
+        file_type: 'inspection_report',
+        is_public: true
+      });
+      if (fileUploadResult.error || !fileUploadResult.data) {
         throw new Error('Failed to upload PDF file');
       }
       
@@ -136,7 +139,7 @@ export class HistoricalInspectionService {
         estimated_cost: 0, // Will be updated if cost estimates are found in PDF
         priority_level: this.determinePriorityLevel(extractedData),
         status: 'completed',
-        report_url: fileUploadResult.data.publicUrl
+        report_url: fileUploadResult.data.file_url
       };
 
       const { data: report, error: reportError } = await supabase
@@ -157,7 +160,7 @@ export class HistoricalInspectionService {
       return {
         inspectionId: inspection.id,
         reportId: report.id,
-        fileUrl: fileUploadResult.data.publicUrl,
+        fileUrl: fileUploadResult.data.file_url,
         propertyMatch: null,
         extractedData,
         success: true

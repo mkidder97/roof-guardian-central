@@ -79,7 +79,12 @@ export class RealPDFParser {
       
       // Fallback to filename-based extraction if PDF parsing fails
       console.log('Falling back to filename-based extraction');
-      return this.extractFromFilename(file.name);
+      const fallbackData = this.extractFromFilename(file.name);
+      return {
+        ...fallbackData,
+        extractedText: '',
+        pageCount: 0
+      };
     }
   }
   
