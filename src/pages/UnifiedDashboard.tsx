@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import { UnifiedSidebar } from "@/components/layout/UnifiedSidebar";
 import { SmartSearchTab } from "@/components/dashboard/SmartSearchTab";
 import { DashboardWidgets } from "@/components/dashboard/DashboardWidgets";
