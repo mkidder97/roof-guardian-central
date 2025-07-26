@@ -114,7 +114,7 @@ jobs:
     - name: Install Dependencies
       run: |
         echo "📦 Installing dependencies..."
-        npm install
+        npm install --legacy-peer-deps
         echo "✅ Dependencies installed"
     
     - name: Agent Pre-Execution Validation
@@ -211,7 +211,7 @@ jobs:
         cache: 'npm'
     
     - name: Install Dependencies
-      run: npm ci
+      run: npm install --legacy-peer-deps
     
     - name: Final Validation
       run: |
