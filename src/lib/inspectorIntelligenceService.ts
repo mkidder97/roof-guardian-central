@@ -58,7 +58,21 @@ export class InspectorIntelligenceService {
     try {
       const { data, error } = await supabase
         .from('roofs')
-        .select('id, property_name, address, city, state, zip, roof_type, roof_area, last_inspection_date')
+        .select(`
+          id, 
+          property_name, 
+          address, 
+          city, 
+          state, 
+          zip, 
+          roof_type, 
+          roof_area, 
+          last_inspection_date,
+          inspection_sessions!property_id(
+            inspection_status,
+            last_updated
+          )
+        `)
         .eq('is_deleted', false)
         .order('property_name');
 

@@ -226,10 +226,14 @@ const InspectorInterface = () => {
     try {
       const properties = await InspectorIntelligenceService.getAvailableProperties();
       
-      // Get property summaries with critical issue counts
+      // Get property summaries with critical issue counts and inspection status
       const propertiesWithSummary = await Promise.all(
         properties.slice(0, 10).map(async (property) => {
           const summary = await InspectorIntelligenceService.getPropertySummary(property.id);
+          
+          // Get the latest inspection status from inspection_sessions
+          const inspectionStatus = (property as any).inspection_sessions?.[0]?.inspection_status || 'scheduled';
+          
           return summary || {
             id: property.id,
             name: property.property_name,
@@ -237,7 +241,8 @@ const InspectorInterface = () => {
             squareFootage: property.roof_area || 0,
             lastInspectionDate: property.last_inspection_date,
             criticalIssues: 0,
-            status: 'good'
+            status: 'good',
+            inspectionStatus
           };
         })
       );
