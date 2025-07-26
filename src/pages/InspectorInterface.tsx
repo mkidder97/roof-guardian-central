@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,6 +22,15 @@ import { InspectorIntelligenceService } from "@/lib/inspectorIntelligenceService
 import { ActiveInspectionInterface } from "@/components/inspection/ActiveInspectionInterface";
 import { useToast } from "@/hooks/use-toast";
 import { BuildingDetailsDialog } from "@/components/inspector/BuildingDetailsDialog";
+import { useInspectorKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
+import { useInspectorEventListener, useInspectionState, usePropertySelection } from "@/hooks/useInspectorEvents";
+import { KeyboardShortcutsHelp } from "@/components/ui/keyboard-shortcuts-help";
+import { offlineManager } from "@/lib/offlineManager";
+import { VirtualizedPropertyList } from "@/components/ui/virtualized-property-list";
+import { QuickActions } from "@/components/ui/quick-actions";
+import { usePerformanceMonitor } from "@/hooks/usePerformanceMonitor";
+import { useInspectorAccessibility } from "@/hooks/useAccessibility";
+import { AccessibleStatus } from "@/components/ui/accessible-components";
 
 interface InspectionBriefing {
   property: {
@@ -60,6 +69,16 @@ interface InspectionBriefing {
 }
 
 const InspectorInterface = () => {
+  // Performance monitoring
+  usePerformanceMonitor('InspectorInterface', { propertiesCount: availableProperties.length });
+  
+  // Accessibility features
+  const {
+    announce,
+    announcePropertySelection,
+    announceInspectionStep,
+    announceError
+  } = useInspectorAccessibility();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [selectedProperty, setSelectedProperty] = useState<string | null>(null);
@@ -72,9 +91,42 @@ const InspectorInterface = () => {
   const [activeInspection, setActiveInspection] = useState<{propertyId: string; propertyName: string} | null>(null);
   const [showBuildingDetails, setShowBuildingDetails] = useState(false);
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null);
+  const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
+  
+  // Initialize keyboard shortcuts and event handling
+  const { setContext, shortcuts } = useInspectorKeyboardShortcuts();
+  const { startInspection, on } = useInspectionState();
+  const { selectProperty, deselectProperty } = usePropertySelection();
+  
+  // Set keyboard context based on current state
+  useEffect(() => {
+    if (activeInspection) {
+      setContext('inspection');
+    } else if (selectedProperty) {
+      setContext('inspector');
+    } else {
+      setContext('global');
+    }
+  }, [activeInspection, selectedProperty, setContext]);
+  
+  // Event listeners for keyboard shortcuts
+  useInspectorEventListener('navigation.help_opened', useCallback(() => {
+    setShowKeyboardHelp(true);
+  }, []));
+  
+  useInspectorEventListener('navigation.tab_changed', useCallback((event) => {
+    // Handle tab changes via keyboard
+    console.log('Tab changed via keyboard:', event.payload.tab);
+  }, []));
+  
+  useInspectorEventListener('inspection.start_requested', useCallback(() => {
+    if (selectedProperty && briefing) {
+      handleStartInspection(selectedProperty, briefing.property.name);
+    }
+  }, [selectedProperty, briefing, handleStartInspection]));
 
-  // Mock data for demo - this would come from your API/database
-  const mockBriefing: InspectionBriefing = {
+  // Mock data for demo - this would come from your API/database  
+  const mockBriefing: InspectionBriefing = useMemo(() => ({
     property: {
       id: "1",
       name: "Prologis Dallas Distribution Center",
@@ -153,121 +205,155 @@ const InspectorInterface = () => {
         issue: "Deteriorated sealant"
       }
     ]
-  };
+  }), []);
 
-  // Load available properties on component mount
-  useEffect(() => {
-    const loadProperties = async () => {
-      setLoading(true);
+  // Optimized property loading with useCallback
+  const loadProperties = useCallback(async () => {
+    setLoading(true);
+    try {
+      const properties = await InspectorIntelligenceService.getAvailableProperties();
+      
+      // Get property summaries with critical issue counts
+      const propertiesWithSummary = await Promise.all(
+        properties.slice(0, 10).map(async (property) => {
+          const summary = await InspectorIntelligenceService.getPropertySummary(property.id);
+          return summary || {
+            id: property.id,
+            name: property.property_name,
+            roofType: property.roof_type || 'Unknown',
+            squareFootage: property.roof_area || 0,
+            lastInspectionDate: property.last_inspection_date,
+            criticalIssues: 0,
+            status: 'good'
+          };
+        })
+      );
+      
+      setAvailableProperties(propertiesWithSummary);
+    } catch (error) {
+      console.error('Error loading properties:', error);
+      
+      // Try to load from offline cache
       try {
-        const properties = await InspectorIntelligenceService.getAvailableProperties();
-        
-        // Get property summaries with critical issue counts
-        const propertiesWithSummary = await Promise.all(
-          properties.slice(0, 10).map(async (property) => {
-            const summary = await InspectorIntelligenceService.getPropertySummary(property.id);
-            return summary || {
-              id: property.id,
-              name: property.property_name,
-              roofType: property.roof_type || 'Unknown',
-              squareFootage: property.roof_area || 0,
-              lastInspectionDate: property.last_inspection_date,
-              criticalIssues: 0,
-              status: 'good'
-            };
-          })
-        );
-        
-        setAvailableProperties(propertiesWithSummary);
-      } catch (error) {
-        console.error('Error loading properties:', error);
+        const offlineData = offlineManager.getOfflineData('inspection');
+        if (offlineData.length > 0) {
+          // Use cached data
+          const cachedProperties = offlineData.map(item => item.data.property).filter(Boolean);
+          setAvailableProperties(cachedProperties);
+          toast({
+            title: "Offline Mode",
+            description: "Loaded cached properties",
+            variant: "default"
+          });
+        } else {
+          throw error;
+        }
+      } catch (offlineError) {
         toast({
           title: "Error",
           description: "Failed to load properties",
           variant: "destructive"
         });
-      } finally {
-        setLoading(false);
       }
-    };
+    } finally {
+      setLoading(false);
+    }
+  }, [toast]);
 
+  // Load available properties on component mount
+  useEffect(() => {
     loadProperties();
+  }, [loadProperties]);
+
+  // Optimized briefing loading with useCallback
+  const loadBriefing = useCallback(async (propertyId: string) => {
+    setLoadingBriefing(true);
+    try {
+      const briefingData = await InspectorIntelligenceService.generateInspectionBriefing(propertyId);
+      if (briefingData) {
+        setBriefing(briefingData);
+        // Cache for offline use
+        await offlineManager.storeOfflineData('inspection', { briefing: briefingData, propertyId });
+      } else {
+        throw new Error('Failed to generate briefing');
+      }
+    } catch (error) {
+      console.error('Error loading briefing:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load inspection briefing",
+        variant: "destructive"
+      });
+    } finally {
+      setLoadingBriefing(false);
+    }
   }, [toast]);
 
   // Load briefing data when property is selected
   useEffect(() => {
-    const loadBriefing = async () => {
-      if (!selectedProperty) return;
-      
-      setLoadingBriefing(true);
-      try {
-        const briefingData = await InspectorIntelligenceService.generateInspectionBriefing(selectedProperty);
-        if (briefingData) {
-          setBriefing(briefingData);
-        } else {
-          throw new Error('Failed to generate briefing');
-        }
-      } catch (error) {
-        console.error('Error loading briefing:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load inspection briefing",
-          variant: "destructive"
-        });
-      } finally {
-        setLoadingBriefing(false);
-      }
-    };
-
-    loadBriefing();
-  }, [selectedProperty, toast]);
-
-  const handleVoiceNote = () => {
-    setIsRecording(!isRecording);
-    if (isRecording) {
-      // Stop recording and add note
-      setVoiceNotes([...voiceNotes, `Voice note ${voiceNotes.length + 1}: Northwest corner leak has expanded 6 inches`]);
+    if (selectedProperty) {
+      loadBriefing(selectedProperty);
     }
-  };
+  }, [selectedProperty, loadBriefing]);
 
-  const getSeverityColor = (severity: string) => {
+  const handleVoiceNote = useCallback(() => {
+    setIsRecording(prev => {
+      if (prev) {
+        // Stop recording and add note
+        const newNote = `Voice note ${voiceNotes.length + 1}: Northwest corner leak has expanded 6 inches`;
+        setVoiceNotes(prev => [...prev, newNote]);
+      }
+      return !prev;
+    });
+  }, [voiceNotes.length]);
+
+  const getSeverityColor = useCallback((severity: string) => {
     switch (severity) {
       case 'high': return 'destructive';
       case 'medium': return 'outline';
       case 'low': return 'secondary';
       default: return 'default';
     }
-  };
+  }, []);
 
-  const handleStartInspection = (propertyId: string, propertyName: string) => {
+  const handleStartInspection = useCallback((propertyId: string, propertyName: string) => {
     setActiveInspection({ propertyId, propertyName });
-  };
+    startInspection(propertyId, propertyName);
+  }, [startInspection]);
 
-  const handleCompleteInspection = (inspectionData: any) => {
+  const handleCompleteInspection = useCallback((inspectionData: any) => {
     console.log('Inspection completed:', inspectionData);
     setActiveInspection(null);
     setSelectedProperty(null);
+    deselectProperty();
     toast({
       title: "Inspection Completed",
       description: `Inspection for ${inspectionData.propertyName} has been saved`,
     });
-  };
+  }, [toast, deselectProperty]);
 
-  const handleCancelInspection = () => {
+  const handleCancelInspection = useCallback(() => {
     if (confirm('Are you sure you want to cancel this inspection? Any unsaved data will be lost.')) {
       setActiveInspection(null);
     }
-  };
+  }, []);
 
-  const handleBuildingClick = (propertyId: string) => {
+  const handleBuildingClick = useCallback((propertyId: string) => {
+    const property = availableProperties.find(p => p.id === propertyId);
     setSelectedBuildingId(propertyId);
     setShowBuildingDetails(true);
-  };
+    selectProperty(propertyId);
+    
+    // Announce selection for screen readers
+    if (property) {
+      announcePropertySelection(property.name, property.criticalIssues || 0);
+    }
+  }, [selectProperty, availableProperties, announcePropertySelection]);
 
-  const handleBuildingDetailsClose = () => {
+  const handleBuildingDetailsClose = useCallback(() => {
     setShowBuildingDetails(false);
     setSelectedBuildingId(null);
-  };
+  }, []);
 
   // If there's an active inspection, show the inspection interface
   if (activeInspection) {
@@ -315,56 +401,21 @@ const InspectorInterface = () => {
                   <span className="ml-2">Loading properties...</span>
                 </div>
               ) : (
-                <div className="grid gap-4 max-h-96 overflow-y-auto">
-                  {availableProperties.map((property) => (
-                    <Card 
-                      key={property.id}
-                      className="cursor-pointer hover:border-primary transition-colors"
-                      onClick={() => handleBuildingClick(property.id)}
-                    >
-                      <CardContent className="p-4">
-                        <div className="flex items-center justify-between">
-                          <div>
-                            <h3 className="font-semibold">{property.name}</h3>
-                            <p className="text-sm text-muted-foreground">
-                              {property.roofType} • {property.squareFootage.toLocaleString()} sq ft
-                            </p>
-                            <p className="text-sm text-muted-foreground">
-                              Last inspected: {property.lastInspectionDate 
-                                ? new Date(property.lastInspectionDate).toLocaleDateString()
-                                : 'Never'
-                              }
-                            </p>
-                          </div>
-                          <div className="flex flex-col items-end gap-1">
-                            {property.criticalIssues > 0 && (
-                              <Badge variant="destructive">
-                                {property.criticalIssues} Critical Issue{property.criticalIssues > 1 ? 's' : ''}
-                              </Badge>
-                            )}
-                            <Badge 
-                              variant={
-                                property.status === 'critical' ? 'destructive' :
-                                property.status === 'overdue' ? 'destructive' :
-                                property.status === 'attention' ? 'secondary' : 'outline'
-                              }
-                            >
-                              {property.status === 'critical' ? 'Critical' :
-                               property.status === 'overdue' ? 'Overdue' :
-                               property.status === 'attention' ? 'Needs Attention' : 'Good'}
-                            </Badge>
-                          </div>
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                  {availableProperties.length === 0 && !loading && (
-                    <div className="text-center py-8">
-                      <Building2 className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <p className="text-gray-500">No properties available for inspection</p>
-                    </div>
-                  )}
-                </div>
+                <VirtualizedPropertyList
+                  properties={availableProperties}
+                  onPropertyClick={handleBuildingClick}
+                  loading={loading}
+                  containerHeight={500}
+                  className="mt-4"
+                />
+              )}
+              
+              {/* Quick Actions for property selection context */}
+              {availableProperties.length > 0 && (
+                <QuickActions 
+                  context="property-selection"
+                  className="mt-4"
+                />
               )}
             </CardContent>
           </Card>
@@ -379,6 +430,7 @@ const InspectorInterface = () => {
             </CardContent>
           </Card>
         ) : briefing ? (
+          // Memoized briefing content to prevent unnecessary re-renders
           // Pre-Inspection Intelligence
           <div className="space-y-6">
             {/* Property Header */}
@@ -654,6 +706,13 @@ const InspectorInterface = () => {
           onStartInspection={handleStartInspection}
         />
       )}
+      
+      {/* Keyboard Shortcuts Help */}
+      <KeyboardShortcutsHelp
+        open={showKeyboardHelp}
+        onOpenChange={setShowKeyboardHelp}
+        shortcuts={shortcuts}
+      />
     </div>
   );
 };
