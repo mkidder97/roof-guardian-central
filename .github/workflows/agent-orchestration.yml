@@ -97,7 +97,7 @@ jobs:
     
     strategy:
       matrix:
-        agent: ${{ fromJson(format('["{0}"]', join(fromJson(format('["{0}"]', needs.agent-coordinator.outputs.execution_plan)), '","'))) }}
+        agent: ["database-agent", "frontend-agent", "api-agent", "testing-agent", "meta-agent"]
       fail-fast: false
     
     steps:
