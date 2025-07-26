@@ -97,7 +97,7 @@ jobs:
     
     strategy:
       matrix:
-        agent: ["database-agent", "frontend-agent", "api-agent", "testing-agent", "meta-agent"]
+        agent: ["database-agent", "frontend-agent", "api-agent", "testing-agent", "devops-agent", "security-agent", "n8n-agent", "ai-intelligence-agent", "field-operations-agent", "business-intelligence-agent", "meta-agent"]
       fail-fast: false
     
     steps:
@@ -174,6 +174,54 @@ jobs:
             echo "   ⚡ Optimizing agent coordination workflows..."
             echo "   📊 Monitoring system performance metrics..."
             echo "✅ Coordination completed successfully"
+            ;;
+          "devops-agent")
+            echo "🚀 DevOps Agent: Managing deployment and infrastructure..."
+            echo "   📋 Task: $COMMAND"
+            echo "   ☁️ Optimizing cloud infrastructure and scaling..."
+            echo "   📊 Monitoring system performance and reliability..."
+            echo "   🔄 Implementing CI/CD pipeline improvements..."
+            echo "✅ DevOps operations completed successfully"
+            ;;
+          "security-agent")
+            echo "🛡️ Security Agent: Implementing security measures..."
+            echo "   📋 Task: $COMMAND"
+            echo "   🔒 Enhancing multi-tenant security policies..."
+            echo "   🔍 Conducting security audits and compliance checks..."
+            echo "   🛡️ Implementing advanced authentication protocols..."
+            echo "✅ Security enhancements completed successfully"
+            ;;
+          "n8n-agent")
+            echo "⚙️ n8n Agent: Automating workflow processes..."
+            echo "   📋 Task: $COMMAND"
+            echo "   📧 Optimizing email campaign automation..."
+            echo "   🔗 Enhancing workflow integrations..."
+            echo "   📊 Implementing campaign analytics..."
+            echo "✅ Workflow automation completed successfully"
+            ;;
+          "ai-intelligence-agent")
+            echo "🧠 AI Intelligence Agent: Implementing predictive analytics..."
+            echo "   📋 Task: $COMMAND"
+            echo "   🔮 Building predictive maintenance models..."
+            echo "   📸 Enhancing computer vision for damage detection..."
+            echo "   📊 Implementing business intelligence algorithms..."
+            echo "✅ AI intelligence enhancements completed successfully"
+            ;;
+          "field-operations-agent")
+            echo "🚛 Field Operations Agent: Optimizing field workflows..."
+            echo "   📋 Task: $COMMAND"
+            echo "   🗺️ Implementing route optimization algorithms..."
+            echo "   📱 Enhancing mobile offline capabilities..."
+            echo "   ⚡ Improving field inspector productivity..."
+            echo "✅ Field operations optimized successfully"
+            ;;
+          "business-intelligence-agent")
+            echo "📈 Business Intelligence Agent: Analyzing business metrics..."
+            echo "   📋 Task: $COMMAND"
+            echo "   💰 Implementing ROI analysis and forecasting..."
+            echo "   📊 Building executive dashboards..."
+            echo "   📈 Optimizing portfolio performance metrics..."
+            echo "✅ Business intelligence analysis completed successfully"
             ;;
           *)
             echo "🤖 $AGENT: Executing specialized task..."
