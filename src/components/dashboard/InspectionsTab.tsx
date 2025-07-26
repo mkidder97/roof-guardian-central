@@ -8,6 +8,7 @@ import { Search, Plus, FileDown, Calendar, User, Building, Loader2, Brain } from
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { InspectionSchedulingModal } from "@/components/inspections/InspectionSchedulingModal";
+import { InspectionStatusBadge, InspectionStatus } from "@/components/ui/inspection-status-badge";
 import { supabase } from "@/integrations/supabase/client";
 import { format } from "date-fns";
 
@@ -17,6 +18,7 @@ interface Inspection {
   completed_date: string | null;
   inspection_type: string | null;
   status: string | null;
+  inspection_status?: InspectionStatus;
   notes: string | null;
   weather_conditions: string | null;
   roof_id: string | null;
@@ -59,7 +61,8 @@ export function InspectionsTab() {
         .select(`
           *,
           roofs!roof_id(property_name),
-          users!inspector_id(first_name, last_name)
+          users!inspector_id(first_name, last_name),
+          inspection_sessions!roof_id(inspection_status)
         `)
         .order('scheduled_date', { ascending: false });
         
@@ -116,15 +119,20 @@ export function InspectionsTab() {
   };
 
   const getStatusBadge = (inspection: Inspection) => {
+    // Use new inspection status if available, otherwise fall back to old logic
+    if (inspection.inspection_status) {
+      return <InspectionStatusBadge status={inspection.inspection_status} size="sm" />;
+    }
+    
     const status = getInspectionStatus(inspection);
     
     switch (status) {
       case "scheduled":
-        return <Badge variant="outline" className="bg-blue-100 text-blue-800">Scheduled</Badge>;
+        return <InspectionStatusBadge status="scheduled" size="sm" />;
       case "in-progress":
-        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800">In Progress</Badge>;
+        return <InspectionStatusBadge status="in_progress" size="sm" />;
       case "completed":
-        return <Badge variant="default" className="bg-green-100 text-green-800">Completed</Badge>;
+        return <InspectionStatusBadge status="completed" size="sm" />;
       case "past-due":
         return <Badge variant="destructive">Past Due</Badge>;
       case "cancelled":

@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { VirtualScroll } from './virtual-scroll';
 import { Building2 } from 'lucide-react';
 import { PriorityBadge, StatusBadge } from './priority-indicators';
+import { InspectionStatusBadge, InspectionStatus } from './inspection-status-badge';
 import { PriorityEngine } from '@/lib/priorityEngine';
 
 interface Property {
@@ -17,6 +18,7 @@ interface Property {
   priority?: 'critical' | 'high' | 'medium' | 'low' | 'info';
   urgencyScore?: number;
   riskFactors?: any;
+  inspectionStatus?: InspectionStatus;
 }
 
 interface VirtualizedPropertyListProps {
@@ -174,6 +176,10 @@ export const VirtualizedPropertyList: React.FC<VirtualizedPropertyListProps> = (
                   </Badge>
                 )}
                 
+                {property.inspectionStatus && (
+                  <InspectionStatusBadge status={property.inspectionStatus} size="sm" />
+                )}
+                
                 <StatusBadge status={property.status as any} size="sm" />
               </div>
               
@@ -314,6 +320,9 @@ const PropertyListItem = React.memo<{
               <Badge variant="destructive">
                 {property.criticalIssues} Critical Issue{property.criticalIssues > 1 ? 's' : ''}
               </Badge>
+            )}
+            {property.inspectionStatus && (
+              <InspectionStatusBadge status={property.inspectionStatus} size="sm" />
             )}
             <StatusBadge status={property.status as any} size="sm" />
           </div>
