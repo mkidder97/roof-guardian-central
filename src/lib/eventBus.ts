@@ -149,6 +149,7 @@ export const INSPECTOR_EVENTS = {
   // Property selection events
   PROPERTY_SELECTED: 'property.selected',
   PROPERTY_DESELECTED: 'property.deselected',
+  PROPERTY_NAVIGATE: 'property.navigate',
   
   // Inspection events
   INSPECTION_STARTED: 'inspection.started',
@@ -156,26 +157,75 @@ export const INSPECTOR_EVENTS = {
   INSPECTION_RESUMED: 'inspection.resumed',
   INSPECTION_COMPLETED: 'inspection.completed',
   INSPECTION_CANCELLED: 'inspection.cancelled',
+  INSPECTION_START_REQUESTED: 'inspection.start_requested',
+  INSPECTION_SCHEDULE_REQUESTED: 'inspection.schedule_requested',
+  INSPECTION_SAVE_REQUESTED: 'inspection.save_requested',
+  INSPECTION_COMPLETE_REQUESTED: 'inspection.complete_requested',
+  INSPECTION_PAUSE_TOGGLE_REQUESTED: 'inspection.pause_toggle_requested',
+  INSPECTION_EXPORT_REQUESTED: 'inspection.export_requested',
+  INSPECTION_EMERGENCY_SAVE_REQUESTED: 'inspection.emergency_save_requested',
   
   // Photo events
   PHOTO_CAPTURED: 'photo.captured',
   PHOTO_DELETED: 'photo.deleted',
   PHOTO_ANNOTATED: 'photo.annotated',
+  PHOTO_CAPTURE_REQUESTED: 'photo.capture_requested',
+  PHOTO_EMERGENCY_REQUESTED: 'photo.emergency_requested',
   
   // Deficiency events
   DEFICIENCY_ADDED: 'deficiency.added',
   DEFICIENCY_UPDATED: 'deficiency.updated',
   DEFICIENCY_DELETED: 'deficiency.deleted',
+  DEFICIENCY_ADD_REQUESTED: 'deficiency.add_requested',
   
   // Voice note events
   VOICE_NOTE_STARTED: 'voice_note.started',
   VOICE_NOTE_STOPPED: 'voice_note.stopped',
   VOICE_NOTE_SAVED: 'voice_note.saved',
+  VOICE_NOTE_TOGGLE_REQUESTED: 'voice_note.toggle_requested',
   
   // Navigation events
   TAB_CHANGED: 'navigation.tab_changed',
   DIALOG_OPENED: 'navigation.dialog_opened',
   DIALOG_CLOSED: 'navigation.dialog_closed',
+  NAVIGATION_COMMAND_PALETTE_OPENED: 'navigation.command_palette_opened',
+  NAVIGATION_HELP_OPENED: 'navigation.help_opened',
+  NAVIGATION_REFRESH_REQUESTED: 'navigation.refresh_requested',
+  NAVIGATION_SEARCH_OPENED: 'navigation.search_opened',
+  
+  // Emergency events
+  EMERGENCY_CONTACT_REQUESTED: 'emergency.contact_requested',
+  EMERGENCY_CALL_REQUESTED: 'emergency.call_requested',
+  
+  // Report events
+  REPORT_URGENT_REQUESTED: 'report.urgent_requested',
+  REPORT_GENERATE_REQUESTED: 'report.generate_requested',
+  
+  // Findings events
+  FINDINGS_SHARE_REQUESTED: 'findings.share_requested',
+  
+  // Quote events
+  QUOTE_REQUEST_REQUESTED: 'quote.request_requested',
+  
+  // Maintenance events
+  MAINTENANCE_SCHEDULE_REQUESTED: 'maintenance.schedule_requested',
+  
+  // Vendor events
+  VENDOR_CONTACT_REQUESTED: 'vendor.contact_requested',
+  
+  // Collaboration events
+  COLLABORATION_SESSION_JOINED: 'collaboration.session_joined',
+  COLLABORATION_SESSION_UPDATED: 'collaboration.session_updated',
+  COLLABORATION_COLLABORATOR_JOINED: 'collaboration.collaborator_joined',
+  COLLABORATION_COLLABORATOR_LEFT: 'collaboration.collaborator_left',
+  COLLABORATION_INSPECTION_PROGRESS: 'collaboration.inspection_progress',
+  COLLABORATION_PHOTO_SHARED: 'collaboration.photo_shared',
+  COLLABORATION_DEFICIENCY_SHARED: 'collaboration.deficiency_shared',
+  COLLABORATION_USER_ACTIVITY: 'collaboration.user_activity',
+  
+  // WebSocket events
+  WEBSOCKET_CONNECTED: 'websocket.connected',
+  WEBSOCKET_DISCONNECTED: 'websocket.disconnected',
   
   // Data sync events
   DATA_SYNC_STARTED: 'data.sync_started',

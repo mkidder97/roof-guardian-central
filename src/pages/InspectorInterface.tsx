@@ -107,6 +107,12 @@ const InspectorInterface = () => {
     }
   }, [activeInspection, selectedProperty, setContext]);
   
+  // Handler functions
+  const handleStartInspection = useCallback((propertyId: string, propertyName: string) => {
+    setActiveInspection({ propertyId, propertyName });
+    startInspection(propertyId, propertyName);
+  }, [startInspection]);
+
   // Event listeners for keyboard shortcuts
   useInspectorEventListener('navigation.help_opened', useCallback(() => {
     setShowKeyboardHelp(true);
@@ -314,10 +320,6 @@ const InspectorInterface = () => {
     }
   }, []);
 
-  const handleStartInspection = useCallback((propertyId: string, propertyName: string) => {
-    setActiveInspection({ propertyId, propertyName });
-    startInspection(propertyId, propertyName);
-  }, [startInspection]);
 
   const handleCompleteInspection = useCallback((inspectionData: any) => {
     console.log('Inspection completed:', inspectionData);

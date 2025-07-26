@@ -22,8 +22,8 @@ import {
   Camera, 
   Square, 
   RotateCcw, 
-  FlashOff, 
-  Flash, 
+  ZapOff, 
+  Zap, 
   MapPin,
   Tag,
   Save,
@@ -32,8 +32,7 @@ import {
   Compass,
   Thermometer,
   Wind,
-  Eye,
-  Zap
+  Eye
 } from 'lucide-react';
 import { useInspectorEvents } from '@/hooks/useInspectorEvents';
 import { offlineManager } from '@/lib/offlineManager';
@@ -454,7 +453,7 @@ export const EnhancedCamera: React.FC<EnhancedCameraProps> = ({
                     onClick={() => setFlashEnabled(!flashEnabled)}
                     className="bg-black/50 border-white/50 text-white hover:bg-black/70"
                   >
-                    {flashEnabled ? <Flash className="h-4 w-4" /> : <FlashOff className="h-4 w-4" />}
+                    {flashEnabled ? <Zap className="h-4 w-4" /> : <ZapOff className="h-4 w-4" />}
                   </Button>
                   
                   <Button
