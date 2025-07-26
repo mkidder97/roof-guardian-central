@@ -28,7 +28,7 @@ import { KeyboardShortcutsHelp } from "@/components/ui/keyboard-shortcuts-help";
 import { offlineManager } from "@/lib/offlineManager";
 import { VirtualizedPropertyList } from "@/components/ui/virtualized-property-list";
 import { QuickActions } from "@/components/ui/quick-actions";
-import { usePerformanceMonitor } from "@/hooks/usePerformanceMonitor";
+
 import { useInspectorAccessibility } from "@/hooks/useAccessibility";
 import { AccessibleStatus } from "@/components/ui/accessible-components";
 
@@ -69,8 +69,6 @@ interface InspectionBriefing {
 }
 
 const InspectorInterface = () => {
-  // Performance monitoring
-  usePerformanceMonitor('InspectorInterface', { propertiesCount: availableProperties.length });
   
   // Accessibility features
   const {
