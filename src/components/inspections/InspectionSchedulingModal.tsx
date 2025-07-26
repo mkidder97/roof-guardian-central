@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -19,6 +19,11 @@ import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { useN8nWorkflow, type CampaignWorkflowData, type ProcessingResult } from '@/hooks/useN8nWorkflow';
 import { useInspectors, type Inspector } from '@/hooks/useInspectors';
+import { usePerformanceMonitor, useOperationTimer } from '@/hooks/usePerformanceMonitor';
+import { ComponentHealthMonitor, useHealthReporting } from '@/components/monitoring/ComponentHealthMonitor';
+import { useAutoRecovery } from '@/components/monitoring/AutoRecoverySystem';
+import { ErrorBoundary } from '@/components/monitoring/ErrorBoundary';
+import { monitoringService } from '@/components/monitoring/MonitoringService';
 
 interface Property {
   id: string;
@@ -77,13 +82,141 @@ interface WorkflowProgress {
   results: ProcessingResult[]
 }
 
+// Memoized PropertyListItem to prevent unnecessary re-renders
+const PropertyListItem = memo(({ 
+  property, 
+  isSelected, 
+  propertyInspector, 
+  selectedInspector, 
+  onPropertySelection 
+}: {
+  property: Property;
+  isSelected: boolean;
+  propertyInspector?: Inspector;
+  selectedInspector: Inspector | null;
+  onPropertySelection: (property: Property, checked: boolean) => void;
+}) => {
+  return (
+    <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
+      <Checkbox
+        checked={isSelected}
+        onCheckedChange={(checked) => onPropertySelection(property, checked)}
+      />
+      <div className="flex-1">
+        <div className="font-medium">{property.property_name}</div>
+        <div className="text-sm text-gray-600">
+          {property.address}, {property.city}, {property.state}
+        </div>
+        <div className="text-xs text-gray-500">
+          PM: {property.property_manager_name || 'Not assigned'} • Last Inspection: {property.last_inspection_date || 'Never'}
+        </div>
+        
+        {/* Inspector Assignment Section */}
+        {isSelected && (
+          <div className="mt-2 p-2 bg-gray-50 rounded text-xs">
+            <div className="flex items-center justify-between">
+              <span className="text-gray-600">Inspector:</span>
+              <div className="flex items-center space-x-2">
+                {propertyInspector ? (
+                  <Badge variant="outline" className="text-xs">
+                    Override: {propertyInspector.full_name}
+                  </Badge>
+                ) : selectedInspector ? (
+                  <Badge variant="secondary" className="text-xs">
+                    Default: {selectedInspector.full_name}
+                  </Badge>
+                ) : (
+                  <Badge variant="destructive" className="text-xs">
+                    No inspector selected
+                  </Badge>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+      <div className="text-right">
+        <div className="text-sm font-medium">{property.roof_area?.toLocaleString() || 'N/A'} sq ft</div>
+      </div>
+    </div>
+  );
+});
+
 export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSchedulingModalProps) {
   const { toast } = useToast();
   const { processCampaignsBatch } = useN8nWorkflow();
   const { inspectors, loading: inspectorsLoading } = useInspectors();
   
+  // Enhanced monitoring and recovery
+  const componentName = 'InspectionSchedulingModal';
+  const { reportApiCall, reportCustomMetric, updateHealthStatus } = useHealthReporting(componentName);
+  const { remountKey, triggerRecovery, getRecoveryHistory } = useAutoRecovery(componentName, [
+    {
+      id: 'modal-performance-reset',
+      name: 'Reset Modal Performance',
+      description: 'Reset modal state when performance degrades',
+      trigger: {
+        performanceThreshold: 150, // 150ms render time
+        consecutive: 2
+      },
+      action: 'reset',
+      cooldown: 2,
+      enabled: true,
+      priority: 8
+    },
+    {
+      id: 'modal-api-recovery',
+      name: 'API Call Recovery',
+      description: 'Reset when API calls fail consistently',
+      trigger: {
+        performanceThreshold: 10000, // 10 second API timeout
+        consecutive: 3
+      },
+      action: 'reset',
+      cooldown: 5,
+      enabled: true,
+      priority: 6
+    }
+  ]);
+  
+  // Performance monitoring with enhanced error reporting
+  const { resetMetrics } = usePerformanceMonitor({
+    componentName,
+    slowRenderThreshold: 50, // Allow up to 50ms for this complex component
+    onSlowRender: (metrics) => {
+      console.warn('InspectionSchedulingModal slow render:', metrics);
+      
+      // Report to monitoring service
+      monitoringService.reportPerformanceMetric({
+        id: `slow_render_${Date.now()}`,
+        componentName,
+        metricType: 'render',
+        value: metrics.lastRenderTime,
+        threshold: 50,
+        timestamp: new Date().toISOString(),
+        metadata: {
+          renderCount: metrics.renderCount,
+          averageTime: metrics.averageRenderTime,
+          slowRenders: metrics.slowRenders
+        }
+      });
+      
+      // Update health status if too many slow renders
+      if (metrics.slowRenders > 5) {
+        updateHealthStatus('degraded', [
+          `${metrics.slowRenders} slow renders detected`,
+          `Average render time: ${metrics.averageRenderTime.toFixed(1)}ms`
+        ], {
+          renderTime: metrics.averageRenderTime,
+          errorRate: 0
+        });
+      }
+    }
+  });
+  const { startTimer, endTimer } = useOperationTimer();
+  
   const [properties, setProperties] = useState<Property[]>([]);
-  const [filteredProperties, setFilteredProperties] = useState<Property[]>([]);
+  // Removed filteredProperties state - now computed via useMemo
   const [selectedProperties, setSelectedProperties] = useState<Property[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [loading, setLoading] = useState(false);
@@ -139,6 +272,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     };
   }, []);
 
+  // Optimized effect - only depend on open state
   useEffect(() => {
     if (open) {
       resetModalState();
@@ -146,16 +280,24 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     }
   }, [open]);
 
+  // Separate effect for filter changes to avoid duplicate fetches
   useEffect(() => {
     if (open) {
+      startTimer('fetchPropertiesWithFilters');
       fetchProperties();
+      endTimer('fetchPropertiesWithFilters');
+      
+      startTimer('fetchZipcodes');
       fetchAvailableZipcodes();
+      endTimer('fetchZipcodes');
     }
-  }, [filters.zipcodes, filters.region, filters.market]);
+  }, [filters.zipcodes, filters.region, filters.market]); // Remove function dependencies
 
-  useEffect(() => {
+  // Memoized filtered properties computation
+  const filteredProperties = useMemo(() => {
+    startTimer('filterProperties');
+    const searchLower = searchTerm.toLowerCase();
     const filtered = properties.filter(property => {
-      const searchLower = searchTerm.toLowerCase();
       return (
         property.property_name.toLowerCase().includes(searchLower) ||
         property.address.toLowerCase().includes(searchLower) ||
@@ -165,73 +307,45 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
         (property.property_manager_name && property.property_manager_name.toLowerCase().includes(searchLower))
       );
     });
-    setFilteredProperties(filtered);
+    endTimer('filterProperties');
+    return filtered;
+  }, [properties, searchTerm, startTimer, endTimer]);
+  
+  // Update current page when filtered properties change
+  useEffect(() => {
     setCurrentPage(1);
-  }, [properties, searchTerm]);
+  }, [filteredProperties]);
 
   // Set default inspector (Michael Kidder) when inspectors load
   useEffect(() => {
-    if (inspectors.length > 0) {
+    if (inspectors.length > 0 && !selectedInspector) {
       const defaultInspector = inspectors.find(inspector => 
         inspector.email === 'mkidder@southernroof.biz'
       ) || inspectors[0]; // Fallback to first inspector if Michael not found
       
-      if (!selectedInspector) {
-        setSelectedInspector(defaultInspector);
-      }
-      
-      // Also set default for direct inspection mode if not already set
-      if (directInspectionMode && !directInspectionData.inspector) {
-        setDirectInspectionData(prev => ({ ...prev, inspector: defaultInspector }));
-      }
+      setSelectedInspector(defaultInspector);
     }
-  }, [inspectors, selectedInspector, directInspectionMode, directInspectionData.inspector]);
+  }, [inspectors, selectedInspector]);
 
-  const resetModalState = () => {
-    setSelectedProperties([]);
-    setSearchTerm('');
-    setCurrentPage(1);
-    setSelectedInspector(null);
-    setPropertyInspectorOverrides({});
-    setDirectInspectionMode(false);
-    setDirectInspectionData({
-      selectedProperty: null,
-      inspector: null,
-      scheduledDate: '',
-      scheduledTime: '',
-      inspectionType: 'routine',
-      priority: 'medium',
-      notes: ''
-    });
-    setWorkflowProgress({
-      isProcessing: false,
-      currentCampaign: '',
-      processedCount: 0,
-      totalCount: 0,
-      results: []
-    });
-  };
-
-  const fetchAvailableZipcodes = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('roofs')
-        .select('zip')
-        .eq('status', 'active')
-        .neq('is_deleted', true)
-        .not('zip', 'is', null)
-        .order('zip');
-
-      if (error) throw error;
-
-      const uniqueZipcodes = [...new Set(data?.map(item => item.zip))].filter(Boolean);
-      setAvailableZipcodes(uniqueZipcodes);
-    } catch (error) {
-      console.error('Error fetching zipcodes:', error);
+  // Separate useEffect for direct inspection mode default inspector
+  useEffect(() => {
+    if (directInspectionMode && !directInspectionData.inspector && selectedInspector) {
+      setDirectInspectionData(prev => ({ ...prev, inspector: selectedInspector }));
     }
-  };
+  }, [directInspectionMode, directInspectionData.inspector, selectedInspector]);
 
-  const processPropertyData = (rawProperties: any[]): Property[] => {
+  const getWarrantyStatus = useCallback((expirationDate: string | null): string => {
+    if (!expirationDate) return 'none';
+    const expiry = new Date(expirationDate);
+    const now = new Date();
+    const monthsUntilExpiry = (expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24 * 30);
+    
+    if (monthsUntilExpiry < 0) return 'expired';
+    if (monthsUntilExpiry <= 12) return 'expiring';
+    return 'active';
+  }, []);
+
+  const processPropertyData = useCallback((rawProperties: any[]): Property[] => {
     return rawProperties.map(property => {
       const propertyManager = property.property_contact_assignments?.find(
         assignment => assignment.assignment_type === 'property_manager' && assignment.is_active
@@ -252,20 +366,40 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
         warranty_status: getWarrantyStatus(property.manufacturer_warranty_expiration)
       };
     });
-  };
+  }, [getWarrantyStatus]);
 
-  const fetchProperties = async () => {
+  const fetchAvailableZipcodes = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('roofs')
+        .select('zip')
+        .eq('status', 'active')
+        .neq('is_deleted', true)
+        .not('zip', 'is', null)
+        .order('zip');
+
+      if (error) throw error;
+
+      const uniqueZipcodes = [...new Set(data?.map(item => item.zip))].filter(Boolean);
+      setAvailableZipcodes(uniqueZipcodes);
+    } catch (error) {
+      console.error('Error fetching zipcodes:', error);
+    }
+  }, []);
+
+  const fetchProperties = useCallback(async () => {
     const cacheKey = `${filters.clientId}-${filters.region}-${filters.market}-${filters.zipcodes.join(',')}`;
     
     if (propertyCache.has(cacheKey)) {
       const cachedProperties = propertyCache.get(cacheKey)!;
       setProperties(cachedProperties);
-      setFilteredProperties(cachedProperties);
       return;
     }
 
     setLoading(true);
+    const apiStartTime = performance.now();
     console.log('Fetching properties with filters:', filters);
+    
     try {
       let query = supabase
         .from('roofs')
@@ -332,18 +466,69 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
       }
 
       const { data, error } = await query;
-      console.log('Query result:', { data: data?.length || 0, error });
+      const apiEndTime = performance.now();
+      const apiDuration = apiEndTime - apiStartTime;
+      
+      // Report API performance
+      reportApiCall(apiDuration);
+      
+      console.log('Query result:', { data: data?.length || 0, error, duration: `${apiDuration.toFixed(1)}ms` });
 
-      if (error) throw error;
+      if (error) {
+        // Report API error
+        monitoringService.reportError({
+          id: `api_error_${Date.now()}`,
+          message: `Properties fetch failed: ${error.message}`,
+          stack: error.stack || '',
+          componentStack: '',
+          componentName,
+          level: 'component',
+          timestamp: new Date().toISOString(),
+          retryCount: 0,
+          url: window.location.href,
+          userAgent: navigator.userAgent,
+          additionalInfo: {
+            apiDuration,
+            filters,
+            errorCode: error.code
+          }
+        });
+        throw error;
+      }
 
       const processedProperties: Property[] = processPropertyData(data || []);
       const finalProperties = processedProperties;
 
       setProperties(finalProperties);
-      setFilteredProperties(finalProperties);
       setPropertyCache(prev => new Map(prev.set(cacheKey, finalProperties)));
+      
+      // Report successful operation
+      reportCustomMetric('properties_loaded', finalProperties.length, {
+        apiDuration,
+        cacheKey,
+        filters
+      });
+      
+      // Update health status
+      updateHealthStatus('healthy', [], {
+        renderTime: 0,
+        errorRate: 0,
+        apiResponseTime: apiDuration,
+        lastOperation: 'fetchProperties'
+      });
+      
     } catch (error) {
       console.error('Error fetching properties:', error);
+      
+      // Update health status on error
+      updateHealthStatus('degraded', [
+        `Properties fetch failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+      ], {
+        renderTime: 0,
+        errorRate: 0.1,
+        apiResponseTime: performance.now() - apiStartTime
+      });
+      
       toast({
         title: "Error",
         description: "Failed to fetch properties. Please try again.",
@@ -352,20 +537,34 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     } finally {
       setLoading(false);
     }
-  };
+  }, [filters.clientId, filters.region, filters.market, filters.zipcodes, propertyCache, toast, processPropertyData]);
 
-  const getWarrantyStatus = (expirationDate: string | null): string => {
-    if (!expirationDate) return 'none';
-    const expiry = new Date(expirationDate);
-    const now = new Date();
-    const monthsUntilExpiry = (expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24 * 30);
-    
-    if (monthsUntilExpiry < 0) return 'expired';
-    if (monthsUntilExpiry <= 12) return 'expiring';
-    return 'active';
-  };
+  const resetModalState = useCallback(() => {
+    setSelectedProperties([]);
+    setSearchTerm('');
+    setCurrentPage(1);
+    setSelectedInspector(null);
+    setPropertyInspectorOverrides({});
+    setDirectInspectionMode(false);
+    setDirectInspectionData({
+      selectedProperty: null,
+      inspector: null,
+      scheduledDate: '',
+      scheduledTime: '',
+      inspectionType: 'routine',
+      priority: 'medium',
+      notes: ''
+    });
+    setWorkflowProgress({
+      isProcessing: false,
+      currentCampaign: '',
+      processedCount: 0,
+      totalCount: 0,
+      results: []
+    });
+  }, []);
 
-  const generateCampaignName = async (): Promise<string> => {
+  const generateCampaignName = useCallback(async (): Promise<string> => {
     try {
       const { data, error } = await supabase
         .rpc('generate_campaign_name', {
@@ -386,9 +585,9 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
       const date = format(new Date(), 'MM/dd/yyyy');
       return `${market} - ${type} Campaign - ${selectedProperties.length} Properties (${date})`;
     }
-  };
+  }, [filters.market, filters.inspectionType, selectedProperties.length]);
 
-  const generateCampaignId = async (): Promise<string> => {
+  const generateCampaignId = useCallback(async (): Promise<string> => {
     try {
       const timestamp = Date.now();
       const randomPart = Math.random().toString(36).substring(2, 10).toUpperCase();
@@ -399,9 +598,10 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
       const randomPart = Math.random().toString(36).substring(2, 10).toUpperCase();
       return `CAMP-${timestamp}-${randomPart}`;
     }
-  };
+  }, []);
 
-  const handleCreateDirectInspection = async () => {
+  const handleCreateDirectInspection = useCallback(async () => {
+    startTimer('createDirectInspection');
     const { selectedProperty, inspector, scheduledDate, scheduledTime, inspectionType, priority, notes } = directInspectionData;
 
     if (!selectedProperty) {
@@ -534,9 +734,11 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
         variant: "destructive",
       });
     }
-  };
+    endTimer('createDirectInspection');
+  }, [directInspectionData, toast, startTimer, endTimer]);
 
-  const handleStartWorkflow = async () => {
+  const handleStartWorkflow = useCallback(async () => {
+    startTimer('startWorkflow');
     if (selectedProperties.length === 0) {
       toast({
         title: "No Properties Selected",
@@ -693,9 +895,10 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
         variant: "destructive",
       });
     }
-  };
+    endTimer('startWorkflow');
+  }, [selectedProperties, selectedInspector, filters.region, filters.market, processCampaignsBatch, toast, startTimer, endTimer]);
 
-  const exportSelectedProperties = () => {
+  const exportSelectedProperties = useCallback(() => {
     if (selectedProperties.length === 0) {
       toast({
         title: "No Properties Selected",
@@ -705,6 +908,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
       return;
     }
 
+    startTimer('exportProperties');
     const csvContent = [
       ['Property Name', 'Address', 'City', 'State', 'Market', 'Region', 'Property Manager', 'PM Email'].join(','),
       ...selectedProperties.map(p => 
@@ -719,9 +923,10 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     a.download = `inspection-properties-${format(new Date(), 'yyyy-MM-dd')}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
-  };
+    endTimer('exportProperties');
+  }, [selectedProperties, toast, startTimer, endTimer]);
 
-  const handlePropertyInspectorOverride = (propertyId: string, inspector: Inspector | null) => {
+  const handlePropertyInspectorOverride = useCallback((propertyId: string, inspector: Inspector | null) => {
     if (inspector && inspector.id !== selectedInspector?.id) {
       setPropertyInspectorOverrides(prev => ({
         ...prev,
@@ -734,15 +939,38 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
         return newOverrides;
       });
     }
-  };
+  }, [selectedInspector?.id]);
 
-  const filteredAndPaginatedProperties = {
-    properties: filteredProperties.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage),
-    totalPages: Math.ceil(filteredProperties.length / itemsPerPage),
-    totalCount: filteredProperties.length
-  };
+  // Memoized property selection handler to prevent recreating inline functions
+  const handlePropertySelection = useCallback((property: Property, checked: boolean) => {
+    if (checked) {
+      setSelectedProperties(prev => [...prev, property]);
+    } else {
+      setSelectedProperties(prev => prev.filter(p => p.id !== property.id));
+      // Clear any inspector override when deselecting
+      setPropertyInspectorOverrides(prev => {
+        const newOverrides = { ...prev };
+        delete newOverrides[property.id];
+        return newOverrides;
+      });
+    }
+  }, []);
 
-  const handleSelectAll = () => {
+  // Memoized pagination computation
+  const filteredAndPaginatedProperties = useMemo(() => {
+    const totalCount = filteredProperties.length;
+    const totalPages = Math.ceil(totalCount / itemsPerPage);
+    const startIndex = (currentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    
+    return {
+      properties: filteredProperties.slice(startIndex, endIndex),
+      totalPages,
+      totalCount
+    };
+  }, [filteredProperties, currentPage, itemsPerPage]);
+
+  const handleSelectAll = useCallback(() => {
     if (filteredProperties.length > 100) {
       // Show confirmation for large selections
       const confirmed = window.confirm(
@@ -751,53 +979,48 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
       if (!confirmed) return;
     }
 
-    const allCurrentSelected = filteredProperties.every(prop => 
-      selectedProperties.some(selected => selected.id === prop.id)
-    );
+    const selectedIds = new Set(selectedProperties.map(p => p.id));
+    const allCurrentSelected = filteredProperties.every(prop => selectedIds.has(prop.id));
     
     if (allCurrentSelected) {
       // Deselect all filtered properties
+      const filteredIds = new Set(filteredProperties.map(p => p.id));
       setSelectedProperties(prev => 
-        prev.filter(selected => 
-          !filteredProperties.some(filtered => filtered.id === selected.id)
-        )
+        prev.filter(selected => !filteredIds.has(selected.id))
       );
     } else {
       // Select all filtered properties that aren't already selected
-      const newSelections = filteredProperties.filter(prop => 
-        !selectedProperties.some(selected => selected.id === prop.id)
-      );
+      const newSelections = filteredProperties.filter(prop => !selectedIds.has(prop.id));
       setSelectedProperties(prev => [...prev, ...newSelections]);
     }
-  };
+  }, [filteredProperties, selectedProperties]);
 
-  const handleSelectCurrentPage = () => {
+  const handleSelectCurrentPage = useCallback(() => {
     const currentPageProperties = filteredAndPaginatedProperties.properties;
-    const allCurrentPageSelected = currentPageProperties.every(prop => 
-      selectedProperties.some(selected => selected.id === prop.id)
-    );
+    const selectedIds = new Set(selectedProperties.map(p => p.id));
+    const allCurrentPageSelected = currentPageProperties.every(prop => selectedIds.has(prop.id));
     
     if (allCurrentPageSelected) {
       // Deselect current page properties
+      const currentPageIds = new Set(currentPageProperties.map(p => p.id));
       setSelectedProperties(prev => 
-        prev.filter(selected => 
-          !currentPageProperties.some(current => current.id === selected.id)
-        )
+        prev.filter(selected => !currentPageIds.has(selected.id))
       );
     } else {
       // Select current page properties that aren't already selected
-      const newSelections = currentPageProperties.filter(prop => 
-        !selectedProperties.some(selected => selected.id === prop.id)
-      );
+      const newSelections = currentPageProperties.filter(prop => !selectedIds.has(prop.id));
       setSelectedProperties(prev => [...prev, ...newSelections]);
     }
-  };
+  }, [filteredAndPaginatedProperties.properties, selectedProperties]);
 
-  const getSelectionStats = () => {
+  // Memoized selection stats computation
+  const selectionStats = useMemo(() => {
     const totalFiltered = filteredProperties.length;
     const totalSelected = selectedProperties.length;
+    const selectedIds = new Set(selectedProperties.map(p => p.id)); // Optimize lookups
+    
     const currentPageSelected = filteredAndPaginatedProperties.properties.filter(prop =>
-      selectedProperties.some(selected => selected.id === prop.id)
+      selectedIds.has(prop.id)
     ).length;
     const currentPageTotal = filteredAndPaginatedProperties.properties.length;
     
@@ -807,19 +1030,58 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
       currentPageSelected,
       currentPageTotal,
       allFilteredSelected: totalFiltered > 0 && filteredProperties.every(prop => 
-        selectedProperties.some(selected => selected.id === prop.id)
+        selectedIds.has(prop.id)
       ),
       allCurrentPageSelected: currentPageTotal > 0 && filteredAndPaginatedProperties.properties.every(prop => 
-        selectedProperties.some(selected => selected.id === prop.id)
+        selectedIds.has(prop.id)
       )
     };
-  };
-
-  const selectionStats = getSelectionStats();
+  }, [filteredProperties, selectedProperties, filteredAndPaginatedProperties]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-7xl max-h-[90vh] flex flex-col">
+    <ErrorBoundary 
+      componentName={componentName}
+      level="component"
+      onError={(error, errorInfo) => {
+        updateHealthStatus('unhealthy', [
+          `Error boundary triggered: ${error.message}`,
+          'Component may need recovery'
+        ], {
+          renderTime: 0,
+          errorRate: 1,
+          lastError: error.message
+        });
+      }}
+    >
+      <ComponentHealthMonitor
+        componentName={componentName}
+        criticalComponent={true}
+        healthCheckInterval={30000}
+        performanceThresholds={{
+          maxRenderTime: 100,
+          maxErrorRate: 0.05,
+          maxMemoryUsage: 100 * 1024 * 1024, // 100MB
+          maxApiTime: 5000
+        }}
+        onHealthChange={(status, metrics, issues) => {
+          if (status === 'unhealthy' && issues.length > 0) {
+            console.warn(`🚨 ${componentName} health critical:`, { status, metrics, issues });
+            
+            // Consider triggering recovery if health is critical
+            if (issues.some(issue => issue.includes('Error boundary') || issue.includes('critical'))) {
+              triggerRecovery().then(success => {
+                if (success) {
+                  console.log(`✅ ${componentName} recovery completed successfully`);
+                } else {
+                  console.error(`❌ ${componentName} recovery failed`);
+                }
+              });
+            }
+          }
+        }}
+      >
+        <Dialog key={remountKey} open={open} onOpenChange={onOpenChange}>
+          <DialogContent className="max-w-7xl max-h-[90vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
@@ -1234,63 +1496,18 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                       ) : (
                         filteredAndPaginatedProperties.properties.map((property) => {
                           const propertyInspector = propertyInspectorOverrides[property.id];
-                          const isSelected = selectedProperties.some(p => p.id === property.id);
+                          const selectedIds = new Set(selectedProperties.map(p => p.id));
+                          const isSelected = selectedIds.has(property.id);
                           
                           return (
-                            <div key={property.id} className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
-                              <Checkbox
-                                checked={isSelected}
-                                onCheckedChange={(checked) => {
-                                  if (checked) {
-                                    setSelectedProperties(prev => [...prev, property]);
-                                  } else {
-                                    setSelectedProperties(prev => prev.filter(p => p.id !== property.id));
-                                    // Clear any inspector override when deselecting
-                                    setPropertyInspectorOverrides(prev => {
-                                      const newOverrides = { ...prev };
-                                      delete newOverrides[property.id];
-                                      return newOverrides;
-                                    });
-                                  }
-                                }}
-                              />
-                              <div className="flex-1">
-                                <div className="font-medium">{property.property_name}</div>
-                                <div className="text-sm text-gray-600">
-                                  {property.address}, {property.city}, {property.state}
-                                </div>
-                                <div className="text-xs text-gray-500">
-                                  PM: {property.property_manager_name || 'Not assigned'} • Last Inspection: {property.last_inspection_date || 'Never'}
-                                </div>
-                                
-                                {/* Inspector Assignment Section */}
-                                {isSelected && (
-                                  <div className="mt-2 p-2 bg-gray-50 rounded text-xs">
-                                    <div className="flex items-center justify-between">
-                                      <span className="text-gray-600">Inspector:</span>
-                                      <div className="flex items-center space-x-2">
-                                        {propertyInspector ? (
-                                          <Badge variant="outline" className="text-xs">
-                                            Override: {propertyInspector.full_name}
-                                          </Badge>
-                                        ) : selectedInspector ? (
-                                          <Badge variant="secondary" className="text-xs">
-                                            Default: {selectedInspector.full_name}
-                                          </Badge>
-                                        ) : (
-                                          <Badge variant="destructive" className="text-xs">
-                                            No inspector selected
-                                          </Badge>
-                                        )}
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                              <div className="text-right">
-                                <div className="text-sm font-medium">{property.roof_area?.toLocaleString() || 'N/A'} sq ft</div>
-                              </div>
-                            </div>
+                            <PropertyListItem
+                              key={property.id}
+                              property={property}
+                              isSelected={isSelected}
+                              propertyInspector={propertyInspector}
+                              selectedInspector={selectedInspector}
+                              onPropertySelection={handlePropertySelection}
+                            />
                           );
                         })
                      )}
@@ -1456,7 +1673,9 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
               </Button>
             )}
           </DialogFooter>
-     </DialogContent>
-   </Dialog>
- );
+          </DialogContent>
+        </Dialog>
+      </ComponentHealthMonitor>
+    </ErrorBoundary>
+  );
 }
