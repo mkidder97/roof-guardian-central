@@ -7,10 +7,13 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
-import { Search, Calendar, CheckCircle, X, FileDown, Filter, MapPin, AlertCircle, User } from 'lucide-react';
+import { Search, Calendar, CheckCircle, X, FileDown, Filter, MapPin, AlertCircle, User, Clock, Zap } from 'lucide-react';
 
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
@@ -111,6 +114,18 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
   const [selectedInspector, setSelectedInspector] = useState<Inspector | null>(null);
   const [propertyInspectorOverrides, setPropertyInspectorOverrides] = useState<Record<string, Inspector>>({});
 
+  // Direct Inspection Mode state
+  const [directInspectionMode, setDirectInspectionMode] = useState(false);
+  const [directInspectionData, setDirectInspectionData] = useState({
+    selectedProperty: null as Property | null,
+    inspector: null as Inspector | null,
+    scheduledDate: '',
+    scheduledTime: '',
+    inspectionType: 'routine' as 'routine' | 'emergency' | 'follow-up',
+    priority: 'medium' as 'low' | 'medium' | 'high',
+    notes: ''
+  });
+
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
@@ -156,14 +171,21 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
 
   // Set default inspector (Michael Kidder) when inspectors load
   useEffect(() => {
-    if (inspectors.length > 0 && !selectedInspector) {
+    if (inspectors.length > 0) {
       const defaultInspector = inspectors.find(inspector => 
         inspector.email === 'mkidder@southernroof.biz'
       ) || inspectors[0]; // Fallback to first inspector if Michael not found
       
-      setSelectedInspector(defaultInspector);
+      if (!selectedInspector) {
+        setSelectedInspector(defaultInspector);
+      }
+      
+      // Also set default for direct inspection mode if not already set
+      if (directInspectionMode && !directInspectionData.inspector) {
+        setDirectInspectionData(prev => ({ ...prev, inspector: defaultInspector }));
+      }
     }
-  }, [inspectors, selectedInspector]);
+  }, [inspectors, selectedInspector, directInspectionMode, directInspectionData.inspector]);
 
   const resetModalState = () => {
     setSelectedProperties([]);
@@ -171,6 +193,16 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     setCurrentPage(1);
     setSelectedInspector(null);
     setPropertyInspectorOverrides({});
+    setDirectInspectionMode(false);
+    setDirectInspectionData({
+      selectedProperty: null,
+      inspector: null,
+      scheduledDate: '',
+      scheduledTime: '',
+      inspectionType: 'routine',
+      priority: 'medium',
+      notes: ''
+    });
     setWorkflowProgress({
       isProcessing: false,
       currentCampaign: '',
@@ -366,6 +398,141 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
       const timestamp = Date.now();
       const randomPart = Math.random().toString(36).substring(2, 10).toUpperCase();
       return `CAMP-${timestamp}-${randomPart}`;
+    }
+  };
+
+  const handleCreateDirectInspection = async () => {
+    const { selectedProperty, inspector, scheduledDate, scheduledTime, inspectionType, priority, notes } = directInspectionData;
+
+    if (!selectedProperty) {
+      toast({
+        title: "No Property Selected",
+        description: "Please select a property for direct inspection.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!inspector) {
+      toast({
+        title: "No Inspector Selected",
+        description: "Please select an inspector for this inspection.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!scheduledDate) {
+      toast({
+        title: "No Date Selected",
+        description: "Please select a scheduled date for the inspection.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      setWorkflowProgress({
+        isProcessing: true,
+        currentCampaign: 'Creating direct inspection...',
+        processedCount: 0,
+        totalCount: 1,
+        results: []
+      });
+
+      // Combine date and time for scheduled datetime
+      const scheduledDateTime = scheduledTime 
+        ? new Date(`${scheduledDate}T${scheduledTime}`)
+        : new Date(`${scheduledDate}T09:00:00`);
+
+      // Create inspection record
+      const { data: inspectionData, error: inspectionError } = await supabase
+        .from('inspections')
+        .insert({
+          roof_id: selectedProperty.id,
+          inspector_id: inspector.id,
+          scheduled_date: scheduledDate,
+          status: 'scheduled',
+          inspection_type: inspectionType,
+          notes: notes || `Direct inspection scheduled for ${selectedProperty.property_name}`
+        })
+        .select()
+        .single();
+
+      if (inspectionError) throw inspectionError;
+
+      // Create inspection session with proper status
+      const { data: sessionData, error: sessionError } = await supabase
+        .from('inspection_sessions')
+        .insert({
+          property_id: selectedProperty.id,
+          inspector_id: inspector.id,
+          inspection_status: 'scheduled',
+          session_data: {
+            inspectionType,
+            priority,
+            notes,
+            scheduledDateTime: scheduledDateTime.toISOString(),
+            directInspection: true,
+            propertyName: selectedProperty.property_name,
+            propertyAddress: `${selectedProperty.address}, ${selectedProperty.city}, ${selectedProperty.state}`
+          },
+          expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days from now
+        })
+        .select()
+        .single();
+
+      if (sessionError) throw sessionError;
+
+      setWorkflowProgress(prev => ({
+        ...prev,
+        isProcessing: false,
+        processedCount: 1,
+        results: [{
+          success: true,
+          campaignData: {
+            campaign_id: inspectionData.id,
+            campaign_name: `Direct Inspection - ${selectedProperty.property_name}`,
+            client_name: selectedProperty.clients?.company_name || 'Unknown Client',
+            property_manager_email: selectedProperty.property_manager_email || '',
+            region: selectedProperty.region,
+            market: selectedProperty.market,
+            inspector_id: inspector.id,
+            inspector_name: inspector.full_name,
+            inspector_email: inspector.email,
+            properties: []
+          }
+        }]
+      }));
+
+      toast({
+        title: "Direct Inspection Created Successfully!",
+        description: `Inspection scheduled for ${selectedProperty.property_name} with ${inspector.full_name} on ${format(new Date(scheduledDate), 'MMM dd, yyyy')}.`,
+      });
+
+      // Reset form
+      setDirectInspectionData({
+        selectedProperty: null,
+        inspector: null,
+        scheduledDate: '',
+        scheduledTime: '',
+        inspectionType: 'routine',
+        priority: 'medium',
+        notes: ''
+      });
+
+    } catch (error) {
+      console.error('Error creating direct inspection:', error);
+      setWorkflowProgress(prev => ({
+        ...prev,
+        isProcessing: false
+      }));
+      
+      toast({
+        title: "Failed to Create Inspection",
+        description: "An error occurred while creating the direct inspection. Please try again.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -654,16 +821,197 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-7xl max-h-[90vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle className="flex items-center space-x-2">
-            <Calendar className="h-5 w-5" />
-            <span>Schedule Inspection Campaign</span>
+            <DialogTitle className="flex items-center justify-between">
+              <div className="flex items-center space-x-2">
+                {directInspectionMode ? <Zap className="h-5 w-5" /> : <Calendar className="h-5 w-5" />}
+                <span>{directInspectionMode ? 'Create Direct Inspection' : 'Schedule Inspection Campaign'}</span>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Label htmlFor="direct-mode" className="text-sm font-normal">
+                  Direct Inspection Mode
+                </Label>
+                <Switch
+                  id="direct-mode"
+                  checked={directInspectionMode}
+                  onCheckedChange={setDirectInspectionMode}
+                />
+              </div>
           </DialogTitle>
         </DialogHeader>
 
           <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
               <div className="space-y-4 h-full flex flex-col">
-                
-              {/* Compact Filter Card */}
+
+              {directInspectionMode ? (
+                // Direct Inspection Form
+                <Card className="flex-1">
+                  <CardHeader>
+                    <CardTitle className="flex items-center space-x-2">
+                      <Zap className="h-5 w-5" />
+                      <span>Create Direct Inspection</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-6">
+                    {/* Property Selection */}
+                    <div className="space-y-2">
+                      <Label htmlFor="property-select">Property *</Label>
+                      <Select 
+                        value={directInspectionData.selectedProperty?.id || ''} 
+                        onValueChange={(value) => {
+                          const property = filteredProperties.find(p => p.id === value);
+                          setDirectInspectionData(prev => ({ ...prev, selectedProperty: property || null }));
+                        }}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder="Select a property" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <div className="p-2">
+                            <div className="relative">
+                              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                              <Input
+                                placeholder="Search properties..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="pl-10 mb-2"
+                              />
+                            </div>
+                          </div>
+                          <ScrollArea className="h-48">
+                            {filteredProperties.map((property) => (
+                              <SelectItem key={property.id} value={property.id}>
+                                <div className="flex flex-col">
+                                  <span className="font-medium">{property.property_name}</span>
+                                  <span className="text-sm text-gray-500">
+                                    {property.address}, {property.city}, {property.state}
+                                  </span>
+                                </div>
+                              </SelectItem>
+                            ))}
+                          </ScrollArea>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Inspector Assignment */}
+                    <div className="space-y-2">
+                      <Label htmlFor="inspector-select">Inspector *</Label>
+                      <Select 
+                        value={directInspectionData.inspector?.id || ''} 
+                        onValueChange={(value) => {
+                          const inspector = inspectors.find(i => i.id === value);
+                          setDirectInspectionData(prev => ({ ...prev, inspector: inspector || null }));
+                        }}
+                        disabled={inspectorsLoading}
+                      >
+                        <SelectTrigger>
+                          <SelectValue placeholder={inspectorsLoading ? "Loading..." : "Select inspector"} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {inspectors.map((inspector) => (
+                            <SelectItem key={inspector.id} value={inspector.id}>
+                              {inspector.full_name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {/* Date and Time */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="scheduled-date">Scheduled Date *</Label>
+                        <Input
+                          id="scheduled-date"
+                          type="date"
+                          value={directInspectionData.scheduledDate}
+                          onChange={(e) => setDirectInspectionData(prev => ({ ...prev, scheduledDate: e.target.value }))}
+                          min={format(new Date(), 'yyyy-MM-dd')}
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="scheduled-time">Scheduled Time</Label>
+                        <Input
+                          id="scheduled-time"
+                          type="time"
+                          value={directInspectionData.scheduledTime}
+                          onChange={(e) => setDirectInspectionData(prev => ({ ...prev, scheduledTime: e.target.value }))}
+                        />
+                      </div>
+                    </div>
+
+                    {/* Inspection Type and Priority */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label htmlFor="inspection-type">Inspection Type</Label>
+                        <Select 
+                          value={directInspectionData.inspectionType} 
+                          onValueChange={(value: 'routine' | 'emergency' | 'follow-up') => 
+                            setDirectInspectionData(prev => ({ ...prev, inspectionType: value }))
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="routine">Routine</SelectItem>
+                            <SelectItem value="emergency">Emergency</SelectItem>
+                            <SelectItem value="follow-up">Follow-up</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label htmlFor="priority">Priority Level</Label>
+                        <Select 
+                          value={directInspectionData.priority} 
+                          onValueChange={(value: 'low' | 'medium' | 'high') => 
+                            setDirectInspectionData(prev => ({ ...prev, priority: value }))
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="low">Low</SelectItem>
+                            <SelectItem value="medium">Medium</SelectItem>
+                            <SelectItem value="high">High</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+
+                    {/* Notes */}
+                    <div className="space-y-2">
+                      <Label htmlFor="inspection-notes">Notes</Label>
+                      <Textarea
+                        id="inspection-notes"
+                        placeholder="Enter any special instructions or notes for this inspection..."
+                        value={directInspectionData.notes}
+                        onChange={(e) => setDirectInspectionData(prev => ({ ...prev, notes: e.target.value }))}
+                        rows={3}
+                      />
+                    </div>
+
+                    {/* Selected Property Summary */}
+                    {directInspectionData.selectedProperty && (
+                      <Card className="bg-blue-50 border-blue-200">
+                        <CardContent className="p-4">
+                          <h4 className="font-medium mb-2">Selected Property</h4>
+                          <div className="text-sm space-y-1">
+                            <div><strong>Name:</strong> {directInspectionData.selectedProperty.property_name}</div>
+                            <div><strong>Address:</strong> {directInspectionData.selectedProperty.address}, {directInspectionData.selectedProperty.city}, {directInspectionData.selectedProperty.state}</div>
+                            <div><strong>Roof Type:</strong> {directInspectionData.selectedProperty.roof_type || 'N/A'}</div>
+                            <div><strong>Area:</strong> {directInspectionData.selectedProperty.roof_area?.toLocaleString() || 'N/A'} sq ft</div>
+                            <div><strong>Last Inspection:</strong> {directInspectionData.selectedProperty.last_inspection_date || 'Never'}</div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </CardContent>
+                </Card>
+              ) : (
+                <>
+                {/* Compact Filter Card */}
               <Card>
                 <CardHeader className="pb-2">
                   <CardTitle className="text-base flex items-center space-x-2">
@@ -950,6 +1298,8 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                  </ScrollArea>
                </CardContent>
              </Card>
+               </>
+              )}
             </div>
           </div>
 
@@ -1035,38 +1385,76 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
               <Button variant="outline" onClick={() => onOpenChange(false)}>
                 Cancel
               </Button>
-              <Button variant="outline" onClick={exportSelectedProperties}>
-                <FileDown className="h-4 w-4 mr-2" />
-                Export List
-              </Button>
-            </div>
-            <Button 
-              onClick={handleStartWorkflow}
-              disabled={selectedProperties.length === 0 || !selectedInspector || workflowProgress.isProcessing}
-              className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
-            >
-              {workflowProgress.isProcessing ? (
-                <>
-                  <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full" />
-                  Processing Batch...
-                </>
-              ) : workflowProgress.results.length > 0 ? (
-                <>
-                  <CheckCircle className="h-4 w-4 mr-2" />
-                  Batch Complete
-                </>
-              ) : (
-                <>
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Start Campaign ({selectedProperties.length} properties)
-                  {selectedInspector && (
-                    <Badge variant="secondary" className="ml-2 text-xs">
-                      {selectedInspector.full_name}
-                    </Badge>
-                  )}
-                </>
+              {!directInspectionMode && (
+                <Button variant="outline" onClick={exportSelectedProperties}>
+                  <FileDown className="h-4 w-4 mr-2" />
+                  Export List
+                </Button>
               )}
-            </Button>
+            </div>
+            
+            {directInspectionMode ? (
+              <Button 
+                onClick={handleCreateDirectInspection}
+                disabled={
+                  !directInspectionData.selectedProperty || 
+                  !directInspectionData.inspector || 
+                  !directInspectionData.scheduledDate || 
+                  workflowProgress.isProcessing
+                }
+                className="bg-green-600 hover:bg-green-700 disabled:opacity-50"
+              >
+                {workflowProgress.isProcessing ? (
+                  <>
+                    <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full" />
+                    Creating Inspection...
+                  </>
+                ) : workflowProgress.results.length > 0 ? (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Inspection Created
+                  </>
+                ) : (
+                  <>
+                    <Zap className="h-4 w-4 mr-2" />
+                    Create Direct Inspection
+                    {directInspectionData.inspector && (
+                      <Badge variant="secondary" className="ml-2 text-xs">
+                        {directInspectionData.inspector.full_name}
+                      </Badge>
+                    )}
+                  </>
+                )}
+              </Button>
+            ) : (
+              <Button 
+                onClick={handleStartWorkflow}
+                disabled={selectedProperties.length === 0 || !selectedInspector || workflowProgress.isProcessing}
+                className="bg-blue-600 hover:bg-blue-700 disabled:opacity-50"
+              >
+                {workflowProgress.isProcessing ? (
+                  <>
+                    <div className="animate-spin h-4 w-4 mr-2 border-2 border-white border-t-transparent rounded-full" />
+                    Processing Batch...
+                  </>
+                ) : workflowProgress.results.length > 0 ? (
+                  <>
+                    <CheckCircle className="h-4 w-4 mr-2" />
+                    Batch Complete
+                  </>
+                ) : (
+                  <>
+                    <Calendar className="h-4 w-4 mr-2" />
+                    Start Campaign ({selectedProperties.length} properties)
+                    {selectedInspector && (
+                      <Badge variant="secondary" className="ml-2 text-xs">
+                        {selectedInspector.full_name}
+                      </Badge>
+                    )}
+                  </>
+                )}
+              </Button>
+            )}
           </DialogFooter>
      </DialogContent>
    </Dialog>

@@ -12,7 +12,19 @@
     "agent:validate": "npm run lint && npx tsc --noEmit --skipLibCheck",
     "agent:build": "npm run agent:validate && npm run build",
     "agent:deploy": "npm run agent:build && echo '🚀 Ready for deployment'",
-    "agent:test": "echo '🧪 Running agent-controlled tests...' && npm run agent:validate"
+    "agent:test": "echo '🧪 Running agent-controlled tests...' && npm run agent:validate",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:run": "vitest run",
+    "test:coverage": "vitest --coverage",
+    "test:unit": "vitest run src/**/*.test.{ts,tsx}",
+    "test:integration": "vitest run src/test/integration/**/*.test.{ts,tsx}",
+    "test:e2e": "vitest run src/test/e2e/**/*.test.{ts,tsx}",
+    "test:database": "vitest run src/test/database/**/*.test.{ts,tsx}",
+    "test:watch": "vitest --watch",
+    "test:direct-inspection": "vitest run --grep \"direct inspection\"",
+    "test:status-transitions": "vitest run --grep \"status transition\"",
+    "test:consistency": "vitest run --grep \"consistency\""
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
@@ -72,20 +84,29 @@
   "devDependencies": {
     "@eslint/js": "^9.9.0",
     "@tailwindcss/typography": "^0.5.15",
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/jest-dom": "^6.6.4",
+    "@testing-library/react": "^16.3.0",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^22.5.5",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
     "@vitejs/plugin-react-swc": "^3.5.0",
+    "@vitest/ui": "^3.2.4",
     "autoprefixer": "^10.4.20",
     "eslint": "^9.9.0",
     "eslint-plugin-react-hooks": "^5.1.0-rc.0",
     "eslint-plugin-react-refresh": "^0.4.9",
     "globals": "^15.9.0",
+    "jest-environment-jsdom": "^30.0.5",
+    "jsdom": "^26.1.0",
     "lovable-tagger": "^1.1.7",
+    "msw": "^2.10.4",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.11",
     "typescript": "^5.5.3",
     "typescript-eslint": "^8.0.1",
-    "vite": "^5.4.1"
+    "vite": "^5.4.1",
+    "vitest": "^3.2.4"
   }
 }

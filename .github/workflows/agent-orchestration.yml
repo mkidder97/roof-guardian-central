@@ -79,6 +79,12 @@ jobs:
         elif [[ "$COMMAND" == *"optimization"* || "$COMMAND" == *"performance"* ]]; then
           AGENTS="database-agent,frontend-agent,api-agent,testing-agent"
           DURATION="45"
+        elif [[ "$COMMAND" == *"deploy"* || "$COMMAND" == *"deployment"* || "$COMMAND" == *"pipeline"* || "$COMMAND" == *"CI/CD"* ]]; then
+          AGENTS="devops-agent,testing-agent,security-agent"
+          DURATION="40"
+        elif [[ "$COMMAND" == *"monitor"* || "$COMMAND" == *"observability"* || "$COMMAND" == *"metrics"* ]]; then
+          AGENTS="devops-agent,performance-agent"
+          DURATION="20"
         else
           # Complex or unclear task - use meta-agent coordination
           AGENTS="meta-agent,database-agent,frontend-agent,api-agent,testing-agent,devops-agent"
@@ -97,7 +103,7 @@ jobs:
     
     strategy:
       matrix:
-        agent: ["database-agent", "frontend-agent", "api-agent", "testing-agent", "meta-agent"]
+        agent: ["database-agent", "frontend-agent", "api-agent", "testing-agent", "meta-agent", "devops-agent", "security-agent", "performance-agent"]
       fail-fast: false
     
     steps:
@@ -157,6 +163,21 @@ jobs:
             echo "🧠 Meta Agent: Coordinating multi-agent execution..."
             npm run agent:deploy
             echo "✅ Coordination completed"
+            ;;
+          "devops-agent")
+            echo "🚀 DevOps Agent: Managing deployment and infrastructure..."
+            npm run agent:deploy
+            echo "✅ DevOps operations completed"
+            ;;
+          "security-agent")
+            echo "🔒 Security Agent: Running security validations..."
+            npm run agent:validate
+            echo "✅ Security checks completed"
+            ;;
+          "performance-agent")
+            echo "⚡ Performance Agent: Analyzing performance metrics..."
+            npm run agent:validate
+            echo "✅ Performance analysis completed"
             ;;
           *)
             echo "🤖 $AGENT: Executing specialized task..."
