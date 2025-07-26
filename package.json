@@ -8,7 +8,11 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "agent:validate": "npm run lint && npx tsc --noEmit --skipLibCheck",
+    "agent:build": "npm run agent:validate && npm run build",
+    "agent:deploy": "npm run agent:build && echo '🚀 Ready for deployment'",
+    "agent:test": "echo '🧪 Running agent-controlled tests...' && npm run agent:validate"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
