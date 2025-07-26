@@ -6,6 +6,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { useInspectionAutosave } from "@/hooks/useInspectionAutosave";
 import { 
   Building2, 
   AlertTriangle, 
@@ -87,9 +88,17 @@ const InspectorInterface = () => {
   const [loading, setLoading] = useState(false);
   const [loadingBriefing, setLoadingBriefing] = useState(false);
   const [activeInspection, setActiveInspection] = useState<{propertyId: string; propertyName: string} | null>(null);
+  const [inspectionData, setInspectionData] = useState<any>(null);
   const [showBuildingDetails, setShowBuildingDetails] = useState(false);
   const [selectedBuildingId, setSelectedBuildingId] = useState<string | null>(null);
   const [showKeyboardHelp, setShowKeyboardHelp] = useState(false);
+  
+  // Initialize autosave for active inspection
+  const { saveSession, loadSession, completeSession } = useInspectionAutosave({
+    propertyId: activeInspection?.propertyId || '',
+    inspectionData,
+    enabled: !!activeInspection
+  });
   
   // Initialize keyboard shortcuts and event handling
   const { setContext, shortcuts } = useInspectorKeyboardShortcuts();
@@ -332,11 +341,17 @@ const InspectorInterface = () => {
     });
   }, [toast, deselectProperty]);
 
-  const handleCancelInspection = useCallback(() => {
-    if (confirm('Are you sure you want to cancel this inspection? Any unsaved data will be lost.')) {
-      setActiveInspection(null);
+  const handleBackFromInspection = useCallback(async () => {
+    // Auto-save current inspection data before going back
+    if (inspectionData && activeInspection) {
+      await saveSession(inspectionData, 'active');
+      toast({
+        title: "Inspection Saved",
+        description: "Your inspection progress has been automatically saved and can be resumed later.",
+      });
     }
-  }, []);
+    setActiveInspection(null);
+  }, [inspectionData, activeInspection, saveSession, toast]);
 
   const handleBuildingClick = useCallback((propertyId: string) => {
     const property = availableProperties.find(p => p.id === propertyId);
@@ -362,7 +377,8 @@ const InspectorInterface = () => {
         propertyId={activeInspection.propertyId}
         propertyName={activeInspection.propertyName}
         onComplete={handleCompleteInspection}
-        onCancel={handleCancelInspection}
+        onCancel={handleBackFromInspection}
+        onDataChange={setInspectionData}
       />
     );
   }

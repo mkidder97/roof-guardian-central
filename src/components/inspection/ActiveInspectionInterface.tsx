@@ -60,6 +60,7 @@ interface ActiveInspectionProps {
   propertyName: string;
   onComplete: (inspectionData: any) => void;
   onCancel: () => void;
+  onDataChange?: (data: any) => void;
 }
 
 const DEFICIENCY_CATEGORIES = [
@@ -80,7 +81,8 @@ export function ActiveInspectionInterface({
   propertyId, 
   propertyName, 
   onComplete, 
-  onCancel 
+  onCancel,
+  onDataChange
 }: ActiveInspectionProps) {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -124,6 +126,36 @@ export function ActiveInspectionInterface({
     estimatedCost: 0,
     scopeOfWork: ''
   });
+
+  // Auto-save inspection data whenever it changes
+  useEffect(() => {
+    if (onDataChange) {
+      const inspectionData = {
+        propertyId,
+        propertyName,
+        deficiencies,
+        overviewPhotos,
+        inspectionNotes,
+        roofSquareFootageConfirmed,
+        capitalExpenses,
+        inspectionStarted,
+        startTime,
+        lastUpdated: new Date().toISOString()
+      };
+      onDataChange(inspectionData);
+    }
+  }, [
+    propertyId, 
+    propertyName, 
+    deficiencies, 
+    overviewPhotos, 
+    inspectionNotes, 
+    roofSquareFootageConfirmed, 
+    capitalExpenses, 
+    inspectionStarted, 
+    startTime, 
+    onDataChange
+  ]);
 
   useEffect(() => {
     if (!inspectionStarted) {
@@ -320,7 +352,7 @@ export function ActiveInspectionInterface({
               size="sm"
               className="text-blue-600 border-white hover:bg-blue-50 text-xs md:text-sm"
             >
-              Cancel
+              ← Back
             </Button>
             <Button 
               onClick={handleCompleteInspection} 
