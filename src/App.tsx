@@ -45,8 +45,8 @@ const AppRoutes = () => {
 };
 
 const App = () => (
-  <QueryClientProvider client={queryClient}>
-    <AuthProvider>
+  <AuthProvider>
+    <QueryClientProvider client={queryClient}>
       <ErrorBoundary componentName="App">
         <TooltipProvider>
           <Toaster />
@@ -56,8 +56,8 @@ const App = () => (
           </BrowserRouter>
         </TooltipProvider>
       </ErrorBoundary>
-    </AuthProvider>
-  </QueryClientProvider>
+    </QueryClientProvider>
+  </AuthProvider>
 );
 
 export default App;
