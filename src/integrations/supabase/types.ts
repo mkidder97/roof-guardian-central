@@ -1379,6 +1379,28 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: Database["public"]["Enums"]["app_role"]
       }
+      get_inspector_inspections: {
+        Args: { p_inspector_id: string }
+        Returns: {
+          inspection_id: string
+          property_id: string
+          property_name: string
+          property_address: string
+          city: string
+          state: string
+          roof_type: string
+          roof_area: number
+          scheduled_date: string
+          completed_date: string
+          status: string
+          inspection_type: string
+          notes: string
+          session_id: string
+          session_status: string
+          session_data: Json
+          last_inspection_date: string
+        }[]
+      }
       has_role: {
         Args: {
           _user_id: string

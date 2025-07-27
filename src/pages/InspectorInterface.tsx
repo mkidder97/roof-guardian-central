@@ -242,52 +242,28 @@ const InspectorInterface = () => {
         throw new Error('No authenticated user');
       }
 
-      // Get inspections assigned to current inspector
-      const { data: inspections, error: inspectionsError } = await supabase
-        .from('inspections')
-        .select(`
-          id,
-          roof_id,
-          scheduled_date,
-          completed_date,
-          status,
-          inspection_type,
-          notes,
-          roofs (
-            id,
-            property_name,
-            address,
-            city,
-            state,
-            roof_type,
-            roof_area,
-            last_inspection_date
-          ),
-          inspection_sessions (
-            id,
-            status,
-            session_data
-          )
-        `)
-        .eq('inspector_id', user.id)
-        .order('scheduled_date', { ascending: true });
+      // Use the new database function to get inspector's inspections with property details
+      const { data: inspectionData, error } = await supabase.rpc('get_inspector_inspections', {
+        p_inspector_id: user.id
+      });
 
-      if (inspectionsError) throw inspectionsError;
+      if (error) throw error;
 
       // Transform to the expected format for the interface
-      const propertiesWithInspections = (inspections || []).map(inspection => ({
-        id: inspection.roofs?.id || inspection.roof_id,
-        name: inspection.roofs?.property_name || 'Unknown Property',
-        roofType: inspection.roofs?.roof_type || 'Unknown',
-        squareFootage: inspection.roofs?.roof_area || 0,
-        lastInspectionDate: inspection.roofs?.last_inspection_date,
+      const propertiesWithInspections = (inspectionData || []).map(item => ({
+        id: item.property_id,
+        name: item.property_name || 'Unknown Property',
+        roofType: item.roof_type || 'Unknown',
+        squareFootage: item.roof_area || 0,
+        lastInspectionDate: item.last_inspection_date,
         criticalIssues: 0,
         status: 'good',
-        inspectionStatus: inspection.status,
-        inspectionId: inspection.id,
-        scheduledDate: inspection.scheduled_date,
-        inspectionType: inspection.inspection_type,
-        sessionData: inspection.inspection_sessions?.[0]
+        inspectionStatus: item.status,
+        inspectionId: item.inspection_id,
+        scheduledDate: item.scheduled_date,
+        inspectionType: item.inspection_type,
+        sessionData: item.session_data,
+        address: `${item.property_address}, ${item.city}, ${item.state}`
       }));
       
       setAvailableProperties(propertiesWithInspections);
