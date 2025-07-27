@@ -3,7 +3,8 @@
  * Enables field inspections without internet connectivity
  */
 
-const CACHE_NAME = `roof-guardian-inspector-${Date.now()}`;
+const BUILD_VERSION = typeof __BUILD_VERSION__ !== 'undefined' ? __BUILD_VERSION__ : Date.now().toString();
+const CACHE_NAME = `roof-guardian-inspector-${BUILD_VERSION}`;
 const OFFLINE_URL = '/offline.html';
 
 // Critical resources to cache for offline functionality

@@ -9,6 +9,9 @@ export default defineConfig(({ mode }) => ({
     host: "::",
     port: 8080,
   },
+  define: {
+    __BUILD_VERSION__: JSON.stringify(process.env.GITHUB_SHA || Date.now().toString()),
+  },
   plugins: [
     react(),
     mode === 'development' &&
