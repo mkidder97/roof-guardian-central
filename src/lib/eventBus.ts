@@ -238,7 +238,45 @@ export const INSPECTOR_EVENTS = {
   OFFLINE_DATA_QUEUED: 'offline.data_queued',
   
   // Keyboard shortcuts
-  SHORTCUT_TRIGGERED: 'keyboard.shortcut_triggered'
+  SHORTCUT_TRIGGERED: 'keyboard.shortcut_triggered',
+  
+  // Unified inspection synchronization events
+  INSPECTION_CREATED: 'inspection.created',
+  INSPECTION_UPDATED: 'inspection.updated',
+  INSPECTION_DELETED: 'inspection.deleted',
+  INSPECTION_STATUS_CHANGED: 'inspection.status_changed',
+  INSPECTION_ASSIGNED: 'inspection.assigned',
+  INSPECTION_UNASSIGNED: 'inspection.unassigned',
+  INSPECTION_RESCHEDULED: 'inspection.rescheduled',
+  INSPECTION_REPORT_GENERATED: 'inspection.report_generated',
+  INSPECTION_REPORT_UPDATED: 'inspection.report_updated',
+  
+  // Inspection data synchronization
+  INSPECTION_DATA_SYNC: 'inspection.data_sync',
+  INSPECTION_DATA_REFRESH: 'inspection.data_refresh',
+  INSPECTION_DATA_STALE: 'inspection.data_stale',
+  INSPECTION_DATA_ERROR: 'inspection.data_error',
+  
+  // Campaign events for unified sync
+  CAMPAIGN_CREATED: 'campaign.created',
+  CAMPAIGN_UPDATED: 'campaign.updated',
+  CAMPAIGN_INSPECTION_ADDED: 'campaign.inspection_added',
+  CAMPAIGN_INSPECTION_REMOVED: 'campaign.inspection_removed',
+  
+  // Building/Property related inspection events
+  BUILDING_INSPECTION_HISTORY_UPDATED: 'building.inspection_history_updated',
+  BUILDING_INSPECTION_SCHEDULED: 'building.inspection_scheduled',
+  BUILDING_INSPECTION_STATUS_CHANGED: 'building.inspection_status_changed',
+  
+  // Real-time collaboration for inspection data
+  INSPECTION_COLLABORATION_START: 'inspection.collaboration_start',
+  INSPECTION_COLLABORATION_UPDATE: 'inspection.collaboration_update',
+  INSPECTION_COLLABORATION_END: 'inspection.collaboration_end',
+  
+  // Component refresh events
+  INSPECTIONS_TAB_REFRESH: 'inspections_tab.refresh',
+  INSPECTION_HISTORY_REFRESH: 'inspection_history.refresh',
+  INSPECTOR_INTERFACE_REFRESH: 'inspector_interface.refresh'
 } as const;
 
 export type InspectorEventType = typeof INSPECTOR_EVENTS[keyof typeof INSPECTOR_EVENTS];

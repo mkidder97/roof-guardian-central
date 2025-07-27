@@ -1,59 +1,177 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useInspectionSync } from "@/hooks/useInspectionSync";
+import { useUnifiedInspectionEvents, useInspectionEventEmitter } from "@/hooks/useUnifiedInspectionEvents";
 import { supabase } from "@/integrations/supabase/client";
-import { Calendar, Eye, Edit, FileText, User } from "lucide-react";
+import { Calendar, Eye, Edit, FileText, User, RefreshCw, Wifi, WifiOff } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { format } from "date-fns";
 
 export function InspectionHistoryTab({ roof }: { roof: any }) {
-  const [inspections, setInspections] = useState<any[]>([]);
   const [reports, setReports] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
+  // Use unified inspection synchronization for this specific roof
+  const {
+    inspections,
+    loading,
+    error,
+    syncStatus,
+    lastSyncTime,
+    refresh,
+    updateInspectionStatus,
+    scheduledCount,
+    completedCount,
+    inProgressCount
+  } = useInspectionSync({
+    autoRefresh: true,
+    refreshInterval: 60000, // 1 minute for building-specific data
+    enableRealTimeSync: true,
+    filters: {
+      roofId: roof.id
+    }
+  });
+
+  // Event system for real-time updates
+  const { on, dataSync } = useUnifiedInspectionEvents();
+  const { emitDataRefresh } = useInspectionEventEmitter();
+
+  // Listen for building-specific inspection events
   useEffect(() => {
-    const fetchInspectionData = async () => {
+    const unsubscribeBuildingHistory = on('buildingInspectionHistoryUpdated', ({ roofId, inspections: updatedInspections }) => {
+      if (roofId === roof.id) {
+        toast({
+          title: "History Updated",
+          description: `Inspection history updated for ${roof.property_name || 'this property'}`,
+        });
+      }
+    });
+
+    const unsubscribeInspectionCreated = on('inspectionCreated', ({ inspection }) => {
+      if (inspection.roof_id === roof.id) {
+        toast({
+          title: "New Inspection",
+          description: `Inspection scheduled for ${roof.property_name || 'this property'}`,
+        });
+      }
+    });
+
+    const unsubscribeStatusChanged = on('inspectionStatusChanged', ({ inspection, newStatus }) => {
+      if (inspection?.roof_id === roof.id) {
+        toast({
+          title: "Status Updated",
+          description: `Inspection status changed to ${newStatus}`,
+        });
+      }
+    });
+
+    return () => {
+      unsubscribeBuildingHistory();
+      unsubscribeInspectionCreated();
+      unsubscribeStatusChanged();
+    };
+  }, [on, roof.id, roof.property_name, toast]);
+
+  // Fetch inspection reports when inspections change
+  useEffect(() => {
+    const fetchReports = async () => {
+      if (inspections.length === 0) {
+        setReports([]);
+        return;
+      }
+
       try {
-        // Fetch inspections
-        const { data: inspectionData, error: inspectionError } = await supabase
-          .from('inspections')
-          .select(`
-            *,
-            users(first_name, last_name)
-          `)
-          .eq('roof_id', roof.id)
-          .order('scheduled_date', { ascending: false });
-
-        if (inspectionError) throw inspectionError;
-
-        // Fetch inspection reports
         const { data: reportData, error: reportError } = await supabase
           .from('inspection_reports')
           .select('*')
-          .in('inspection_id', inspectionData?.map(i => i.id) || []);
+          .in('inspection_id', inspections.map(i => i.id));
 
         if (reportError) throw reportError;
-
-        setInspections(inspectionData || []);
         setReports(reportData || []);
       } catch (error) {
-        console.error('Error fetching inspection data:', error);
-      } finally {
-        setLoading(false);
+        console.error('Error fetching inspection reports:', error);
+        toast({
+          title: "Error",
+          description: "Failed to fetch inspection reports",
+          variant: "destructive"
+        });
       }
     };
 
-    fetchInspectionData();
-  }, [roof.id]);
+    fetchReports();
+  }, [inspections, toast]);
+
+  const handleManualRefresh = useCallback(() => {
+    refresh();
+    dataSync.syncBuildingHistory(roof.id);
+    emitDataRefresh(['inspection_history']);
+    toast({
+      title: "Refreshing",
+      description: "Updating inspection history...",
+    });
+  }, [refresh, dataSync, roof.id, emitDataRefresh, toast]);
+
+  const handleStatusChange = useCallback(async (inspectionId: string, newStatus: string) => {
+    try {
+      await updateInspectionStatus(inspectionId, newStatus);
+      toast({
+        title: "Status Updated",
+        description: `Inspection status changed to ${newStatus}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update inspection status",
+        variant: "destructive"
+      });
+    }
+  }, [updateInspectionStatus, toast]);
 
   return (
     <div className="space-y-6">
-      {/* Inspection Timeline */}
+      {/* Inspection Timeline Header */}
       <div className="flex items-center justify-between">
-        <h3 className="text-lg font-semibold">Inspection History</h3>
-        <Button>
-          <Calendar className="h-4 w-4 mr-2" />
-          Schedule Inspection
-        </Button>
+        <div className="flex items-center space-x-4">
+          <h3 className="text-lg font-semibold">Inspection History</h3>
+          
+          {/* Sync Status Indicator */}
+          <div className="flex items-center space-x-2 text-sm text-gray-500">
+            {syncStatus === 'syncing' ? (
+              <RefreshCw className="h-4 w-4 animate-spin text-blue-600" />
+            ) : syncStatus === 'error' ? (
+              <WifiOff className="h-4 w-4 text-red-600" />
+            ) : syncStatus === 'stale' ? (
+              <Badge variant="outline" className="text-yellow-600 border-yellow-600 text-xs">Stale</Badge>
+            ) : (
+              <Wifi className="h-4 w-4 text-green-600" />
+            )}
+            {lastSyncTime && (
+              <span className="text-xs">
+                Last sync: {format(lastSyncTime, 'HH:mm')}
+              </span>
+            )}
+          </div>
+        </div>
+        
+        <div className="flex items-center space-x-2">
+          {/* Manual Refresh Button */}
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={handleManualRefresh}
+            disabled={loading || syncStatus === 'syncing'}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${(loading || syncStatus === 'syncing') ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          
+          <Button>
+            <Calendar className="h-4 w-4 mr-2" />
+            Schedule Inspection
+          </Button>
+        </div>
       </div>
 
       {/* Inspection Findings - Recent Report */}
@@ -247,24 +365,37 @@ export function InspectionHistoryTab({ roof }: { roof: any }) {
         )}
       </div>
 
-      {/* Inspection Summary */}
+      {/* Enhanced Inspection Summary */}
       <Card>
         <CardHeader>
-          <CardTitle>Inspection Summary</CardTitle>
+          <CardTitle className="flex items-center justify-between">
+            Inspection Summary
+            {error && (
+              <Badge variant="destructive" className="text-xs">
+                Sync Error
+              </Badge>
+            )}
+          </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             <div className="text-center">
-              <div className="text-2xl font-bold text-accent">
-                {inspections.filter(i => i.status === 'completed').length}
+              <div className="text-2xl font-bold text-green-600">
+                {completedCount}
               </div>
               <p className="text-sm text-muted-foreground">Completed</p>
             </div>
             <div className="text-center">
-              <div className="text-2xl font-bold text-primary">
-                {inspections.filter(i => i.status === 'scheduled').length}
+              <div className="text-2xl font-bold text-blue-600">
+                {scheduledCount}
               </div>
               <p className="text-sm text-muted-foreground">Scheduled</p>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl font-bold text-orange-600">
+                {inProgressCount}
+              </div>
+              <p className="text-sm text-muted-foreground">In Progress</p>
             </div>
             <div className="text-center">
               <div className="text-2xl font-bold text-destructive">
@@ -272,14 +403,20 @@ export function InspectionHistoryTab({ roof }: { roof: any }) {
               </div>
               <p className="text-sm text-muted-foreground">High Priority Issues</p>
             </div>
-            <div className="text-center">
-              <div className="text-2xl font-bold text-foreground">
-                {inspections.length > 0 ? 
-                  Math.round((new Date().getTime() - new Date(inspections[0].completed_date || inspections[0].scheduled_date).getTime()) / (1000 * 60 * 60 * 24)) : 
+          </div>
+          
+          {/* Additional metrics */}
+          <div className="mt-4 pt-4 border-t">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground">
+                Total Inspections: {inspections.length}
+              </span>
+              <span className="text-muted-foreground">
+                Days Since Last: {inspections.length > 0 ? 
+                  Math.round((new Date().getTime() - new Date(inspections[0]?.completed_date || inspections[0]?.scheduled_date || new Date()).getTime()) / (1000 * 60 * 60 * 24)) : 
                   0
-                } days
-              </div>
-              <p className="text-sm text-muted-foreground">Since Last Inspection</p>
+                }
+              </span>
             </div>
           </div>
         </CardContent>

@@ -25,6 +25,7 @@ import { useToast } from "@/hooks/use-toast";
 import { BuildingDetailsDialog } from "@/components/inspector/BuildingDetailsDialog";
 import { useInspectorKeyboardShortcuts } from "@/hooks/useKeyboardShortcuts";
 import { useInspectorEventListener, useInspectionState, usePropertySelection } from "@/hooks/useInspectorEvents";
+import { useUnifiedInspectionEvents, useInspectionEventEmitter } from "@/hooks/useUnifiedInspectionEvents";
 import { KeyboardShortcutsHelp } from "@/components/ui/keyboard-shortcuts-help";
 import { offlineManager } from "@/lib/offlineManager";
 import { VirtualizedPropertyList } from "@/components/ui/virtualized-property-list";
@@ -105,6 +106,10 @@ const InspectorInterface = () => {
   const { startInspection, on } = useInspectionState();
   const { selectProperty, deselectProperty } = usePropertySelection();
   
+  // Unified event system for real-time synchronization
+  const { inspectionLifecycle, dataSync } = useUnifiedInspectionEvents();
+  const { emitDataRefresh, emitInspectionCreated } = useInspectionEventEmitter();
+  
   // Set keyboard context based on current state
   useEffect(() => {
     if (activeInspection) {
@@ -120,7 +125,13 @@ const InspectorInterface = () => {
   const handleStartInspection = useCallback((propertyId: string, propertyName: string) => {
     setActiveInspection({ propertyId, propertyName });
     startInspection(propertyId, propertyName);
-  }, [startInspection]);
+    
+    // Emit unified event for real-time synchronization
+    emitDataRefresh(['inspections_tab', 'inspection_history']);
+    
+    // Track inspection start in analytics/monitoring
+    console.log('Inspector Interface: Starting inspection for property', propertyId);
+  }, [startInspection, emitDataRefresh]);
 
   // Event listeners for keyboard shortcuts
   useInspectorEventListener('navigation.help_opened', useCallback(() => {
@@ -335,28 +346,66 @@ const InspectorInterface = () => {
   }, []);
 
 
-  const handleCompleteInspection = useCallback((inspectionData: any) => {
+  const handleCompleteInspection = useCallback(async (inspectionData: any) => {
     console.log('Inspection completed:', inspectionData);
-    setActiveInspection(null);
-    setSelectedProperty(null);
-    deselectProperty();
-    toast({
-      title: "Inspection Completed",
-      description: `Inspection for ${inspectionData.propertyName} has been saved`,
-    });
-  }, [toast, deselectProperty]);
+    
+    try {
+      // Update inspection status through unified system
+      if (inspectionData.inspectionId) {
+        await inspectionLifecycle.changeStatus(inspectionData.inspectionId, 'completed', inspectionData);
+      }
+      
+      // Sync building history for the property
+      if (inspectionData.propertyId) {
+        await dataSync.syncBuildingHistory(inspectionData.propertyId);
+      }
+      
+      // Clear local state
+      setActiveInspection(null);
+      setSelectedProperty(null);
+      deselectProperty();
+      
+      // Emit global refresh for all inspection-related components
+      emitDataRefresh(['inspections_tab', 'inspection_history', 'inspector_interface']);
+      
+      toast({
+        title: "Inspection Completed",
+        description: `Inspection for ${inspectionData.propertyName} has been completed and synced`,
+      });
+    } catch (error) {
+      console.error('Error completing inspection:', error);
+      toast({
+        title: "Error",
+        description: "Failed to complete inspection. Please try again.",
+        variant: "destructive"
+      });
+    }
+  }, [toast, deselectProperty, inspectionLifecycle, dataSync, emitDataRefresh]);
 
   const handleBackFromInspection = useCallback(async () => {
     // Auto-save current inspection data before going back
     if (inspectionData && activeInspection) {
       await saveSession(inspectionData, 'active');
+      
+      // Update inspection status to paused/draft through unified system
+      if (inspectionData.inspectionId) {
+        try {
+          await inspectionLifecycle.changeStatus(inspectionData.inspectionId, 'paused', inspectionData);
+        } catch (error) {
+          console.error('Error updating inspection status:', error);
+        }
+      }
+      
+      // Emit data refresh to sync with other components
+      emitDataRefresh(['inspections_tab', 'inspection_history']);
+      
       toast({
         title: "Inspection Saved",
         description: "Your inspection progress has been automatically saved and can be resumed later.",
       });
     }
     setActiveInspection(null);
-  }, [inspectionData, activeInspection, saveSession, toast]);
+  }, [inspectionData, activeInspection, saveSession, toast, inspectionLifecycle, emitDataRefresh]);
 
   const handleBuildingClick = useCallback((propertyId: string) => {
     const property = availableProperties.find(p => p.id === propertyId);
@@ -364,11 +413,14 @@ const InspectorInterface = () => {
     setShowBuildingDetails(true);
     selectProperty(propertyId);
     
+    // Sync building-specific inspection history when property is selected
+    dataSync.syncBuildingHistory(propertyId);
+    
     // Announce selection for screen readers
     if (property) {
       announcePropertySelection(property.name, property.criticalIssues || 0);
     }
-  }, [selectProperty, availableProperties, announcePropertySelection]);
+  }, [selectProperty, availableProperties, announcePropertySelection, dataSync]);
 
   const handleBuildingDetailsClose = useCallback(() => {
     setShowBuildingDetails(false);

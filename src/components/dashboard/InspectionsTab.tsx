@@ -1,16 +1,18 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, FileDown, Calendar, User, Building, Loader2, Brain } from "lucide-react";
+import { Search, Plus, FileDown, Calendar, User, Building, Loader2, Brain, RefreshCw, Wifi, WifiOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { InspectionSchedulingModal } from "@/components/inspections/InspectionSchedulingModal";
 import { InspectionStatusBadge, InspectionStatus } from "@/components/ui/inspection-status-badge";
-import { supabase } from "@/integrations/supabase/client";
+import { useInspectionSync } from "@/hooks/useInspectionSync";
+import { useUnifiedInspectionEvents, useInspectionEventEmitter } from "@/hooks/useUnifiedInspectionEvents";
 import { format } from "date-fns";
+import { useToast } from "@/hooks/use-toast";
 
 interface Inspection {
   id: string;
@@ -38,48 +40,79 @@ export function InspectionsTab() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [schedulingModalOpen, setSchedulingModalOpen] = useState(false);
-  const [inspections, setInspections] = useState<Inspection[]>([]);
   const [filteredInspections, setFilteredInspections] = useState<Inspection[]>([]);
-  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { userRole } = useAuth();
+  const { toast } = useToast();
 
+  // Use unified inspection synchronization
+  const {
+    inspections,
+    loading,
+    error,
+    syncStatus,
+    lastSyncTime,
+    refresh,
+    updateInspectionStatus,
+    scheduledCount,
+    completedCount,
+    inProgressCount,
+    pastDueCount
+  } = useInspectionSync({
+    autoRefresh: true,
+    refreshInterval: 30000,
+    enableRealTimeSync: true
+  });
+
+  // Event system for real-time updates
+  const { on } = useUnifiedInspectionEvents();
+  const { emitDataRefresh } = useInspectionEventEmitter();
+
+  // Listen for real-time events
   useEffect(() => {
-    fetchInspections();
-  }, []);
+    const unsubscribeInspectionCreated = on('inspectionCreated', ({ inspection }) => {
+      toast({
+        title: "New Inspection Created",
+        description: `Inspection scheduled for ${inspection.roofs?.property_name || 'property'}`,
+      });
+    });
+
+    const unsubscribeInspectionUpdated = on('inspectionUpdated', ({ inspection, updates }) => {
+      if (updates.status) {
+        toast({
+          title: "Inspection Updated",
+          description: `Status changed to ${updates.status}`,
+        });
+      }
+    });
+
+    const unsubscribeStatusChanged = on('inspectionStatusChanged', ({ newStatus, inspection }) => {
+      toast({
+        title: "Status Changed",
+        description: `Inspection status updated to ${newStatus}`,
+      });
+    });
+
+    const unsubscribeDataRefresh = on('dataRefresh', ({ components }) => {
+      if (!components || components.includes('inspections_tab')) {
+        // Data will automatically refresh via useInspectionSync
+        console.log('InspectionsTab: Data refresh triggered');
+      }
+    });
+
+    return () => {
+      unsubscribeInspectionCreated();
+      unsubscribeInspectionUpdated();
+      unsubscribeStatusChanged();
+      unsubscribeDataRefresh();
+    };
+  }, [on, toast]);
 
   useEffect(() => {
     filterInspections();
   }, [searchTerm, statusFilter, inspections]);
 
-  const fetchInspections = async () => {
-    try {
-      setLoading(true);
-      
-      const { data: inspectionsData, error } = await supabase
-        .from('inspections')
-        .select(`
-          *,
-          roofs!roof_id(property_name),
-          users!inspector_id(first_name, last_name),
-          inspection_sessions!roof_id(inspection_status)
-        `)
-        .order('scheduled_date', { ascending: false });
-        
-      if (error) {
-        console.error('Error fetching inspections:', error);
-        return;
-      }
-      
-      setInspections((inspectionsData as unknown as Inspection[]) || []);
-    } catch (error) {
-      console.error('Error fetching inspections:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const filterInspections = () => {
+  const filterInspections = useCallback(() => {
     let filtered = inspections;
 
     if (searchTerm) {
@@ -95,7 +128,7 @@ export function InspectionsTab() {
     }
 
     setFilteredInspections(filtered);
-  };
+  }, [inspections, searchTerm, statusFilter]);
 
   const getInspectorName = (inspection: Inspection) => {
     if (inspection.users?.first_name || inspection.users?.last_name) {
@@ -168,7 +201,7 @@ export function InspectionsTab() {
     }
   };
 
-  const exportData = () => {
+  const exportData = useCallback(() => {
     const csvData = filteredInspections.map(inspection => ({
       'Property': inspection.roofs?.property_name || 'Unknown Property',
       'Inspector': getInspectorName(inspection),
@@ -192,7 +225,32 @@ export function InspectionsTab() {
     a.download = `inspections-${new Date().toISOString().split('T')[0]}.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
-  };
+  }, [filteredInspections]);
+
+  const handleManualRefresh = useCallback(() => {
+    refresh();
+    emitDataRefresh(['inspections_tab']);
+    toast({
+      title: "Refreshing",
+      description: "Updating inspection data...",
+    });
+  }, [refresh, emitDataRefresh, toast]);
+
+  const handleStatusChange = useCallback(async (inspectionId: string, newStatus: string) => {
+    try {
+      await updateInspectionStatus(inspectionId, newStatus);
+      toast({
+        title: "Status Updated",
+        description: `Inspection status changed to ${newStatus}`,
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: "Failed to update inspection status",
+        variant: "destructive"
+      });
+    }
+  }, [updateInspectionStatus, toast]);
 
   if (loading) {
     return (
@@ -233,9 +291,39 @@ export function InspectionsTab() {
               <SelectItem value="past-due">Past Due</SelectItem>
             </SelectContent>
           </Select>
+          
+          {/* Sync Status Indicator */}
+          <div className="flex items-center space-x-2 text-sm text-gray-500">
+            {syncStatus === 'syncing' ? (
+              <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
+            ) : syncStatus === 'error' ? (
+              <WifiOff className="h-4 w-4 text-red-600" />
+            ) : syncStatus === 'stale' ? (
+              <Badge variant="outline" className="text-yellow-600 border-yellow-600">Stale</Badge>
+            ) : (
+              <Wifi className="h-4 w-4 text-green-600" />
+            )}
+            {lastSyncTime && (
+              <span className="text-xs">
+                Last sync: {format(lastSyncTime, 'HH:mm:ss')}
+              </span>
+            )}
+          </div>
         </div>
         
         <div className="flex items-center space-x-3">
+          {/* Manual Refresh Button */}
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={handleManualRefresh}
+            disabled={loading || syncStatus === 'syncing'}
+            className="text-gray-600"
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${(loading || syncStatus === 'syncing') ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          
           {(userRole === 'inspector' || userRole === 'super_admin') && (
             <Button 
               variant="outline" 
@@ -354,13 +442,43 @@ export function InspectionsTab() {
         </Table>
       </div>
 
-      {/* Pagination */}
+      {/* Enhanced Statistics */}
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-600">Showing {filteredInspections.length} of {inspections.length} inspections</p>
+        <div className="flex items-center space-x-4">
+          <p className="text-sm text-gray-600">
+            Showing {filteredInspections.length} of {inspections.length} inspections
+          </p>
+          {error && (
+            <Badge variant="destructive" className="text-xs">
+              Sync Error
+            </Badge>
+          )}
+        </div>
         <div className="flex items-center space-x-4 text-sm text-gray-600">
-          <span>Scheduled: {inspections.filter(i => getInspectionStatus(i) === 'scheduled').length}</span>
-          <span>Completed: {inspections.filter(i => getInspectionStatus(i) === 'completed').length}</span>
-          <span>Past Due: {inspections.filter(i => getInspectionStatus(i) === 'past-due').length}</span>
+          <span className="flex items-center">
+            <Badge variant="outline" className="mr-1">
+              {scheduledCount}
+            </Badge>
+            Scheduled
+          </span>
+          <span className="flex items-center">
+            <Badge variant="outline" className="mr-1 bg-blue-50 text-blue-700">
+              {inProgressCount}
+            </Badge>
+            In Progress
+          </span>
+          <span className="flex items-center">
+            <Badge variant="outline" className="mr-1 bg-green-50 text-green-700">
+              {completedCount}
+            </Badge>
+            Completed
+          </span>
+          <span className="flex items-center">
+            <Badge variant="destructive" className="mr-1">
+              {pastDueCount}
+            </Badge>
+            Past Due
+          </span>
         </div>
       </div>
 

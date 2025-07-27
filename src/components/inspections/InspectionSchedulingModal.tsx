@@ -20,11 +20,37 @@ import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { useN8nWorkflow, type CampaignWorkflowData, type ProcessingResult } from '@/hooks/useN8nWorkflow';
 import { useInspectors, type Inspector } from '@/hooks/useInspectors';
-import { usePerformanceMonitor, useOperationTimer } from '@/hooks/usePerformanceMonitor';
-import { ComponentHealthMonitor, useHealthReporting } from '@/components/monitoring/ComponentHealthMonitor';
-import { useAutoRecovery } from '@/components/monitoring/AutoRecoverySystem';
-import { ErrorBoundary } from '@/components/monitoring/ErrorBoundary';
-import { monitoringService } from '@/components/monitoring/MonitoringService';
+import { useUnifiedInspectionEvents, useInspectionEventEmitter } from '@/hooks/useUnifiedInspectionEvents';
+// Optional monitoring imports - only imported when needed to prevent React context errors
+let usePerformanceMonitor = null;
+let useOperationTimer = null;
+let ComponentHealthMonitor = null;
+let useHealthReporting = null;
+let useAutoRecovery = null;
+let ErrorBoundary = null;
+let monitoringService = null;
+
+try {
+  // Only import monitoring components if React context is available
+  const performanceModule = require('@/hooks/usePerformanceMonitor');
+  usePerformanceMonitor = performanceModule.usePerformanceMonitor;
+  useOperationTimer = performanceModule.useOperationTimer;
+  
+  const healthModule = require('@/components/monitoring/ComponentHealthMonitor');
+  ComponentHealthMonitor = healthModule.ComponentHealthMonitor;
+  useHealthReporting = healthModule.useHealthReporting;
+  
+  const recoveryModule = require('@/components/monitoring/AutoRecoverySystem');
+  useAutoRecovery = recoveryModule.useAutoRecovery;
+  
+  const errorModule = require('@/components/monitoring/ErrorBoundary');
+  ErrorBoundary = errorModule.ErrorBoundary;
+  
+  const monitoringModule = require('@/components/monitoring/MonitoringService');
+  monitoringService = monitoringModule.monitoringService;
+} catch (error) {
+  console.warn('Monitoring modules failed to load, running without monitoring:', error);
+}
 
 interface Property {
   id: string;
@@ -180,73 +206,122 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
   const { processCampaignsBatch } = useN8nWorkflow();
   const { inspectors, loading: inspectorsLoading } = useInspectors();
   
-  // Enhanced monitoring and recovery
-  const componentName = 'InspectionSchedulingModal';
-  const { reportApiCall, reportCustomMetric, updateHealthStatus } = useHealthReporting(componentName);
-  const { remountKey, triggerRecovery, getRecoveryHistory } = useAutoRecovery(componentName, [
-    {
-      id: 'modal-performance-reset',
-      name: 'Reset Modal Performance',
-      description: 'Reset modal state when performance degrades',
-      trigger: {
-        performanceThreshold: 150, // 150ms render time
-        consecutive: 2
-      },
-      action: 'reset',
-      cooldown: 2,
-      enabled: true,
-      priority: 8
-    },
-    {
-      id: 'modal-api-recovery',
-      name: 'API Call Recovery',
-      description: 'Reset when API calls fail consistently',
-      trigger: {
-        performanceThreshold: 10000, // 10 second API timeout
-        consecutive: 3
-      },
-      action: 'reset',
-      cooldown: 5,
-      enabled: true,
-      priority: 6
-    }
-  ]);
+  // Unified event system for real-time inspection synchronization
+  const { inspectionLifecycle, dataSync } = useUnifiedInspectionEvents();
+  const { emitInspectionCreated, emitDataRefresh } = useInspectionEventEmitter();
   
-  // Performance monitoring with enhanced error reporting
-  const { resetMetrics } = usePerformanceMonitor({
-    componentName,
-    slowRenderThreshold: 50, // Allow up to 50ms for this complex component
-    onSlowRender: (metrics) => {
-      console.warn('InspectionSchedulingModal slow render:', metrics);
-      
-      // Report to monitoring service
-      monitoringService.reportPerformanceMetric({
-        id: `slow_render_${Date.now()}`,
+  // Enhanced monitoring and recovery - made optional to prevent React dispatcher errors
+  const componentName = 'InspectionSchedulingModal';
+  const [monitoringEnabled, setMonitoringEnabled] = useState(Boolean(useHealthReporting && useAutoRecovery));
+  
+  // Safely initialize monitoring hooks with try-catch
+  let healthReporting = null;
+  let autoRecovery = null;
+  
+  if (useHealthReporting && useAutoRecovery) {
+    try {
+      healthReporting = useHealthReporting(componentName);
+      autoRecovery = useAutoRecovery(componentName, [
+        {
+          id: 'modal-performance-reset',
+          name: 'Reset Modal Performance',
+          description: 'Reset modal state when performance degrades',
+          trigger: {
+            performanceThreshold: 150, // 150ms render time
+            consecutive: 2
+          },
+          action: 'reset',
+          cooldown: 2,
+          enabled: true,
+          priority: 8
+        },
+        {
+          id: 'modal-api-recovery',
+          name: 'API Call Recovery',
+          description: 'Reset when API calls fail consistently',
+          trigger: {
+            performanceThreshold: 10000, // 10 second API timeout
+            consecutive: 3
+          },
+          action: 'reset',
+          cooldown: 5,
+          enabled: true,
+          priority: 6
+        }
+      ]);
+    } catch (error) {
+      console.warn('Monitoring hooks failed to initialize:', error);
+      setMonitoringEnabled(false);
+      // Continue without monitoring
+    }
+  }
+  
+  // Safe destructuring with fallbacks
+  const { reportApiCall, reportCustomMetric, updateHealthStatus } = healthReporting || {
+    reportApiCall: () => {},
+    reportCustomMetric: () => {},
+    updateHealthStatus: () => {}
+  };
+  
+  const { remountKey, triggerRecovery, getRecoveryHistory } = autoRecovery || {
+    remountKey: 0,
+    triggerRecovery: async () => false,
+    getRecoveryHistory: () => []
+  };
+  
+  // Performance monitoring with enhanced error reporting - made optional
+  let performanceMonitor = null;
+  let operationTimer = null;
+  
+  if (usePerformanceMonitor && useOperationTimer && monitoringEnabled) {
+    try {
+      performanceMonitor = usePerformanceMonitor({
         componentName,
-        metricType: 'render',
-        value: metrics.lastRenderTime,
-        threshold: 50,
-        timestamp: new Date().toISOString(),
-        metadata: {
-          renderCount: metrics.renderCount,
-          averageTime: metrics.averageRenderTime,
-          slowRenders: metrics.slowRenders
+        slowRenderThreshold: 50, // Allow up to 50ms for this complex component
+        onSlowRender: (metrics) => {
+          console.warn('InspectionSchedulingModal slow render:', metrics);
+          
+          // Report to monitoring service if available
+          if (typeof monitoringService?.reportPerformanceMetric === 'function') {
+            monitoringService.reportPerformanceMetric({
+              id: `slow_render_${Date.now()}`,
+              componentName,
+              metricType: 'render',
+              value: metrics.lastRenderTime,
+              threshold: 50,
+              timestamp: new Date().toISOString(),
+              metadata: {
+                renderCount: metrics.renderCount,
+                averageTime: metrics.averageRenderTime,
+                slowRenders: metrics.slowRenders
+              }
+            });
+          }
+          
+          // Update health status if too many slow renders
+          if (metrics.slowRenders > 5 && updateHealthStatus) {
+            updateHealthStatus('degraded', [
+              `${metrics.slowRenders} slow renders detected`,
+              `Average render time: ${metrics.averageRenderTime.toFixed(1)}ms`
+            ], {
+              renderTime: metrics.averageRenderTime,
+              errorRate: 0
+            });
+          }
         }
       });
-      
-      // Update health status if too many slow renders
-      if (metrics.slowRenders > 5) {
-        updateHealthStatus('degraded', [
-          `${metrics.slowRenders} slow renders detected`,
-          `Average render time: ${metrics.averageRenderTime.toFixed(1)}ms`
-        ], {
-          renderTime: metrics.averageRenderTime,
-          errorRate: 0
-        });
-      }
+      operationTimer = useOperationTimer();
+    } catch (error) {
+      console.warn('Performance monitoring failed to initialize:', error);
     }
-  });
-  const { startTimer, endTimer } = useOperationTimer();
+  }
+  
+  // Safe destructuring with fallbacks
+  const { resetMetrics } = performanceMonitor || { resetMetrics: () => {} };
+  const { startTimer, endTimer } = operationTimer || {
+    startTimer: () => {},
+    endTimer: () => {}
+  };
   
   const [properties, setProperties] = useState<Property[]>([]);
   // Removed filteredProperties state - now computed via useMemo
@@ -552,30 +627,42 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
       const apiEndTime = performance.now();
       const apiDuration = apiEndTime - apiStartTime;
       
-      // Report API performance
-      reportApiCall(apiDuration);
+      // Report API performance if monitoring enabled
+      if (monitoringEnabled && reportApiCall) {
+        try {
+          reportApiCall(apiDuration);
+        } catch (error) {
+          console.warn('Failed to report API call:', error);
+        }
+      }
       
       console.log('Query result:', { data: data?.length || 0, error, duration: `${apiDuration.toFixed(1)}ms` });
 
       if (error) {
-        // Report API error
-        monitoringService.reportError({
-          id: `api_error_${Date.now()}`,
-          message: `Properties fetch failed: ${error.message}`,
-          stack: error.stack || '',
-          componentStack: '',
-          componentName,
-          level: 'component',
-          timestamp: new Date().toISOString(),
-          retryCount: 0,
-          url: window.location.href,
-          userAgent: navigator.userAgent,
-          additionalInfo: {
-            apiDuration,
-            filters,
-            errorCode: error.code
+        // Report API error if monitoring enabled
+        if (monitoringEnabled && typeof monitoringService?.reportError === 'function') {
+          try {
+            monitoringService.reportError({
+              id: `api_error_${Date.now()}`,
+              message: `Properties fetch failed: ${error.message}`,
+              stack: error.stack || '',
+              componentStack: '',
+              componentName,
+              level: 'component',
+              timestamp: new Date().toISOString(),
+              retryCount: 0,
+              url: window.location.href,
+              userAgent: navigator.userAgent,
+              additionalInfo: {
+                apiDuration,
+                filters,
+                errorCode: error.code
+              }
+            });
+          } catch (monitoringError) {
+            console.warn('Failed to report error to monitoring service:', monitoringError);
           }
-        });
+        }
         throw error;
       }
 
@@ -585,32 +672,50 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
       setProperties(finalProperties);
       setPropertyCache(prev => new Map(prev.set(cacheKey, finalProperties)));
       
-      // Report successful operation
-      reportCustomMetric('properties_loaded', finalProperties.length, {
-        apiDuration,
-        cacheKey,
-        filters
-      });
+      // Report successful operation if monitoring enabled
+      if (monitoringEnabled && reportCustomMetric) {
+        try {
+          reportCustomMetric('properties_loaded', finalProperties.length, {
+            apiDuration,
+            cacheKey,
+            filters
+          });
+        } catch (error) {
+          console.warn('Failed to report custom metric:', error);
+        }
+      }
       
-      // Update health status
-      updateHealthStatus('healthy', [], {
-        renderTime: 0,
-        errorRate: 0,
-        apiResponseTime: apiDuration,
-        lastOperation: 'fetchProperties'
-      });
+      // Update health status if monitoring enabled
+      if (monitoringEnabled && updateHealthStatus) {
+        try {
+          updateHealthStatus('healthy', [], {
+            renderTime: 0,
+            errorRate: 0,
+            apiResponseTime: apiDuration,
+            lastOperation: 'fetchProperties'
+          });
+        } catch (error) {
+          console.warn('Failed to update health status:', error);
+        }
+      }
       
     } catch (error) {
       console.error('Error fetching properties:', error);
       
-      // Update health status on error
-      updateHealthStatus('degraded', [
-        `Properties fetch failed: ${error instanceof Error ? error.message : 'Unknown error'}`
-      ], {
-        renderTime: 0,
-        errorRate: 0.1,
-        apiResponseTime: performance.now() - apiStartTime
-      });
+      // Update health status on error if monitoring enabled
+      if (monitoringEnabled && updateHealthStatus) {
+        try {
+          updateHealthStatus('degraded', [
+            `Properties fetch failed: ${error instanceof Error ? error.message : 'Unknown error'}`
+          ], {
+            renderTime: 0,
+            errorRate: 0.1,
+            apiResponseTime: performance.now() - apiStartTime
+          });
+        } catch (monitoringError) {
+          console.warn('Failed to update health status on error:', monitoringError);
+        }
+      }
       
       toast({
         title: "Error",
@@ -877,6 +982,32 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
 
       if (sessionError) throw sessionError;
 
+      // Transform inspection data for unified event system
+      const createdInspection = {
+        ...inspectionData,
+        roofs: {
+          property_name: selectedProperty.property_name,
+          address: selectedProperty.address,
+          city: selectedProperty.city,
+          state: selectedProperty.state
+        },
+        users: {
+          first_name: inspector.full_name.split(' ')[0],
+          last_name: inspector.full_name.split(' ').slice(1).join(' '),
+          email: inspector.email
+        },
+        inspection_status: 'scheduled'
+      };
+
+      // Emit unified events for real-time synchronization
+      emitInspectionCreated(createdInspection);
+      
+      // Sync building history for the property
+      dataSync.syncBuildingHistory(selectedProperty.id);
+      
+      // Trigger data refresh for all components
+      emitDataRefresh(['inspections_tab', 'inspection_history', 'inspector_interface']);
+
       setWorkflowProgress(prev => ({
         ...prev,
         isProcessing: false,
@@ -1054,6 +1185,20 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
         processedCount: 1,
         results: [...results.successful, ...results.failed]
       }));
+
+      // Emit unified events for batch campaign creation
+      if (results.successful.length > 0) {
+        // Trigger global data refresh for all inspection-related components
+        emitDataRefresh(['inspections_tab', 'inspection_history', 'inspector_interface']);
+        
+        // Emit campaign creation events for each successful campaign
+        results.successful.forEach(result => {
+          if (result.campaignData) {
+            // Note: This is for campaign creation, individual inspections will be created later
+            console.log('Batch campaign created:', result.campaignData.campaign_name);
+          }
+        });
+      }
 
       // Show detailed results toast
       if (results.failed.length === 0) {
@@ -1250,51 +1395,10 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     };
   }, [filteredProperties, selectedProperties, filteredAndPaginatedProperties]);
 
-  return (
-    <ErrorBoundary 
-      componentName={componentName}
-      level="component"
-      onError={(error, errorInfo) => {
-        updateHealthStatus('unhealthy', [
-          `Error boundary triggered: ${error.message}`,
-          'Component may need recovery'
-        ], {
-          renderTime: 0,
-          errorRate: 1,
-          lastError: error.message
-        });
-      }}
-    >
-      <ComponentHealthMonitor
-        componentName={componentName}
-        criticalComponent={true}
-        healthCheckInterval={30000}
-        performanceThresholds={{
-          maxRenderTime: 100,
-          maxErrorRate: 0.05,
-          maxMemoryUsage: 100 * 1024 * 1024, // 100MB
-          maxApiTime: 5000
-        }}
-        onHealthChange={(status, metrics, issues) => {
-          if (status === 'unhealthy' && issues.length > 0) {
-            console.warn(`🚨 ${componentName} health critical:`, { status, metrics, issues });
-            
-            // Consider triggering recovery if health is critical
-            if (issues.some(issue => issue.includes('Error boundary') || issue.includes('critical'))) {
-              triggerRecovery().then(success => {
-                if (success) {
-                  console.log(`✅ ${componentName} recovery completed successfully`);
-                } else {
-                  console.error(`❌ ${componentName} recovery failed`);
-                }
-              });
-            }
-          }
-        }}
-      >
-        <Dialog key={remountKey} open={open} onOpenChange={onOpenChange}>
-          <DialogContent className="max-w-7xl max-h-[90vh] flex flex-col">
-          <DialogHeader>
+  // Render the main dialog content
+  const renderDialogContent = () => (
+    <>
+      <DialogHeader>
             <DialogTitle className="flex items-center justify-between">
               <div className="flex items-center space-x-2">
                 {directInspectionMode ? <Zap className="h-5 w-5" /> : <Calendar className="h-5 w-5" />}
@@ -2038,9 +2142,79 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
               </Button>
             )}
           </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      </ComponentHealthMonitor>
-    </ErrorBoundary>
+    </>
+  );
+
+  // Return the wrapped component based on monitoring availability
+  if (monitoringEnabled && ErrorBoundary && ComponentHealthMonitor) {
+    return (
+      <ErrorBoundary 
+        componentName={componentName}
+        level="component"
+        onError={(error, errorInfo) => {
+          if (updateHealthStatus) {
+            try {
+              updateHealthStatus('unhealthy', [
+                `Error boundary triggered: ${error.message}`,
+                'Component may need recovery'
+              ], {
+                renderTime: 0,
+                errorRate: 1,
+                lastError: error.message
+              });
+            } catch (monitoringError) {
+              console.warn('Failed to update health status on error boundary:', monitoringError);
+            }
+          }
+        }}
+      >
+        <ComponentHealthMonitor
+          componentName={componentName}
+          criticalComponent={true}
+          healthCheckInterval={30000}
+          performanceThresholds={{
+            maxRenderTime: 100,
+            maxErrorRate: 0.05,
+            maxMemoryUsage: 100 * 1024 * 1024, // 100MB
+            maxApiTime: 5000
+          }}
+          onHealthChange={(status, metrics, issues) => {
+            if (status === 'unhealthy' && issues.length > 0) {
+              console.warn(`🚨 ${componentName} health critical:`, { status, metrics, issues });
+              
+              // Consider triggering recovery if health is critical
+              if (issues.some(issue => issue.includes('Error boundary') || issue.includes('critical'))) {
+                if (triggerRecovery) {
+                  triggerRecovery().then(success => {
+                    if (success) {
+                      console.log(`✅ ${componentName} recovery completed successfully`);
+                    } else {
+                      console.error(`❌ ${componentName} recovery failed`);
+                    }
+                  }).catch(error => {
+                    console.warn('Recovery trigger failed:', error);
+                  });
+                }
+              }
+            }
+          }}
+        >
+          <Dialog key={remountKey} open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="max-w-7xl max-h-[90vh] flex flex-col">
+              {renderDialogContent()}
+            </DialogContent>
+          </Dialog>
+        </ComponentHealthMonitor>
+      </ErrorBoundary>
+    );
+  }
+
+  // Return dialog without monitoring
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-7xl max-h-[90vh] flex flex-col">
+        {renderDialogContent()}
+      </DialogContent>
+    </Dialog>
   );
 }
