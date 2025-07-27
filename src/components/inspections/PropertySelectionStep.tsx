@@ -151,6 +151,12 @@ export function PropertySelectionStep({
     try {
       setIsCreatingInspection(true);
       
+      // Combine notes with scheduled time information
+      const combinedNotes = [
+        setupData.notes,
+        setupData.scheduledTime ? `Scheduled Time: ${setupData.scheduledTime}` : ''
+      ].filter(Boolean).join('\n');
+      
       // Create inspection records for all selected properties
       const inspectionPromises = selectedProperties.map(property => 
         supabase
@@ -159,20 +165,20 @@ export function PropertySelectionStep({
             roof_id: property.id,
             inspector_id: setupData.inspectorId,
             scheduled_date: setupData.scheduledDate,
-            scheduled_time: setupData.scheduledTime,
             priority: setupData.priority,
             inspection_type: setupData.inspectionType,
             status: 'scheduled',
-            notes: setupData.notes
+            notes: combinedNotes
           })
       );
 
       const results = await Promise.all(inspectionPromises);
       
-      // Check for errors
+      // Check for errors with detailed logging
       const errors = results.filter(result => result.error);
       if (errors.length > 0) {
-        throw new Error(`Failed to schedule ${errors.length} inspections`);
+        console.error('Database errors encountered:', errors.map(err => err.error));
+        throw new Error(`Failed to schedule ${errors.length} inspections: ${errors[0].error?.message || 'Unknown error'}`);
       }
 
       toast({
@@ -186,7 +192,7 @@ export function PropertySelectionStep({
       console.error('Error scheduling inspections:', error);
       toast({
         title: "Error",
-        description: "Failed to schedule some inspections. Please try again.",
+        description: `Failed to schedule inspections: ${error instanceof Error ? error.message : 'Unknown error'}`,
         variant: "destructive"
       });
     } finally {
