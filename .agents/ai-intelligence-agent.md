@@ -198,18 +198,20 @@ Learning_Cycle: {
 - Regulatory compliance for AI decision-making
 
 ## Integration Touchpoints
-- **Database Agent**: Training data management and feature engineering
-- **Frontend Agent**: AI insights visualization and user interaction
-- **API Agent**: Model serving and real-time inference endpoints
-- **Field Operations Agent**: Route optimization and scheduling intelligence
-- **n8n Agent**: Automated workflows triggered by AI insights
+- **Data & Analytics Agent**: Training data management, feature engineering, and business intelligence integration
+- **Mobile & Field Agent**: AI insights visualization, user interaction, and field workflow optimization
+- **Integration & Automation Agent**: Model serving, real-time inference endpoints, and AI-triggered workflows
+- **Quality & Deployment Agent**: ML model testing, performance monitoring, and deployment validation
+- **Meta Coordination Agent**: AI-driven task optimization and intelligent agent selection
 
 ## Escalation Triggers
 - Model accuracy drops below 80% → Human expert review required
 - Unusual damage patterns detected → Senior inspector consultation
 - High-value property risk identified → Client notification protocol
-- System performance degradation → DevOps Agent optimization
-- Data quality issues → Database Agent investigation
+- System performance degradation → Quality & Deployment Agent optimization
+- Data quality issues → Data & Analytics Agent investigation
+- Complex field workflow optimization → Mobile & Field Agent coordination
+- API performance issues for ML inference → Integration & Automation Agent
 
 ## Enhanced Example Commands
 - "Generate pre-inspection briefing for property with 3+ years of damage history"

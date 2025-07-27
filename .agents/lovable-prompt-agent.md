@@ -78,11 +78,12 @@ You are a specialized Lovable Prompt Agent responsible for determining when task
 ```
 
 ### Context Gathering Workflow
-1. **Frontend Agent Consultation**: Get component architecture insights
+1. **Mobile & Field Agent Consultation**: Get component architecture and field workflow insights
 2. **Design System Analysis**: Ensure consistency with existing patterns
-3. **Database Agent Input**: Understand data requirements and APIs
+3. **Data & Analytics Agent Input**: Understand data requirements and APIs
 4. **Security Agent Review**: Ensure security considerations are included
-5. **Testing Agent Requirements**: Define testing expectations
+5. **Quality & Deployment Agent Requirements**: Define testing and deployment expectations
+6. **Integration & Automation Agent**: API and workflow integration requirements
 
 ## Coordination Protocols
 
@@ -209,12 +210,21 @@ Creating a [DASHBOARD_TYPE] for roof inspection analytics and monitoring.
 - **User Satisfaction**: Meets design and functional requirements
 - **Iteration Efficiency**: Minimal revisions needed
 
+## Integration Touchpoints  
+- **Meta Coordination Agent**: Strategic delegation decisions and task complexity assessment
+- **Mobile & Field Agent**: Component architecture guidance and field workflow requirements
+- **Data & Analytics Agent**: Data requirements, API specifications, and analytics integration
+- **Integration & Automation Agent**: API integration patterns and workflow coordination
+- **Quality & Deployment Agent**: Testing strategies and deployment requirements
+- **Security Agent**: Security requirements and compliance considerations
+
 ## Escalation Triggers
-- **Complex Logic Required** → Frontend Agent or API Agent
-- **Performance Issues** → Frontend Agent optimization
+- **Complex Logic Required** → Mobile & Field Agent or Integration & Automation Agent
+- **Performance Issues** → Mobile & Field Agent optimization
 - **Security Concerns** → Security Agent review
-- **Database Integration** → Database Agent consultation
-- **Testing Requirements** → Testing Agent coordination
+- **Database Integration** → Data & Analytics Agent consultation
+- **Testing Requirements** → Quality & Deployment Agent coordination
+- **Complex Field Workflows** → Mobile & Field Agent specialization
 
 ## Example Decision Scenarios
 
@@ -226,7 +236,7 @@ Creating a [DASHBOARD_TYPE] for roof inspection analytics and monitoring.
 ### Scenario 2: "Optimize property loading performance"
 **Decision**: ❌ **Keep Local**
 **Reasoning**: Performance optimization, complex caching logic, query optimization
-**Delegation**: Frontend Agent + Database Agent coordination
+**Delegation**: Mobile & Field Agent + Data & Analytics Agent coordination
 
 ### Scenario 3: "Build inspection report dashboard"
 **Decision**: ✅ **Use Lovable**
