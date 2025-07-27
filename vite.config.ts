@@ -79,9 +79,15 @@ export default defineConfig(({ mode }) => ({
   server: {
     host: "::",
     port: 8080,
+    hmr: {
+      overlay: false // Disable HMR overlay that can corrupt React
+    }
   },
   define: {
     __BUILD_VERSION__: JSON.stringify(process.env.GITHUB_SHA || Date.now().toString()),
+  },
+  optimizeDeps: {
+    exclude: ['@supabase/supabase-js'] // Prevent auth lib from HMR corruption
   },
   plugins: [
     react(),

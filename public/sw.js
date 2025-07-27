@@ -25,6 +25,14 @@ const CACHEABLE_API_PATTERNS = [
   /\/api\/inspection-reports/
 ];
 
+// React chunks that should NOT be cached to prevent dispatcher corruption
+const REACT_CHUNKS = ['/node_modules/.vite/deps/chunk-', 'react', 'ReactDOM'];
+
+// Check if request is a React chunk that should not be cached
+function isReactChunk(url) {
+  return REACT_CHUNKS.some(chunk => url.includes(chunk));
+}
+
 // Install event - cache critical resources
 self.addEventListener('install', event => {
   console.log('Service Worker installing...');
@@ -114,6 +122,13 @@ self.addEventListener('fetch', event => {
   if (request.destination === 'image' || 
       request.destination === 'script' || 
       request.destination === 'style') {
+    
+    // Don't cache React chunks that can cause dispatcher corruption
+    if (isReactChunk(request.url)) {
+      event.respondWith(fetch(request));
+      return;
+    }
+    
     event.respondWith(
       caches.match(request)
         .then(cachedResponse => {

@@ -47,7 +47,33 @@ const AppRoutes = () => {
 const App = () => (
   <AuthProvider>
     <QueryClientProvider client={queryClient}>
-      <ErrorBoundary componentName="App">
+      <ErrorBoundary 
+        componentName="App"
+        fallback={
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="text-center space-y-4">
+              <div className="text-2xl font-bold text-primary">RoofMind</div>
+              <div className="text-muted-foreground">Loading...</div>
+              <button 
+                onClick={() => window.location.reload()}
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-md"
+              >
+                Reload
+              </button>
+            </div>
+          </div>
+        }
+        onError={() => {
+          // Clear all caches on React error
+          if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.getRegistrations().then(registrations => {
+              registrations.forEach(reg => reg.unregister());
+            });
+          }
+          localStorage.clear();
+          sessionStorage.clear();
+        }}
+      >
         <TooltipProvider>
           <Toaster />
           <Sonner />

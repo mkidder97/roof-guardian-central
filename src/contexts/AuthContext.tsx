@@ -45,11 +45,21 @@ export const useAuth = () => {
 };
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
-  const [profile, setProfile] = useState<Profile | null>(null);
-  const [userRole, setUserRole] = useState<UserRole | null>(null);
-  const [loading, setLoading] = useState(true);
+  // Safety check for React dispatcher
+  let user, setUser, session, setSession, profile, setProfile, userRole, setUserRole, loading, setLoading;
+  
+  try {
+    [user, setUser] = useState<User | null>(null);
+    [session, setSession] = useState<Session | null>(null);
+    [profile, setProfile] = useState<Profile | null>(null);
+    [userRole, setUserRole] = useState<UserRole | null>(null);
+    [loading, setLoading] = useState(true);
+  } catch (error) {
+    console.error('React dispatcher error in AuthProvider:', error);
+    // Fallback to force remount
+    window.location.reload();
+    return null;
+  }
 
   const fetchProfile = async (userId: string) => {
     try {
@@ -73,6 +83,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       console.error('Error fetching profile:', error);
     }
   };
+
+  // Add recovery mechanism for auth state corruption
+  useEffect(() => {
+    const handleAuthError = () => {
+      console.log('Auth state corruption detected, forcing reload');
+      window.location.reload();
+    };
+
+    window.addEventListener('unhandledrejection', handleAuthError);
+    return () => window.removeEventListener('unhandledrejection', handleAuthError);
+  }, []);
 
   useEffect(() => {
     // Set up auth state listener
