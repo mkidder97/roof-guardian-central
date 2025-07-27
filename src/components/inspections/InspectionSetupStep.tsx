@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
@@ -26,14 +27,25 @@ export function InspectionSetupStep({ open, onOpenChange, onComplete }: Inspecti
     priority: 'medium',
     inspectionType: 'routine'
   });
+  const [dateMode, setDateMode] = useState<'specific' | 'range'>('specific');
   const [selectedDate, setSelectedDate] = useState<Date>();
+  const [dateRange, setDateRange] = useState<{ from: Date | undefined; to: Date | undefined }>({
+    from: undefined,
+    to: undefined
+  });
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
     
     if (!formData.inspectorId) newErrors.inspectorId = 'Inspector is required';
-    if (!selectedDate) newErrors.scheduledDate = 'Date is required';
+    
+    if (dateMode === 'specific') {
+      if (!selectedDate) newErrors.scheduledDate = 'Date is required';
+    } else {
+      if (!dateRange.from || !dateRange.to) newErrors.scheduledDate = 'Date range is required';
+    }
+    
     if (!formData.scheduledTime) newErrors.scheduledTime = 'Time is required';
     
     setErrors(newErrors);
@@ -45,7 +57,9 @@ export function InspectionSetupStep({ open, onOpenChange, onComplete }: Inspecti
     
     const setupData: InspectionSetupData = {
       inspectorId: formData.inspectorId!,
-      scheduledDate: format(selectedDate!, 'yyyy-MM-dd'),
+      scheduledDate: dateMode === 'specific' 
+        ? format(selectedDate!, 'yyyy-MM-dd')
+        : `${format(dateRange.from!, 'yyyy-MM-dd')} to ${format(dateRange.to!, 'yyyy-MM-dd')}`,
       scheduledTime: formData.scheduledTime!,
       priority: formData.priority!,
       inspectionType: formData.inspectionType!,
@@ -97,38 +111,95 @@ export function InspectionSetupStep({ open, onOpenChange, onComplete }: Inspecti
                 )}
               </div>
 
-              {/* Date Selection */}
-              <div className="space-y-2">
-                <Label>Inspection Date *</Label>
-                <Popover>
-                  <PopoverTrigger asChild>
-                    <Button
-                      variant="outline"
-                      className={cn(
-                        "w-full justify-start text-left font-normal",
-                        !selectedDate && "text-muted-foreground",
-                        errors.scheduledDate && "border-destructive"
-                      )}
-                    >
-                      <CalendarIcon className="mr-2 h-4 w-4" />
-                      {selectedDate ? format(selectedDate, "PPP") : "Pick a date"}
-                    </Button>
-                  </PopoverTrigger>
-                  <PopoverContent className="w-auto p-0" align="start">
-                    <Calendar
-                      mode="single"
-                      selected={selectedDate}
-                      onSelect={setSelectedDate}
-                      disabled={(date) => date < new Date()}
-                      initialFocus
-                      className="pointer-events-auto"
-                    />
-                  </PopoverContent>
-                </Popover>
-                {errors.scheduledDate && (
-                  <p className="text-sm text-destructive">{errors.scheduledDate}</p>
-                )}
+              {/* Date Mode Selection */}
+              <div className="space-y-3">
+                <Label>Schedule Type</Label>
+                <RadioGroup 
+                  value={dateMode} 
+                  onValueChange={(value: 'specific' | 'range') => setDateMode(value)}
+                  className="flex gap-6"
+                >
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="specific" id="specific" />
+                    <Label htmlFor="specific">Specific Date</Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <RadioGroupItem value="range" id="range" />
+                    <Label htmlFor="range">Date Range</Label>
+                  </div>
+                </RadioGroup>
               </div>
+
+              {/* Date Selection */}
+              {dateMode === 'specific' ? (
+                <div className="space-y-2">
+                  <Label>Inspection Date *</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !selectedDate && "text-muted-foreground",
+                          errors.scheduledDate && "border-destructive"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {selectedDate ? format(selectedDate, "PPP") : "Pick a date"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={selectedDate}
+                        onSelect={setSelectedDate}
+                        disabled={(date) => date < new Date()}
+                        initialFocus
+                        className="pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  {errors.scheduledDate && (
+                    <p className="text-sm text-destructive">{errors.scheduledDate}</p>
+                  )}
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  <Label>Date Range *</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          (!dateRange.from || !dateRange.to) && "text-muted-foreground",
+                          errors.scheduledDate && "border-destructive"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {dateRange.from && dateRange.to ? (
+                          `${format(dateRange.from, "PPP")} - ${format(dateRange.to, "PPP")}`
+                        ) : (
+                          "Pick date range"
+                        )}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="range"
+                        selected={dateRange}
+                        onSelect={(range) => setDateRange(range as { from: Date | undefined; to: Date | undefined } || { from: undefined, to: undefined })}
+                        disabled={(date) => date < new Date()}
+                        initialFocus
+                        className="pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                  {errors.scheduledDate && (
+                    <p className="text-sm text-destructive">{errors.scheduledDate}</p>
+                  )}
+                </div>
+              )}
 
               {/* Time Selection */}
               <div className="space-y-2">
