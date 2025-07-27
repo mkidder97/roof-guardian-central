@@ -204,16 +204,38 @@ export function InspectionSetupStep({ open, onOpenChange, onComplete }: Inspecti
               {/* Time Selection */}
               <div className="space-y-2">
                 <Label htmlFor="time">Inspection Time *</Label>
-                <div className="relative">
-                  <Clock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="time"
-                    type="time"
-                    className={cn("pl-10", errors.scheduledTime && "border-destructive")}
-                    value={formData.scheduledTime || ''}
-                    onChange={(e) => setFormData(prev => ({ ...prev, scheduledTime: e.target.value }))}
-                  />
-                </div>
+                <Select
+                  value={formData.scheduledTime}
+                  onValueChange={(value) => setFormData(prev => ({ ...prev, scheduledTime: value }))}
+                >
+                  <SelectTrigger className={cn(errors.scheduledTime && "border-destructive")}>
+                    <div className="flex items-center gap-2">
+                      <Clock className="h-4 w-4 text-muted-foreground" />
+                      <SelectValue placeholder="Select inspection time" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="08:00">8:00 AM</SelectItem>
+                    <SelectItem value="08:30">8:30 AM</SelectItem>
+                    <SelectItem value="09:00">9:00 AM</SelectItem>
+                    <SelectItem value="09:30">9:30 AM</SelectItem>
+                    <SelectItem value="10:00">10:00 AM</SelectItem>
+                    <SelectItem value="10:30">10:30 AM</SelectItem>
+                    <SelectItem value="11:00">11:00 AM</SelectItem>
+                    <SelectItem value="11:30">11:30 AM</SelectItem>
+                    <SelectItem value="12:00">12:00 PM</SelectItem>
+                    <SelectItem value="12:30">12:30 PM</SelectItem>
+                    <SelectItem value="13:00">1:00 PM</SelectItem>
+                    <SelectItem value="13:30">1:30 PM</SelectItem>
+                    <SelectItem value="14:00">2:00 PM</SelectItem>
+                    <SelectItem value="14:30">2:30 PM</SelectItem>
+                    <SelectItem value="15:00">3:00 PM</SelectItem>
+                    <SelectItem value="15:30">3:30 PM</SelectItem>
+                    <SelectItem value="16:00">4:00 PM</SelectItem>
+                    <SelectItem value="16:30">4:30 PM</SelectItem>
+                    <SelectItem value="17:00">5:00 PM</SelectItem>
+                  </SelectContent>
+                </Select>
                 {errors.scheduledTime && (
                   <p className="text-sm text-destructive">{errors.scheduledTime}</p>
                 )}
