@@ -9,11 +9,12 @@ import { glob } from "glob";
 const tooltipProviderPlugin = () => ({
   name: 'tooltip-provider-protection',
   buildStart() {
-    const allowedFiles = [
-      'src/App.tsx',
-      'src/test/utils/test-utils.tsx',
-      'src/components/ui/tooltip.tsx'
-    ];
+  const allowedFiles = [
+    'src/App.tsx',
+    'src/test/utils/test-utils.tsx',
+    'src/components/ui/tooltip.tsx',
+    'src/lib/tooltipProtection.ts'
+  ];
     
     try {
       const tsxFiles = glob.sync('src/**/*.{tsx,ts}');
