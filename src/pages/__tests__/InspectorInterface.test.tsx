@@ -419,9 +419,9 @@ describe('InspectorInterface', () => {
   })
 
   describe('Loading States', () => {
-    it('shows loading state for properties', () => {
+    it('shows loading state for properties', async () => {
       // Mock loading state
-      const { InspectorIntelligenceService } = vi.mocked(await import('@/lib/inspectorIntelligenceService'))
+      const { InspectorIntelligenceService } = await import('@/lib/inspectorIntelligenceService')
       vi.mocked(InspectorIntelligenceService.getAvailableProperties).mockImplementation(
         () => new Promise(() => {}) // Never resolves
       )
@@ -486,6 +486,7 @@ describe('InspectorInterface', () => {
         const closeButton = screen.getByRole('button', { name: 'Close' })
         expect(closeButton).toBeInTheDocument()
       })
+      const closeButton = screen.getByRole('button', { name: 'Close' })
       await user.click(closeButton)
 
       // Should show error state
@@ -504,7 +505,12 @@ describe('InspectorInterface', () => {
         announce: mockAnnounce,
         announcePropertySelection: mockAnnounce,
         announceInspectionStep: vi.fn(),
-        announceError: vi.fn()
+        announceError: vi.fn(),
+        setKeyboardTrap: vi.fn(() => vi.fn()),
+        manageFocus: vi.fn(),
+        announceValidation: vi.fn(),
+        announcePhotoCapture: vi.fn(),
+        announceProgress: vi.fn()
       })
 
       const user = userEvent.setup()

@@ -114,7 +114,7 @@ const TestInspectionStatusComponent = ({ inspectionId }: { inspectionId: string 
       // Update session status
       await supabase
         .from('inspection_sessions')
-        .update({ inspection_status: newStatus })
+        .update({ status: newStatus })
         .eq('property_id', 'prop-1')
         .select()
         .single()

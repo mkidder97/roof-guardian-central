@@ -273,7 +273,7 @@ describe('Direct Inspection User Workflow Tests', () => {
       expect(workflowTracker.operations[1].data).toMatchObject({
         property_id: 'prop-1',
         inspector_id: 'inspector-1',
-        inspection_status: 'scheduled'
+        status: 'scheduled'
       })
     })
 
@@ -569,7 +569,7 @@ describe('Direct Inspection User Workflow Tests', () => {
       // Form should show property2 details
       await waitFor(() => {
         const detailsCard = screen.getByText('Selected Property').closest('.bg-blue-50')
-        expect(within(detailsCard!).getByText(/Houston Property 2/)).toBeInTheDocument()
+        expect(within(detailsCard! as HTMLElement).getByText(/Houston Property 2/)).toBeInTheDocument()
       })
     })
   })

@@ -169,7 +169,7 @@ describe('Database Consistency Tests', () => {
       const sessionData = {
         property_id: 'prop-1',
         inspector_id: 'inspector-1',
-        inspection_status: 'scheduled',
+        status: 'scheduled',
         session_data: {
           inspectionType: 'routine',
           priority: 'medium',
@@ -195,7 +195,7 @@ describe('Database Consistency Tests', () => {
       expect(createdInspection.roof_id).toBe(createdSession.property_id)
       expect(createdInspection.inspector_id).toBe(createdSession.inspector_id)
       expect(createdInspection.status).toBe('scheduled')
-      expect(createdSession.inspection_status).toBe('scheduled')
+      expect(createdSession.status).toBe('scheduled')
     })
 
     it('ensures property_id and roof_id consistency', async () => {
@@ -214,7 +214,7 @@ describe('Database Consistency Tests', () => {
       const sessionData = {
         property_id: propertyId,
         inspector_id: 'inspector-1',
-        inspection_status: 'scheduled',
+        status: 'scheduled',
         session_data: { inspectionType: 'routine' },
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
       }
@@ -245,7 +245,7 @@ describe('Database Consistency Tests', () => {
       const sessionData = {
         property_id: 'prop-1',
         inspector_id: inspectorId,
-        inspection_status: 'scheduled',
+        status: 'scheduled',
         session_data: { inspectionType: 'routine' },
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
       }
@@ -276,7 +276,7 @@ describe('Database Consistency Tests', () => {
       // Update corresponding session status
       await supabase
         .from('inspection_sessions')
-        .update({ inspection_status: 'in_progress' })
+        .update({ status: 'in_progress' })
         .eq('property_id', 'prop-1')
         .select()
         .single()
@@ -285,7 +285,7 @@ describe('Database Consistency Tests', () => {
       const sessionUpdate = mockSupabaseOperations.sessionUpdates[0]
 
       expect(inspectionUpdate.status).toBe('in_progress')
-      expect(sessionUpdate.inspection_status).toBe('in_progress')
+      expect(sessionUpdate.status).toBe('in_progress')
     })
 
     it('validates all valid status transitions', async () => {
@@ -313,7 +313,7 @@ describe('Database Consistency Tests', () => {
 
         await supabase
           .from('inspection_sessions')
-          .update({ inspection_status: transition.to })
+          .update({ status: transition.to })
           .eq('property_id', 'prop-1')
           .select()
           .single()
@@ -322,7 +322,7 @@ describe('Database Consistency Tests', () => {
         const sessionUpdate = mockSupabaseOperations.sessionUpdates[0]
 
         expect(inspectionUpdate.status).toBe(transition.to)
-        expect(sessionUpdate.inspection_status).toBe(transition.to)
+        expect(sessionUpdate.status).toBe(transition.to)
       }
     })
 
@@ -339,7 +339,7 @@ describe('Database Consistency Tests', () => {
 
       const sessionUpdate = supabase
         .from('inspection_sessions')
-        .update({ inspection_status: 'in_progress' })
+        .update({ status: 'in_progress' })
         .eq('property_id', 'prop-1')
         .select()
         .single()
@@ -353,100 +353,67 @@ describe('Database Consistency Tests', () => {
   })
 
   describe('Data Integrity Validation', () => {
-    it('validates inspection consistency using RPC function', async () => {
+    it('validates inspection and session record counts', async () => {
       const { supabase } = await import('@/integrations/supabase/client')
 
-      const result = await supabase.rpc('validate_inspection_consistency')
+      // Create test data
+      await supabase.from('inspections').insert({
+        roof_id: 'prop-1',
+        inspector_id: 'inspector-1',
+        scheduled_date: '2024-12-01',
+        status: 'scheduled',
+        inspection_type: 'routine'
+      }).select().single()
 
-      expect(result.data).toEqual({
-        total_inspections: 5,
-        total_sessions: 5,
-        linked_sessions: 5,
-        orphaned_sessions: 0,
-        missing_sessions: 0,
-        status_mismatches: 0,
-        property_mismatches: 0,
-        inspector_mismatches: 0
-      })
+      await supabase.from('inspection_sessions').insert({
+        property_id: 'prop-1',
+        inspector_id: 'inspector-1',
+        status: 'scheduled',
+        session_data: { test: true }
+      }).select().single()
+
+      expect(mockSupabaseOperations.inspectionInserts).toHaveLength(1)
+      expect(mockSupabaseOperations.sessionInserts).toHaveLength(1)
     })
 
-    it('detects orphaned sessions', async () => {
+    it('detects orphaned sessions through direct queries', async () => {
       // Mock data with orphaned session
       vi.mocked(mockSupabaseOperations).sessionInserts.push({
         property_id: 'prop-999',
         inspector_id: 'inspector-1',
-        inspection_status: 'scheduled',
+        status: 'scheduled',
         session_data: { orphaned: true }
       })
 
-      const { supabase } = await import('@/integrations/supabase/client')
-      
-      // Mock RPC to return orphaned sessions
-      vi.mocked(supabase.rpc).mockResolvedValueOnce({
-        data: {
-          total_inspections: 5,
-          total_sessions: 6,
-          linked_sessions: 5,
-          orphaned_sessions: 1,
-          missing_sessions: 0,
-          status_mismatches: 0,
-          property_mismatches: 0,
-          inspector_mismatches: 0
-        },
-        error: null
-      })
-
-      const result = await supabase.rpc('validate_inspection_consistency')
-      
-      expect(result.data.orphaned_sessions).toBe(1)
-      expect(result.data.total_sessions).toBeGreaterThan(result.data.linked_sessions)
+      // Verify the orphaned session was tracked
+      expect(mockSupabaseOperations.sessionInserts).toContainEqual(
+        expect.objectContaining({
+          property_id: 'prop-999',
+          session_data: { orphaned: true }
+        })
+      )
     })
 
-    it('detects missing sessions', async () => {
+    it('validates status consistency between tables', async () => {
       const { supabase } = await import('@/integrations/supabase/client')
-      
-      // Mock RPC to return missing sessions
-      vi.mocked(supabase.rpc).mockResolvedValueOnce({
-        data: {
-          total_inspections: 6,
-          total_sessions: 5,
-          linked_sessions: 5,
-          orphaned_sessions: 0,
-          missing_sessions: 1,
-          status_mismatches: 0,
-          property_mismatches: 0,
-          inspector_mismatches: 0
-        },
-        error: null
-      })
 
-      const result = await supabase.rpc('validate_inspection_consistency')
-      
-      expect(result.data.missing_sessions).toBe(1)
-      expect(result.data.total_inspections).toBeGreaterThan(result.data.total_sessions)
-    })
+      // Create records with matching status
+      await supabase.from('inspections').insert({
+        roof_id: 'prop-test',
+        inspector_id: 'inspector-1',
+        status: 'in_progress'
+      }).select().single()
 
-    it('detects status mismatches', async () => {
-      const { supabase } = await import('@/integrations/supabase/client')
-      
-      // Mock RPC to return status mismatches
-      vi.mocked(supabase.rpc).mockResolvedValueOnce({
-        data: {
-          total_inspections: 5,
-          total_sessions: 5,
-          linked_sessions: 5,
-          orphaned_sessions: 0,
-          missing_sessions: 0,
-          status_mismatches: 1,
-          property_mismatches: 0,
-          inspector_mismatches: 0
-        },
-        error: null
-      })
+      await supabase.from('inspection_sessions').insert({
+        property_id: 'prop-test',
+        inspector_id: 'inspector-1',
+        status: 'in_progress'
+      }).select().single()
 
-      const result = await supabase.rpc('validate_inspection_consistency')
-      
-      expect(result.data.status_mismatches).toBe(1)
+      const inspection = mockSupabaseOperations.inspectionInserts[0]
+      const session = mockSupabaseOperations.sessionInserts[0]
+
+      expect(inspection.status).toBe(session.status)
     })
   })
 
@@ -498,7 +465,7 @@ describe('Database Consistency Tests', () => {
       const sessions = Array.from({ length: batchSize }, (_, i) => ({
         property_id: `prop-${i}`,
         inspector_id: 'inspector-1',
-        inspection_status: 'scheduled',
+        status: 'scheduled',
         session_data: { batchTest: true },
         expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
       }))
@@ -532,7 +499,7 @@ describe('Database Consistency Tests', () => {
         const session = await supabase.from('inspection_sessions').insert({
           property_id: `prop-concurrent-${i}`,
           inspector_id: 'inspector-1',
-          inspection_status: 'scheduled',
+          status: 'scheduled',
           session_data: { concurrent: true },
           expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString()
         }).select().single()

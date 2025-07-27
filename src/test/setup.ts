@@ -5,7 +5,7 @@ import { setupServer } from 'msw/node'
 import { http, HttpResponse } from 'msw'
 
 // Mock server for API calls
-export const server = setupServer()
+const server = setupServer()
 
 // Cleanup after each test case (e.g. clearing jsdom)
 afterEach(() => {
@@ -22,5 +22,4 @@ afterAll(() => {
 })
 
 // Global test utilities
-export { server }
-export { expect }
+export { server, expect }

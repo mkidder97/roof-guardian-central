@@ -10,11 +10,16 @@ const mockAuthContext = {
   user: {
     id: 'test-user',
     email: 'test@example.com',
+    app_metadata: {},
+    aud: 'authenticated',
+    created_at: '2024-01-01T00:00:00Z',
     user_metadata: {
       first_name: 'Test',
       last_name: 'User'
     }
   },
+  session: null,
+  profile: null,
   userRole: 'inspector' as const,
   loading: false,
   signIn: vi.fn(),
@@ -51,7 +56,7 @@ function customRender(
 }
 
 // Mock toast hook
-export const mockToast = vi.fn()
+const mockToast = vi.fn()
 vi.mock('@/hooks/use-toast', () => ({
   useToast: () => ({
     toast: mockToast
@@ -59,7 +64,7 @@ vi.mock('@/hooks/use-toast', () => ({
 }))
 
 // Mock navigation
-export const mockNavigate = vi.fn()
+const mockNavigate = vi.fn()
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom')
   return {

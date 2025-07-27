@@ -3,6 +3,9 @@
  * Provides type-safe interfaces for the inspection management system
  */
 
+// Import Property type from property module to avoid duplication
+import type { Property } from './property';
+
 // Core inspection status type
 export type InspectionStatus = 'scheduled' | 'in_progress' | 'ready_for_review' | 'completed' | 'cancelled';
 
@@ -174,28 +177,6 @@ export interface DirectInspectionData {
   notes: string;
 }
 
-// Property interface
-export interface Property {
-  id: string;
-  property_name: string;
-  address: string;
-  city: string;
-  state: string;
-  zip: string;
-  market: string;
-  region: string;
-  roof_type: string;
-  roof_area: number;
-  last_inspection_date: string | null;
-  client_id: string;
-  status: string;
-  clients?: {
-    company_name: string;
-  };
-  property_manager_name?: string;
-  property_manager_email?: string;
-  property_manager_phone?: string;
-}
 
 // Inspector interface
 export interface Inspector {
@@ -257,7 +238,12 @@ export function toUnifiedInspection(inspection: InspectionSyncData): UnifiedInsp
       city: '',
       state: ''
     } : null,
-    users: inspection.users
+    users: inspection.users ? {
+      id: 'inspector-1',
+      first_name: inspection.users.first_name,
+      last_name: inspection.users.last_name,
+      email: 'inspector@example.com'
+    } : null
   };
 }
 

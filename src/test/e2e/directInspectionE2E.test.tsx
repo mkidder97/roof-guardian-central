@@ -101,10 +101,10 @@ vi.mock('@/integrations/supabase/client', () => ({
             }
           }),
           update: vi.fn().mockImplementation((data) => {
-            if (data.inspection_status) {
+            if (data.status) {
               e2eState.statusUpdates.push({
                 table: 'inspection_sessions',
-                status: data.inspection_status,
+                status: data.status,
                 timestamp: new Date().toISOString()
               })
             }
@@ -257,7 +257,7 @@ describe('Direct Inspection End-to-End Tests', () => {
 
       expect(createdSession.property_id).toBe('prop-1')
       expect(createdSession.inspector_id).toBe('inspector-1')
-      expect(createdSession.inspection_status).toBe('scheduled')
+      expect(createdSession.status).toBe('scheduled')
       expect(createdSession.session_data.notes).toBe('E2E test inspection')
 
       // Step 7: Switch to dashboard view and verify inspection appears
@@ -314,7 +314,7 @@ describe('Direct Inspection End-to-End Tests', () => {
 
       // Start inspection
       await supabase.from('inspections').update({ status: 'in_progress' }).eq('id', 'e2e-inspection-1')
-      await supabase.from('inspection_sessions').update({ inspection_status: 'in_progress' }).eq('property_id', 'prop-1')
+      await supabase.from('inspection_sessions').update({ status: 'in_progress' }).eq('property_id', 'prop-1')
 
       expect(e2eState.statusUpdates).toContainEqual({
         table: 'inspections',
@@ -330,7 +330,7 @@ describe('Direct Inspection End-to-End Tests', () => {
 
       // Complete inspection
       await supabase.from('inspections').update({ status: 'completed' }).eq('id', 'e2e-inspection-1')
-      await supabase.from('inspection_sessions').update({ inspection_status: 'completed' }).eq('property_id', 'prop-1')
+      await supabase.from('inspection_sessions').update({ status: 'completed' }).eq('property_id', 'prop-1')
 
       // Verify final status
       expect(e2eState.statusUpdates.filter(u => u.status === 'completed')).toHaveLength(2)
@@ -493,7 +493,7 @@ describe('Direct Inspection End-to-End Tests', () => {
         id: 'integration-session-1',
         property_id: 'prop-1',
         inspector_id: 'inspector-1',
-        inspection_status: 'scheduled',
+        status: 'scheduled',
         session_data: { integrationTest: true },
         created_at: new Date().toISOString()
       })
@@ -517,7 +517,7 @@ describe('Direct Inspection End-to-End Tests', () => {
       const { supabase } = await import('@/integrations/supabase/client')
       
       await supabase.from('inspections').update({ status: 'in_progress' }).eq('id', 'integration-test-1')
-      await supabase.from('inspection_sessions').update({ inspection_status: 'in_progress' }).eq('id', 'integration-session-1')
+      await supabase.from('inspection_sessions').update({ status: 'in_progress' }).eq('id', 'integration-session-1')
 
       // Verify status updates were tracked
       expect(e2eState.statusUpdates).toContainEqual({

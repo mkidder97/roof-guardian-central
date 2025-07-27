@@ -440,9 +440,9 @@ describe('Direct Mode Integration Tests', () => {
         expect(screen.getByText('Selected Property')).toBeInTheDocument()
         const detailsCard = screen.getByText('Selected Property').closest('.bg-blue-50')
         
-        expect(within(detailsCard!).getByText(/Property 0/)).toBeInTheDocument()
-        expect(within(detailsCard!).getByText(/100 Main St/)).toBeInTheDocument()
-        expect(within(detailsCard!).getByText(/10,000 sq ft/)).toBeInTheDocument()
+        expect(within(detailsCard! as HTMLElement).getByText(/Property 0/)).toBeInTheDocument()
+        expect(within(detailsCard! as HTMLElement).getByText(/100 Main St/)).toBeInTheDocument()
+        expect(within(detailsCard! as HTMLElement).getByText(/10,000 sq ft/)).toBeInTheDocument()
       })
     })
 

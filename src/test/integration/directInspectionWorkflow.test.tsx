@@ -165,7 +165,7 @@ describe('Direct Inspection Workflow Integration Tests', () => {
       expect(mockSupabaseOperations.insertInspectionSession).toHaveBeenCalledWith({
         property_id: 'prop-1',
         inspector_id: 'inspector-1',
-        inspection_status: 'scheduled',
+        status: 'scheduled',
         session_data: expect.objectContaining({
           inspectionType: 'routine',
           priority: 'medium',
@@ -278,7 +278,7 @@ describe('Direct Inspection Workflow Integration Tests', () => {
 
         expect(inspectionCall.roof_id).toBe(sessionCall.property_id)
         expect(inspectionCall.inspector_id).toBe(sessionCall.inspector_id)
-        expect(sessionCall.inspection_status).toBe('scheduled')
+        expect(sessionCall.status).toBe('scheduled')
       })
     })
 
@@ -313,7 +313,7 @@ describe('Direct Inspection Workflow Integration Tests', () => {
         const sessionData = mockSupabaseOperations.insertInspectionSession.mock.calls[0][0]
 
         expect(inspectionData.status).toBe('scheduled')
-        expect(sessionData.inspection_status).toBe('scheduled')
+        expect(sessionData.status).toBe('scheduled')
       })
     })
   })
@@ -338,7 +338,7 @@ describe('Direct Inspection Workflow Integration Tests', () => {
           last_name: 'Kidder'
         },
         inspection_sessions: [{
-          inspection_status: 'scheduled'
+          status: 'scheduled'
         }]
       }
 

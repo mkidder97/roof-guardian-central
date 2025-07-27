@@ -422,7 +422,7 @@ describe('Direct Mode Filter Components', () => {
 
       // Navigate to last page
       const nextButton = screen.getByRole('button', { name: /next/i })
-      while (!nextButton.disabled) {
+      while (!(nextButton as HTMLButtonElement).disabled) {
         await user.click(nextButton)
         await waitFor(() => {
           expect(screen.getByText(/page \d+ of/i)).toBeInTheDocument()

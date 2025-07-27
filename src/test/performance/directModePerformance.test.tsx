@@ -487,7 +487,7 @@ describe('Direct Mode Performance Tests', () => {
       for (let page = 1; page <= 5; page++) {
         if (page > 1) {
           const nextButton = screen.getByRole('button', { name: /next/i })
-          if (!nextButton.disabled) {
+          if (!(nextButton as HTMLButtonElement).disabled) {
             await user.click(nextButton)
             await waitFor(() => {
               expect(screen.getByText(`Page ${page} of`)).toBeInTheDocument()
