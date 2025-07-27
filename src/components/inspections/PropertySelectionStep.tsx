@@ -46,7 +46,7 @@ export function PropertySelectionStep({
 
   const [properties, setProperties] = useState<Property[]>([]);
   const [filteredProperties, setFilteredProperties] = useState<Property[]>([]);
-  const [selectedProperty, setSelectedProperty] = useState<Property | null>(null);
+  const [selectedProperties, setSelectedProperties] = useState<Property[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [zipFilter, setZipFilter] = useState('');
   const [cityFilter, setCityFilter] = useState('');
@@ -126,42 +126,67 @@ export function PropertySelectionStep({
     setFilteredProperties(filtered);
   }, [properties, searchTerm, zipFilter, cityFilter]);
 
+  const handleSelectAll = () => {
+    setSelectedProperties([...filteredProperties]);
+  };
+
+  const handleDeselectAll = () => {
+    setSelectedProperties([]);
+  };
+
+  const handlePropertyToggle = (property: Property) => {
+    setSelectedProperties(prev => {
+      const isSelected = prev.some(p => p.id === property.id);
+      if (isSelected) {
+        return prev.filter(p => p.id !== property.id);
+      } else {
+        return [...prev, property];
+      }
+    });
+  };
+
   const handleScheduleInspection = async () => {
-    if (!selectedProperty) return;
+    if (selectedProperties.length === 0) return;
 
     try {
       setIsCreatingInspection(true);
       
-      // Create inspection record
-      const { data: inspection, error } = await supabase
-        .from('inspections')
-        .insert({
-          roof_id: selectedProperty.id,
-          inspector_id: setupData.inspectorId,
-          scheduled_date: setupData.scheduledDate,
-          scheduled_time: setupData.scheduledTime,
-          priority: setupData.priority,
-          inspection_type: setupData.inspectionType,
-          status: 'scheduled',
-          notes: setupData.notes
-        })
-        .select()
-        .single();
+      // Create inspection records for all selected properties
+      const inspectionPromises = selectedProperties.map(property => 
+        supabase
+          .from('inspections')
+          .insert({
+            roof_id: property.id,
+            inspector_id: setupData.inspectorId,
+            scheduled_date: setupData.scheduledDate,
+            scheduled_time: setupData.scheduledTime,
+            priority: setupData.priority,
+            inspection_type: setupData.inspectionType,
+            status: 'scheduled',
+            notes: setupData.notes
+          })
+      );
 
-      if (error) throw error;
+      const results = await Promise.all(inspectionPromises);
+      
+      // Check for errors
+      const errors = results.filter(result => result.error);
+      if (errors.length > 0) {
+        throw new Error(`Failed to schedule ${errors.length} inspections`);
+      }
 
       toast({
-        title: "Inspection Scheduled",
-        description: `Direct inspection scheduled for ${selectedProperty.property_name} on ${setupData.scheduledDate}`,
+        title: "Inspections Scheduled",
+        description: `${selectedProperties.length} inspection${selectedProperties.length > 1 ? 's' : ''} scheduled for ${setupData.scheduledDate}`,
       });
 
       onInspectionScheduled();
       
     } catch (error) {
-      console.error('Error scheduling inspection:', error);
+      console.error('Error scheduling inspections:', error);
       toast({
         title: "Error",
-        description: "Failed to schedule inspection. Please try again.",
+        description: "Failed to schedule some inspections. Please try again.",
         variant: "destructive"
       });
     } finally {
@@ -260,49 +285,81 @@ export function PropertySelectionStep({
           {/* Property List */}
           <Card className="flex-1 min-h-0">
             <CardHeader className="pb-3">
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Building className="h-5 w-5" />
-                Select Property ({filteredProperties.length} found)
-              </CardTitle>
+              <div className="flex justify-between items-center">
+                <CardTitle className="text-lg flex items-center gap-2">
+                  <Building className="h-5 w-5" />
+                  Select Properties ({selectedProperties.length} of {filteredProperties.length} selected)
+                </CardTitle>
+                <div className="flex gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={handleSelectAll}
+                    disabled={filteredProperties.length === 0 || selectedProperties.length === filteredProperties.length}
+                  >
+                    Select All
+                  </Button>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={handleDeselectAll}
+                    disabled={selectedProperties.length === 0}
+                  >
+                    Clear All
+                  </Button>
+                </div>
+              </div>
             </CardHeader>
             <CardContent className="p-0 flex-1">
-              <ScrollArea className="h-80">
+              <ScrollArea className="h-[400px]">
                 <div className="p-4 space-y-2">
                   {loading ? (
                     <p className="text-center text-muted-foreground py-8">Loading properties...</p>
                   ) : filteredProperties.length === 0 ? (
                     <p className="text-center text-muted-foreground py-8">No properties found</p>
                   ) : (
-                    filteredProperties.map((property) => (
-                      <Card
-                        key={property.id}
-                        className={cn(
-                          "cursor-pointer transition-colors hover:bg-muted/50",
-                          selectedProperty?.id === property.id && "ring-2 ring-primary bg-muted"
-                        )}
-                        onClick={() => setSelectedProperty(property)}
-                      >
-                        <CardContent className="p-4">
-                          <div className="flex justify-between items-start">
-                          <div className="space-y-1">
-                              <h4 className="font-medium">{property.property_name}</h4>
-                              <p className="text-sm text-muted-foreground flex items-center gap-1">
-                                <MapPin className="h-3 w-3" />
-                                {property.address}, {property.city}, {property.state} {property.zip}
-                              </p>
-                              {property.roof_area && (
-                                <p className="text-sm text-muted-foreground">
-                                  {property.roof_area.toLocaleString()} sq ft
+                    filteredProperties.map((property) => {
+                      const isSelected = selectedProperties.some(p => p.id === property.id);
+                      return (
+                        <Card
+                          key={property.id}
+                          className={cn(
+                            "cursor-pointer transition-colors hover:bg-muted/50",
+                            isSelected && "ring-2 ring-primary bg-muted"
+                          )}
+                          onClick={() => handlePropertyToggle(property)}
+                        >
+                          <CardContent className="p-4">
+                            <div className="flex justify-between items-start">
+                              <div className="space-y-1 flex-1">
+                                <div className="flex items-center gap-2">
+                                  <input
+                                    type="checkbox"
+                                    checked={isSelected}
+                                    onChange={() => handlePropertyToggle(property)}
+                                    className="rounded border-border"
+                                    onClick={(e) => e.stopPropagation()}
+                                  />
+                                  <h4 className="font-medium">{property.property_name}</h4>
+                                </div>
+                                <p className="text-sm text-muted-foreground flex items-center gap-1 ml-6">
+                                  <MapPin className="h-3 w-3" />
+                                  {property.address}, {property.city}, {property.state} {property.zip}
                                 </p>
+                                {property.roof_area && (
+                                  <p className="text-sm text-muted-foreground ml-6">
+                                    {property.roof_area.toLocaleString()} sq ft
+                                  </p>
+                                )}
+                              </div>
+                              {isSelected && (
+                                <CheckCircle className="h-5 w-5 text-primary flex-shrink-0" />
                               )}
                             </div>
-                            {selectedProperty?.id === property.id && (
-                              <CheckCircle className="h-5 w-5 text-primary" />
-                            )}
-                          </div>
-                        </CardContent>
-                      </Card>
-                    ))
+                          </CardContent>
+                        </Card>
+                      );
+                    })
                   )}
                 </div>
               </ScrollArea>
@@ -318,9 +375,12 @@ export function PropertySelectionStep({
             
             <Button 
               onClick={handleScheduleInspection}
-              disabled={!selectedProperty || isCreatingInspection}
+              disabled={selectedProperties.length === 0 || isCreatingInspection}
             >
-              {isCreatingInspection ? 'Scheduling...' : 'Schedule Inspection'}
+              {isCreatingInspection 
+                ? 'Scheduling...' 
+                : `Schedule ${selectedProperties.length} Inspection${selectedProperties.length > 1 ? 's' : ''}`
+              }
             </Button>
           </div>
         </div>
