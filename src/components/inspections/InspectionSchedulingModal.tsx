@@ -31,27 +31,8 @@ let useAutoRecovery = null;
 let ErrorBoundary = null;
 let monitoringService = null;
 
-try {
-  // Only import monitoring components if React context is available
-  const performanceModule = require('@/hooks/usePerformanceMonitor');
-  usePerformanceMonitor = performanceModule.usePerformanceMonitor;
-  useOperationTimer = performanceModule.useOperationTimer;
-  
-  const healthModule = require('@/components/monitoring/ComponentHealthMonitor');
-  ComponentHealthMonitor = healthModule.ComponentHealthMonitor;
-  useHealthReporting = healthModule.useHealthReporting;
-  
-  const recoveryModule = require('@/components/monitoring/AutoRecoverySystem');
-  useAutoRecovery = recoveryModule.useAutoRecovery;
-  
-  const errorModule = require('@/components/monitoring/ErrorBoundary');
-  ErrorBoundary = errorModule.ErrorBoundary;
-  
-  const monitoringModule = require('@/components/monitoring/MonitoringService');
-  monitoringService = monitoringModule.monitoringService;
-} catch (error) {
-  console.warn('Monitoring modules failed to load, running without monitoring:', error);
-}
+// Monitoring modules disabled to prevent runtime errors
+console.log('🔍 DEBUG: Monitoring modules disabled for debugging')
 
 interface Property {
   id: string;
@@ -1424,6 +1405,8 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
 
               {directInspectionMode ? (
                 <>
+                {console.log('🔍 DEBUG: Rendering Direct Mode. directInspectionMode =', directInspectionMode)}
+                {console.log('🔍 DEBUG: directInspectionData =', directInspectionData)}
                 {/* Direct Mode Filter Card */}
                 <Card>
                   <CardHeader className="pb-2">
@@ -1616,6 +1599,12 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                   </CardContent>
                 </Card>
 
+                {/* DEBUG MARKER - FORM SHOULD START HERE */}
+                <div style={{border: '3px solid red', padding: '5px', margin: '5px', backgroundColor: 'yellow', color: 'black'}}>
+                  🚨 DEBUG: Form rendering checkpoint reached
+                </div>
+                {console.log('🔍 FORM CHECKPOINT: About to render Inspection Details card')}
+                
                 {/* Direct Inspection Form - Always visible in Direct Mode */}
                 <Card>
                   <CardHeader>
