@@ -59,16 +59,13 @@ export class PropertyQueryBuilder {
    * Log query performance metrics
    */
   private async logPerformance(metrics: QueryPerformanceMetrics): Promise<void> {
-    try {
-      await supabase.from('query_performance_log').insert({
-        query_type: metrics.queryType,
-        filters: metrics.filters,
-        execution_time_ms: metrics.executionTimeMs,
-        row_count: metrics.rowCount
-      });
-    } catch (error) {
-      console.error('Failed to log query performance:', error);
-    }
+    // Mock performance logging since table doesn't exist yet
+    console.log('Query Performance:', {
+      type: metrics.queryType,
+      time: `${metrics.executionTimeMs.toFixed(2)}ms`,
+      rows: metrics.rowCount,
+      filters: metrics.filters
+    });
   }
 
   /**
@@ -93,22 +90,55 @@ export class PropertyQueryBuilder {
     }
 
     try {
-      // Use the optimized stored function for complex queries
+      // Use direct query since RPC functions don't exist yet
       if (filters.searchTerm || filters.zipcodes?.length) {
-        const { data, error } = await supabase.rpc('search_properties', {
-          p_search_term: filters.searchTerm || null,
-          p_region: filters.region === 'all' ? null : filters.region,
-          p_market: filters.market === 'all' ? null : filters.market,
-          p_zipcodes: filters.zipcodes?.length ? filters.zipcodes : null,
-          p_client_id: filters.clientId === 'all' ? null : filters.clientId,
-          p_limit: filters.limit || 50,
-          p_offset: filters.offset || 0
-        });
+        // Build search query manually
+        let query = supabase
+          .from('roofs')
+          .select(`
+            id, property_name, address, city, state, zip, market, region,
+            roof_type, roof_area, last_inspection_date, site_contact_name,
+            site_contact_phone, roof_access, latitude, longitude,
+            manufacturer_warranty_expiration, installer_warranty_expiration,
+            client_id, status, property_manager_name, property_manager_email,
+            property_manager_phone, clients!inner(company_name),
+            property_contact_assignments!left(
+              assignment_type, is_active,
+              client_contacts!left(id, first_name, last_name, email, office_phone, mobile_phone, role, title)
+            )
+          `, { count: 'exact' })
+          .eq('status', 'active')
+          .eq('is_deleted', false);
+
+        if (filters.searchTerm) {
+          query = query.or(`property_name.ilike.%${filters.searchTerm}%,address.ilike.%${filters.searchTerm}%`);
+        }
+        if (filters.region && filters.region !== 'all') {
+          query = query.eq('region', filters.region);
+        }
+        if (filters.market && filters.market !== 'all') {
+          query = query.eq('market', filters.market);
+        }
+        if (filters.zipcodes?.length) {
+          query = query.in('zip', filters.zipcodes);
+        }
+        if (filters.clientId && filters.clientId !== 'all') {
+          query = query.eq('client_id', filters.clientId);
+        }
+
+        if (filters.limit) {
+          query = query.limit(filters.limit);
+        }
+        if (filters.offset) {
+          query = query.range(filters.offset, filters.offset + (filters.limit || 50) - 1);
+        }
+
+        const { data, error, count } = await query;
 
         if (error) throw error;
 
         const properties = this.transformProperties(data || []);
-        const totalCount = data?.[0]?.total_count || 0;
+        const totalCount = count || 0;
 
         // Cache the results
         this.cache.set(cacheKey, {
@@ -242,15 +272,40 @@ export class PropertyQueryBuilder {
     clientId?: string;
   }): Promise<Array<{ zipcode: string; propertyCount: number }>> {
     try {
-      const { data, error } = await supabase.rpc('get_available_zipcodes', {
-        p_region: filters.region === 'all' ? null : filters.region,
-        p_market: filters.market === 'all' ? null : filters.market,
-        p_client_id: filters.clientId === 'all' ? null : filters.clientId
-      });
+      // Manual query since RPC doesn't exist yet
+      let query = supabase
+        .from('roofs')
+        .select('zip')
+        .eq('status', 'active')
+        .eq('is_deleted', false)
+        .not('zip', 'is', null);
+
+      if (filters.region && filters.region !== 'all') {
+        query = query.eq('region', filters.region);
+      }
+      if (filters.market && filters.market !== 'all') {
+        query = query.eq('market', filters.market);
+      }
+      if (filters.clientId && filters.clientId !== 'all') {
+        query = query.eq('client_id', filters.clientId);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
 
-      return data || [];
+      // Group by zipcode and count
+      const zipcodeCounts = (data || []).reduce((acc: Record<string, number>, item: any) => {
+        if (item.zip) {
+          acc[item.zip] = (acc[item.zip] || 0) + 1;
+        }
+        return acc;
+      }, {});
+
+      return Object.entries(zipcodeCounts).map(([zipcode, propertyCount]) => ({
+        zipcode,
+        propertyCount
+      }));
     } catch (error) {
       console.error('Error fetching available zipcodes:', error);
       return [];
@@ -268,15 +323,42 @@ export class PropertyQueryBuilder {
     uniqueManagers: number;
   }>> {
     try {
+      // Manual query since materialized view doesn't exist yet
       const { data, error } = await supabase
-        .from('mv_region_market_stats')
-        .select('*')
-        .order('region')
-        .order('market');
+        .from('roofs')
+        .select('region, market, zip, property_manager_name')
+        .eq('status', 'active')
+        .eq('is_deleted', false)
+        .not('region', 'is', null)
+        .not('market', 'is', null);
 
       if (error) throw error;
 
-      return data || [];
+      // Group and aggregate data manually
+      const stats = (data || []).reduce((acc: Record<string, any>, item: any) => {
+        const key = `${item.region}-${item.market}`;
+        if (!acc[key]) {
+          acc[key] = {
+            region: item.region,
+            market: item.market,
+            propertyCount: 0,
+            zipcodes: new Set(),
+            managers: new Set()
+          };
+        }
+        acc[key].propertyCount++;
+        if (item.zip) acc[key].zipcodes.add(item.zip);
+        if (item.property_manager_name) acc[key].managers.add(item.property_manager_name);
+        return acc;
+      }, {});
+
+      return Object.values(stats).map((stat: any) => ({
+        region: stat.region,
+        market: stat.market,
+        propertyCount: stat.propertyCount,
+        uniqueZipcodes: stat.zipcodes.size,
+        uniqueManagers: stat.managers.size
+      }));
     } catch (error) {
       console.error('Error fetching region/market stats:', error);
       return [];

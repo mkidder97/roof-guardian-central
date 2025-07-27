@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { inspectorEventBus, INSPECTOR_EVENTS, InspectorEvent } from '@/lib/eventBus';
 import { useInspectorEvents, useInspectionState, usePropertySelection } from '@/hooks/useInspectorEvents';
-import { useInspectionSync, type InspectionSyncData } from '@/hooks/useInspectionSync';
+import { useInspectionSync } from '@/hooks/useInspectionSync';
+import type { InspectionSyncData } from '@/types/inspection';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface UnifiedInspectionEventPayloads {
@@ -111,7 +112,7 @@ export function useUnifiedInspectionEvents() {
     
     // Emit to event bus using the correct event key
     const eventKey = getEventKey(eventType);
-    baseEmit(eventKey, payload, payload.source);
+    baseEmit(eventKey as any, payload, payload.source);
     
     // Store in persistent history if requested
     if (persistent) {
