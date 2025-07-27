@@ -196,7 +196,7 @@ export function PropertySelectionStep({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] w-full h-[95vh] flex flex-col p-6">
+      <DialogContent className="max-w-[95vw] w-full h-[90vh] flex flex-col p-6">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CheckCircle className="h-5 w-5 text-primary" />
@@ -311,7 +311,7 @@ export function PropertySelectionStep({
               </div>
             </CardHeader>
             <CardContent className="p-0 flex-1">
-              <ScrollArea className="h-[50vh]">
+              <ScrollArea className="h-[40vh]">
                 <div className="p-4 space-y-2">
                   {loading ? (
                     <p className="text-center text-muted-foreground py-8">Loading properties...</p>
@@ -367,7 +367,7 @@ export function PropertySelectionStep({
           </Card>
 
           {/* Actions */}
-          <div className="flex justify-between items-center pt-6 mt-auto border-t bg-background">
+          <div className="flex justify-between items-center pt-6 mt-4 border-t bg-background flex-shrink-0">
             <Button 
               variant="outline" 
               onClick={onBack} 
