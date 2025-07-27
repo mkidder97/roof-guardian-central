@@ -37,6 +37,7 @@ import { CampaignTracker } from "@/components/dashboard/CampaignTracker";
 import { WorkOrdersTab } from "@/components/dashboard/WorkOrdersTab";
 import { HistoricalInspectionUploader } from "@/components/admin/HistoricalInspectionUploader";
 import { AccountsTab } from "@/components/dashboard/AccountsTab";
+import { InspectionSchedulingModal } from "@/components/inspections/InspectionSchedulingModal";
 
 interface DashboardStats {
   totalProperties: number;
@@ -64,6 +65,9 @@ export function UnifiedDashboard() {
 
   // Command palette
   const { open: commandPaletteOpen, setOpen: setCommandPaletteOpen } = useCommandPalette();
+  
+  // Inspection scheduling modal
+  const [inspectionModalOpen, setInspectionModalOpen] = useState(false);
 
   // Load dashboard statistics
   useEffect(() => {
@@ -140,7 +144,7 @@ export function UnifiedDashboard() {
       case 'properties':
         return <RoofsTab />;
       case 'inspections':
-        return <InspectionsTab />;
+        return <InspectionsTab onOpenSchedulingModal={() => setInspectionModalOpen(true)} />;
       case 'campaigns':
         return <CampaignTracker />;
       case 'work-orders':
@@ -272,8 +276,8 @@ export function UnifiedDashboard() {
         onOpenChange={setCommandPaletteOpen}
         onNavigate={handleTabChange}
         onCreateInspection={() => {
-          // Handle create inspection
-          console.log('Create inspection');
+          setInspectionModalOpen(true);
+          setCommandPaletteOpen(false);
         }}
         onCreateWorkOrder={() => {
           // Handle create work order
@@ -283,6 +287,12 @@ export function UnifiedDashboard() {
           // Handle create campaign
           console.log('Create campaign');
         }}
+      />
+      
+      {/* Inspection Scheduling Modal */}
+      <InspectionSchedulingModal
+        open={inspectionModalOpen}
+        onOpenChange={setInspectionModalOpen}
       />
     </div>
   );

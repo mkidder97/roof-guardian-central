@@ -10,7 +10,11 @@ import { format } from 'date-fns';
 import { useInspectionSync } from '@/hooks/useInspectionSync';
 import type { InspectionSyncData, InspectionStatus } from '@/types/inspection';
 
-export function InspectionsTab() {
+interface InspectionsTabProps {
+  onOpenSchedulingModal?: () => void;
+}
+
+export function InspectionsTab({ onOpenSchedulingModal }: InspectionsTabProps) {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -222,10 +226,18 @@ export function InspectionsTab() {
         <CardHeader>
           <CardTitle className="flex items-center justify-between">
             <span>All Inspections</span>
-            <Button variant="outline" size="sm" onClick={() => refresh()} disabled={loading}>
-              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-              Refresh
-            </Button>
+            <div className="flex items-center gap-2">
+              {onOpenSchedulingModal && (
+                <Button variant="default" size="sm" onClick={onOpenSchedulingModal}>
+                  <Calendar className="h-4 w-4 mr-2" />
+                  Schedule Inspections
+                </Button>
+              )}
+              <Button variant="outline" size="sm" onClick={() => refresh()} disabled={loading}>
+                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+                Refresh
+              </Button>
+            </div>
           </CardTitle>
         </CardHeader>
         <CardContent>
