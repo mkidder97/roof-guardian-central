@@ -4,6 +4,7 @@ import { BrowserRouter } from 'react-router-dom'
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { vi } from 'vitest'
 import { AuthContext } from '@/contexts/AuthContext'
+import { TooltipProvider } from '@/components/ui/tooltip'
 
 // Mock auth context
 const mockAuthContext = {
@@ -45,7 +46,9 @@ function customRender(
       <BrowserRouter>
         <QueryClientProvider client={queryClient}>
           <AuthContext.Provider value={mockAuthContext}>
-            {children}
+            <TooltipProvider>
+              {children}
+            </TooltipProvider>
           </AuthContext.Provider>
         </QueryClientProvider>
       </BrowserRouter>
