@@ -1,298 +1,392 @@
-# Direct Inspection Workflow Test Suite
+# Direct Inspection Mode Test Suite
 
-This directory contains comprehensive tests for the direct inspection scheduling workflow feature. The test suite ensures that the feature works correctly across all areas of the software.
+This document describes the comprehensive test suite for the Direct Inspection Mode filtering and selection system.
 
-## Test Overview
+## Overview
 
-The test suite validates the entire direct inspection workflow including:
-- Modal-based inspection creation
-- Database consistency between `inspections` and `inspection_sessions` tables
-- Status transitions and synchronization
-- Display in both main dashboard and inspector interface
-- Error handling and edge cases
+The Direct Mode test suite ensures that the Direct Inspection Mode works exactly like Campaign Mode while providing proper single-property selection functionality. The tests cover unit testing, integration testing, performance testing, and end-to-end workflows.
 
 ## Test Structure
 
-```
-src/test/
-├── setup.ts                           # Global test setup and configuration
-├── mocks/
-│   └── supabase.ts                    # Mock data and Supabase client
-├── utils/
-│   └── test-utils.tsx                 # Custom render functions and utilities
-├── integration/
-│   ├── directInspectionWorkflow.test.tsx    # Integration tests for direct inspection creation
-│   └── statusTransitions.test.tsx           # Status transition integration tests
-├── e2e/
-│   └── directInspectionE2E.test.tsx         # End-to-end workflow tests
-└── database/
-    └── consistency.test.ts                  # Database consistency validation tests
+### 1. Unit Tests (`unit/directModeFilters.test.tsx`)
 
-components/
-├── inspections/__tests__/
-│   └── InspectionSchedulingModal.test.tsx   # Unit tests for scheduling modal
-├── dashboard/__tests__/
-│   └── InspectionsTab.test.tsx              # Unit tests for dashboard display
-└── pages/__tests__/
-    └── InspectorInterface.test.tsx          # Unit tests for inspector interface
-```
+Tests individual components and their isolated functionality:
 
-## Test Categories
+- **Filter Dropdown Components**
+  - Region, Market, Inspection Type, Zipcode dropdowns
+  - Default value initialization
+  - Filter value updates and validation
 
-### 1. Unit Tests
-- **InspectionSchedulingModal**: Tests the direct inspection creation modal
-- **InspectionsTab**: Tests inspection display in the main dashboard
-- **InspectorInterface**: Tests inspection display in the inspector interface
+- **Property Search Functionality**
+  - Multi-field search (name, address, city, manager)
+  - Case-insensitive search
+  - Real-time filtering
+  - Empty state handling
 
-### 2. Integration Tests
-- **Direct Inspection Workflow**: Tests the complete flow from creation to database storage
-- **Status Transitions**: Tests status changes and synchronization between tables
+- **Single Property Selection**
+  - Radio button behavior (single selection)
+  - Visual selection indicators
+  - Property details population
+  - Selection clearing
 
-### 3. Database Consistency Tests
-- Tests data integrity between `inspections` and `inspection_sessions` tables
-- Validates foreign key relationships and status synchronization
-- Tests cascade operations and constraint enforcement
+- **Pagination Controls**
+  - Page navigation
+  - Boundary conditions
+  - Page size handling
+  - State persistence
 
-### 4. End-to-End Tests
-- Complete workflow validation from UI interaction to database storage
-- Cross-component integration testing
-- Error handling and recovery scenarios
+- **Property List Rendering**
+  - Property detail display
+  - Inspection date formatting
+  - Contact information display
+  - Property metrics
 
-## Key Test Scenarios
+### 2. Integration Tests (`integration/directModeIntegration.test.tsx`)
 
-### Direct Inspection Creation
-- ✅ Modal display and form interaction
-- ✅ Property and inspector selection
-- ✅ Date/time scheduling
-- ✅ Form validation (required fields)
-- ✅ Database record creation
-- ✅ Success/error notifications
+Tests component interactions and data flow:
 
-### Database Consistency
-- ✅ Inspection and session records are created simultaneously
-- ✅ Property ID consistency (`roof_id` = `property_id`)
-- ✅ Inspector ID consistency
-- ✅ Status synchronization
-- ✅ Data integrity validation using RPC functions
+- **Filter Application with Backend Queries**
+  - Multiple filter combinations
+  - API call optimization
+  - Result filtering accuracy
+  - Cache invalidation
 
-### Status Transitions
-- ✅ Valid transition paths: scheduled → in_progress → ready_for_review → completed
-- ✅ Cancellation from any status
-- ✅ Status synchronization between tables
-- ✅ Bulk status operations
-- ✅ Status history tracking
+- **Property Search Across Multiple Fields**
+  - Combined search and filter operations
+  - Search result accuracy
+  - Performance under load
 
-### Dashboard Integration
-- ✅ Inspections appear in main dashboard
-- ✅ Correct status badge display
-- ✅ Priority indicators
-- ✅ Search and filtering functionality
-- ✅ Export capabilities
+- **State Management Between Filter Changes**
+  - Filter state persistence
+  - Selection state management
+  - Search state handling
+  - Pagination state
 
-### Inspector Interface Integration
-- ✅ Inspections appear in assigned inspector's interface
-- ✅ Property selection and briefing generation
-- ✅ Inspection start/completion workflow
-- ✅ Real-time status updates
+- **Property Selection and Form Population**
+  - Property detail extraction
+  - Form field population
+  - Validation handling
+  - Error states
 
-## Running Tests
+- **Cache Functionality and Performance**
+  - Query result caching
+  - Cache invalidation strategies
+  - Memory management
+  - Performance optimization
 
-### All Tests
-```bash
-npm test
-```
+### 3. Comparison Tests (`comparison/directVsCampaignMode.test.tsx`)
 
-### Specific Test Categories
-```bash
-# Unit tests only
-npm run test:unit
+Ensures Direct Mode functionality matches Campaign Mode exactly:
 
-# Integration tests only
-npm run test:integration
+- **Filter Behavior Comparison**
+  - Identical filter results
+  - Same API queries
+  - Consistent performance
+  - Filter independence
 
-# End-to-end tests only
-npm run test:e2e
+- **Property Display Differences**
+  - Multi-select vs single-select
+  - Selection UI differences
+  - Information parity
 
-# Database consistency tests only
-npm run test:database
-```
+- **State Isolation Between Modes**
+  - Independent selections
+  - Separate search terms
+  - Isolated pagination
+  - Mode-specific state
 
-### Feature-Specific Tests
-```bash
-# Direct inspection workflow tests
-npm run test:direct-inspection
+- **Performance Parity**
+  - Load time comparison
+  - Filter performance
+  - Search responsiveness
+  - Memory usage
 
-# Status transition tests
-npm run test:status-transitions
+### 4. User Workflow Tests (`workflow/directInspectionUserFlow.test.tsx`)
 
-# Data consistency tests
-npm run test:consistency
-```
+Tests complete user workflows and scenarios:
 
-### Development Testing
-```bash
-# Watch mode for development
-npm run test:watch
+- **Complete Direct Inspection Creation Workflow**
+  - Filter → Search → Select → Create flow
+  - Inspector assignment
+  - Form validation
+  - Success confirmation
 
-# Test with UI
-npm run test:ui
+- **Error Handling in Workflow**
+  - API error recovery
+  - Validation error display
+  - User feedback
+  - Graceful degradation
 
-# Coverage report
-npm run test:coverage
-```
+- **Form Validation and Edge Cases**
+  - Date validation
+  - Required field validation
+  - Input sanitization
+  - Error messaging
+
+- **Performance During Workflow**
+  - UI responsiveness
+  - Fast user interactions
+  - State consistency
+
+### 5. Performance Tests (`performance/directModePerformance.test.tsx`)
+
+Tests system performance under various conditions:
+
+- **Large Dataset Filtering (288+ properties)**
+  - Load time thresholds
+  - Filter application speed
+  - Search responsiveness
+  - Complex filter combinations
+
+- **Search Performance**
+  - Real-time search response
+  - Rapid typing handling
+  - Large dataset search
+  - Multi-field search optimization
+
+- **Memory Usage During Operations**
+  - Memory leak detection
+  - Efficient pagination
+  - Cache memory management
+  - Garbage collection
+
+- **UI Responsiveness Under Load**
+  - Non-blocking operations
+  - Responsive interactions
+  - Mode switching performance
+  - Error recovery speed
+
+### 6. End-to-End Tests (`e2e/directInspectionE2E.test.tsx`)
+
+Tests complete application workflows:
+
+- **Complete Direct Inspection Lifecycle**
+  - Scheduling to completion
+  - Cross-component integration
+  - Database consistency
+  - Status transitions
+
+- **Error Scenarios and Recovery**
+  - Partial failure handling
+  - Network failure recovery
+  - Data consistency
+  - User error recovery
+
+- **Cross-Component Integration**
+  - Modal to dashboard integration
+  - Inspector interface integration
+  - Data synchronization
+  - Status propagation
 
 ## Test Configuration
 
-### Vitest Configuration
-- **Environment**: jsdom for DOM testing
-- **Setup**: Automatic mock setup and cleanup
-- **Coverage**: v8 provider with HTML reports
-- **Globals**: Enabled for convenience
+### Performance Thresholds
 
-### Mock Strategy
-- **Supabase Client**: Comprehensive mocking with operation tracking
-- **React Router**: Navigation mocking
-- **Toast Notifications**: Interaction tracking
-- **External Services**: Service layer mocking
+```typescript
+performance: {
+  maxLoadTime: 3000,        // 3 seconds for initial load
+  maxFilterTime: 2000,      // 2 seconds for filter application
+  maxSearchTime: 500,       // 500ms for search response
+  maxMemoryIncrease: 50,    // 50% memory increase threshold
+  maxUIResponseTime: 1000   // 1 second for UI responsiveness
+}
+```
 
-### Test Data
-Mock data includes:
-- **Properties**: Sample property records with various configurations
-- **Inspectors**: Sample inspector users with different roles
-- **Inspections**: Sample inspection records in different states
-- **Sessions**: Sample session records with various status configurations
+### Dataset Sizes
 
-## Validation Coverage
+- **Small**: 50 properties (quick tests)
+- **Medium**: 288 properties (realistic production size)
+- **Large**: 1000 properties (stress testing)
+- **XLarge**: 5000 properties (extreme stress testing)
 
-### Frontend Validation
-- ✅ Form field validation
-- ✅ Required field enforcement
-- ✅ Date/time validation
-- ✅ User role permissions
-- ✅ Error message display
+### Test Timeouts
 
-### Backend Validation
-- ✅ Database constraint enforcement
-- ✅ Foreign key integrity
-- ✅ Status transition rules
-- ✅ Data consistency checks
-- ✅ Cascade operations
+- **Unit**: 5 seconds
+- **Integration**: 10 seconds
+- **Workflow**: 15 seconds
+- **Performance**: 30 seconds
+- **E2E**: 60 seconds
 
-### Cross-System Validation
-- ✅ UI state synchronization
-- ✅ Real-time updates
-- ✅ Offline functionality
-- ✅ Error recovery
-- ✅ Performance under load
+## Running Tests
 
-## Error Scenarios Tested
+### All Direct Mode Tests
+```bash
+npm run test:direct-mode
+# or
+vitest run src/test/**/*direct*.test.tsx
+```
 
-### Network/Database Errors
-- ✅ Connection failures
-- ✅ Timeout handling
-- ✅ Partial operation failures
-- ✅ Retry mechanisms
-- ✅ Graceful degradation
+### By Category
+```bash
+# Unit tests
+npm run test:direct-unit
+vitest run src/test/unit/directModeFilters.test.tsx
 
-### Data Validation Errors
-- ✅ Invalid input handling
-- ✅ Missing required fields
-- ✅ Constraint violations
-- ✅ Orphaned record detection
-- ✅ Status inconsistencies
+# Integration tests
+npm run test:direct-integration
+vitest run src/test/integration/directMode*.test.tsx
 
-### User Experience Errors
-- ✅ Permission denied scenarios
-- ✅ Concurrent modification conflicts
-- ✅ Outdated data handling
-- ✅ Session timeout recovery
-- ✅ Browser compatibility issues
+# Comparison tests
+npm run test:direct-comparison
+vitest run src/test/comparison/directVsCampaignMode.test.tsx
 
-## Performance Testing
+# Workflow tests
+npm run test:direct-workflow
+vitest run src/test/workflow/directInspectionUserFlow.test.tsx
 
-### Load Testing
-- ✅ Large dataset handling (100+ inspections)
-- ✅ Concurrent user operations
-- ✅ Bulk operations efficiency
-- ✅ Memory usage optimization
-- ✅ Render performance
+# Performance tests
+npm run test:direct-performance
+vitest run src/test/performance/directModePerformance.test.tsx
 
-### Scalability Testing
-- ✅ Database query optimization
-- ✅ Component re-render minimization
-- ✅ Memory leak prevention
-- ✅ Network request batching
-- ✅ Cache effectiveness
+# End-to-end tests
+npm run test:direct-e2e
+vitest run src/test/e2e/directInspectionE2E.test.tsx
+```
 
-## Accessibility Testing
+### Development Mode
+```bash
+# Watch mode for active development
+npm run test:direct-watch
+vitest src/test/**/*direct*.test.tsx
 
-### Screen Reader Support
-- ✅ ARIA label compliance
-- ✅ Focus management
-- ✅ Keyboard navigation
-- ✅ Status announcements
-- ✅ Error message accessibility
+# Coverage report
+npm run test:direct-coverage
+vitest run --coverage src/test/**/*direct*.test.tsx
+```
 
-### Keyboard Navigation
-- ✅ Tab order consistency
-- ✅ Shortcut functionality
-- ✅ Modal focus trapping
-- ✅ Form navigation
-- ✅ Context-sensitive help
+## Test Data and Mocks
+
+### Mock Data Generation
+
+The test suite uses dynamic mock data generation for realistic testing:
+
+```typescript
+// Generate properties for testing
+const mockProperties = testUtils.createMockProperties(288, {
+  regions: ['Central', 'East', 'West', 'North', 'South'],
+  markets: ['Dallas', 'Houston', 'Austin', 'San Antonio'],
+  zipcodes: ['75001', '75002', '75003', '75004']
+})
+```
+
+### Supabase Mocking
+
+Advanced Supabase mocking that simulates real query behavior:
+
+```typescript
+// Mock with realistic filtering
+vi.mock('@/integrations/supabase/client', () => ({
+  supabase: {
+    from: (table) => ({
+      select: () => queryBuilder,
+      eq: (field, value) => applyFilter(field, value),
+      order: () => executeQuery()
+    })
+  }
+}))
+```
+
+## Test Scenarios
+
+### Filter Scenarios
+- Single region filter
+- Region and market combination
+- Multiple zipcode selection
+- Complex multi-parameter filtering
+
+### Search Scenarios
+- Property name exact match
+- City name search
+- Property manager search
+- Partial address search
+
+### Error Scenarios
+- API failure handling
+- Empty result sets
+- Invalid form data
+- Network timeouts
+
+## Performance Monitoring
+
+### Key Metrics Tracked
+- Initial load time
+- Filter application time
+- Search response time
+- Memory usage patterns
+- UI responsiveness
+
+### Performance Reports
+Tests generate detailed performance reports including:
+- Operation timings
+- Memory usage patterns
+- API call efficiency
+- User interaction responsiveness
+
+## Best Practices
+
+### Writing New Tests
+
+1. **Follow the AAA Pattern**: Arrange, Act, Assert
+2. **Use Descriptive Test Names**: Clearly describe what is being tested
+3. **Mock External Dependencies**: Use consistent mocking patterns
+4. **Test Edge Cases**: Include error conditions and boundary cases
+5. **Measure Performance**: Include timing assertions for critical operations
+
+### Mock Data Guidelines
+
+1. **Realistic Data**: Use data that resembles production
+2. **Consistent Patterns**: Follow established mock data structures
+3. **Scalable Generation**: Use functions to generate large datasets
+4. **Edge Cases**: Include null values, empty strings, and boundary conditions
+
+### Performance Testing
+
+1. **Set Clear Thresholds**: Define acceptable performance limits
+2. **Test Various Loads**: Test with different dataset sizes
+3. **Monitor Memory**: Track memory usage patterns
+4. **Measure Real Operations**: Time actual user interactions
 
 ## Continuous Integration
 
-### Pre-commit Hooks
-Tests are automatically run before commits to ensure:
-- All existing tests pass
-- New code meets coverage requirements
-- No regressions are introduced
-- Code quality standards are maintained
+The test suite is designed to run in CI/CD pipelines with:
 
-### CI/CD Pipeline
-- **Pull Request**: Full test suite execution
-- **Main Branch**: Regression testing and deployment validation
-- **Release**: Comprehensive testing including manual verification
-- **Hotfix**: Critical path testing for urgent fixes
-
-## Test Maintenance
-
-### Regular Updates
-- Mock data kept current with schema changes
-- Test scenarios updated with new features
-- Performance benchmarks adjusted for growth
-- Accessibility standards compliance verification
-
-### Coverage Goals
-- **Unit Tests**: 90%+ coverage
-- **Integration Tests**: All critical paths covered
-- **E2E Tests**: Complete user journeys validated
-- **Database Tests**: All data integrity rules verified
+- **Parallel Execution**: Tests can run in parallel for faster feedback
+- **Retry Logic**: Flaky tests are automatically retried
+- **Performance Regression Detection**: Performance metrics are tracked over time
+- **Coverage Requirements**: Minimum coverage thresholds are enforced
 
 ## Troubleshooting
 
 ### Common Issues
-1. **Mock Data Inconsistency**: Ensure mock data matches current schema
-2. **Test Timeouts**: Increase timeout for complex operations
-3. **Race Conditions**: Use proper waiting mechanisms
-4. **Memory Leaks**: Clean up resources in test teardown
-5. **Flaky Tests**: Identify and fix non-deterministic behavior
 
-### Debugging Tips
-- Use `test:ui` for interactive debugging
-- Add `console.log` statements for state inspection
-- Use `waitFor` for asynchronous operations
-- Check mock function call history
-- Verify test isolation and cleanup
+1. **Timeout Errors**: Increase timeout values for slow operations
+2. **Mock Data Issues**: Verify mock data matches expected format
+3. **Performance Failures**: Check if thresholds need adjustment for CI environment
+4. **Flaky Tests**: Add proper wait conditions and retries
+
+### Debug Mode
+
+Run tests with debug information:
+```bash
+DEBUG=true vitest run src/test/**/*direct*.test.tsx
+```
 
 ## Contributing
 
-When adding new features to the direct inspection workflow:
+When adding new Direct Mode functionality:
 
-1. **Add Unit Tests**: Test individual components and functions
-2. **Add Integration Tests**: Test feature interactions
-3. **Update Mock Data**: Include relevant test data
-4. **Document Changes**: Update this README with new test scenarios
-5. **Verify Coverage**: Ensure adequate test coverage for new code
+1. **Add Unit Tests**: Test individual components
+2. **Add Integration Tests**: Test component interactions
+3. **Update Comparison Tests**: Ensure parity with Campaign Mode
+4. **Add Performance Tests**: Verify performance requirements
+5. **Update Documentation**: Keep this README current
 
-For questions or issues with the test suite, please refer to the project's main documentation or contact the development team.
+## Future Enhancements
+
+Planned test suite improvements:
+
+- **Visual Regression Testing**: Screenshot comparison tests
+- **Accessibility Testing**: Screen reader and keyboard navigation tests
+- **Mobile Responsiveness**: Touch interaction and responsive design tests
+- **Load Testing**: Concurrent user simulation
+- **Cross-Browser Testing**: Multi-browser compatibility validation

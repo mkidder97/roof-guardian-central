@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
 import { Switch } from '@/components/ui/switch';
@@ -88,20 +89,47 @@ const PropertyListItem = memo(({
   isSelected, 
   propertyInspector, 
   selectedInspector, 
-  onPropertySelection 
+  onPropertySelection,
+  singleSelectMode = false,
+  onDirectSelection
 }: {
   property: Property;
   isSelected: boolean;
   propertyInspector?: Inspector;
   selectedInspector: Inspector | null;
-  onPropertySelection: (property: Property, checked: boolean) => void;
+  onPropertySelection?: (property: Property, checked: boolean) => void;
+  singleSelectMode?: boolean;
+  onDirectSelection?: (property: Property) => void;
 }) => {
+  const handleSelectionClick = () => {
+    if (singleSelectMode && onDirectSelection) {
+      onDirectSelection(property);
+    }
+  };
+
   return (
-    <div className="flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50">
-      <Checkbox
-        checked={isSelected}
-        onCheckedChange={(checked) => onPropertySelection(property, checked)}
-      />
+    <div 
+      className={`flex items-center space-x-3 p-3 border rounded-lg hover:bg-gray-50 cursor-pointer ${
+        singleSelectMode && isSelected ? 'border-blue-500 bg-blue-50' : ''
+      }`}
+      onClick={singleSelectMode ? handleSelectionClick : undefined}
+    >
+      {singleSelectMode ? (
+        <div className="w-4 h-4 flex items-center justify-center">
+          <div className={`w-3 h-3 rounded-full border-2 ${
+            isSelected ? 'bg-blue-500 border-blue-500' : 'border-gray-300'
+          }`}>
+            {isSelected && (
+              <div className="w-full h-full bg-white rounded-full scale-50" />
+            )}
+          </div>
+        </div>
+      ) : (
+        <Checkbox
+          checked={isSelected}
+          onCheckedChange={(checked) => onPropertySelection?.(property, checked)}
+        />
+      )}
       <div className="flex-1">
         <div className="font-medium">{property.property_name}</div>
         <div className="text-sm text-gray-600">
@@ -112,7 +140,7 @@ const PropertyListItem = memo(({
         </div>
         
         {/* Inspector Assignment Section */}
-        {isSelected && (
+        {isSelected && !singleSelectMode && (
           <div className="mt-2 p-2 bg-gray-50 rounded text-xs">
             <div className="flex items-center justify-between">
               <span className="text-gray-600">Inspector:</span>
@@ -137,6 +165,11 @@ const PropertyListItem = memo(({
       </div>
       <div className="text-right">
         <div className="text-sm font-medium">{property.roof_area?.toLocaleString() || 'N/A'} sq ft</div>
+        {singleSelectMode && (
+          <div className="text-xs text-gray-500 mt-1">
+            {property.market} • {property.region}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -233,6 +266,14 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     zipcodes: [] as string[]
   });
 
+  // Separate filter state for Direct Mode
+  const [directFilters, setDirectFilters] = useState({
+    region: 'all',
+    market: 'all',
+    inspectionType: 'annual',
+    zipcodes: [] as string[]
+  });
+
   const [workflowProgress, setWorkflowProgress] = useState<WorkflowProgress>({
     isProcessing: false,
     currentCampaign: '',
@@ -259,6 +300,12 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     notes: ''
   });
 
+  // Direct Mode specific state
+  const [directSearchTerm, setDirectSearchTerm] = useState('');
+  const [directCurrentPage, setDirectCurrentPage] = useState(1);
+  const [directProperties, setDirectProperties] = useState<Property[]>([]);
+  const [directLoading, setDirectLoading] = useState(false);
+
   useEffect(() => {
     const handleOnline = () => setIsOnline(true);
     const handleOffline = () => setIsOnline(false);
@@ -282,7 +329,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
 
   // Separate effect for filter changes to avoid duplicate fetches
   useEffect(() => {
-    if (open) {
+    if (open && !directInspectionMode) {
       startTimer('fetchPropertiesWithFilters');
       fetchProperties();
       endTimer('fetchPropertiesWithFilters');
@@ -291,7 +338,20 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
       fetchAvailableZipcodes();
       endTimer('fetchZipcodes');
     }
-  }, [filters.zipcodes, filters.region, filters.market]); // Remove function dependencies
+  }, [filters.zipcodes, filters.region, filters.market, directInspectionMode]); // Remove function dependencies
+
+  // Separate effect for Direct Mode filter changes
+  useEffect(() => {
+    if (open && directInspectionMode) {
+      startTimer('fetchDirectPropertiesWithFilters');
+      fetchDirectProperties();
+      endTimer('fetchDirectPropertiesWithFilters');
+      
+      startTimer('fetchDirectZipcodes');
+      fetchAvailableZipcodes();
+      endTimer('fetchDirectZipcodes');
+    }
+  }, [directFilters.zipcodes, directFilters.region, directFilters.market, directInspectionMode]);
 
   // Memoized filtered properties computation
   const filteredProperties = useMemo(() => {
@@ -310,11 +370,34 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     endTimer('filterProperties');
     return filtered;
   }, [properties, searchTerm, startTimer, endTimer]);
+
+  // Memoized filtered direct properties computation
+  const filteredDirectProperties = useMemo(() => {
+    startTimer('filterDirectProperties');
+    const searchLower = directSearchTerm.toLowerCase();
+    const filtered = directProperties.filter(property => {
+      return (
+        property.property_name.toLowerCase().includes(searchLower) ||
+        property.address.toLowerCase().includes(searchLower) ||
+        property.city.toLowerCase().includes(searchLower) ||
+        property.market.toLowerCase().includes(searchLower) ||
+        property.region.toLowerCase().includes(searchLower) ||
+        (property.property_manager_name && property.property_manager_name.toLowerCase().includes(searchLower))
+      );
+    });
+    endTimer('filterDirectProperties');
+    return filtered;
+  }, [directProperties, directSearchTerm, startTimer, endTimer]);
   
   // Update current page when filtered properties change
   useEffect(() => {
     setCurrentPage(1);
   }, [filteredProperties]);
+
+  // Update direct mode current page when filtered properties change
+  useEffect(() => {
+    setDirectCurrentPage(1);
+  }, [directProperties, directSearchTerm]);
 
   // Set default inspector (Michael Kidder) when inspectors load
   useEffect(() => {
@@ -539,6 +622,106 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     }
   }, [filters.clientId, filters.region, filters.market, filters.zipcodes, propertyCache, toast, processPropertyData]);
 
+  const fetchDirectProperties = useCallback(async () => {
+    const cacheKey = `direct-all-${directFilters.region}-${directFilters.market}-${directFilters.zipcodes.join(',')}`;
+    
+    if (propertyCache.has(cacheKey)) {
+      const cachedProperties = propertyCache.get(cacheKey)!;
+      setDirectProperties(cachedProperties);
+      return;
+    }
+
+    setDirectLoading(true);
+    const apiStartTime = performance.now();
+    console.log('Fetching direct properties with filters:', directFilters);
+    
+    try {
+      let query = supabase
+        .from('roofs')
+        .select(`
+          id,
+          property_name,
+          address,
+          city,
+          state,
+          zip,
+          market,
+          region,
+          roof_type,
+          roof_area,
+          last_inspection_date,
+          site_contact_name,
+          site_contact_phone,
+          roof_access,
+          latitude,
+          longitude,
+          manufacturer_warranty_expiration,
+          installer_warranty_expiration,
+          client_id,
+          status,
+          property_manager_name,
+          property_manager_email,
+          property_manager_phone,
+          clients!inner(company_name),
+          property_contact_assignments!left(
+            assignment_type,
+            is_active,
+            client_contacts!left(
+              id,
+              first_name,
+              last_name,
+              email,
+              office_phone,
+              mobile_phone,
+              role,
+              title
+            )
+          )
+        `)
+        .eq('status', 'active')
+        .neq('is_deleted', true);
+
+      if (directFilters.region !== 'all') {
+        console.log('Filtering by region:', directFilters.region);
+        query = query.eq('region', directFilters.region);
+      }
+      
+      if (directFilters.market !== 'all') {
+        console.log('Filtering by market:', directFilters.market);
+        query = query.eq('market', directFilters.market);
+      }
+      
+      if (directFilters.zipcodes.length > 0) {
+        console.log('Filtering by zipcodes:', directFilters.zipcodes);
+        query = query.in('zip', directFilters.zipcodes);
+      }
+
+      const { data, error } = await query;
+      const apiEndTime = performance.now();
+      const apiDuration = apiEndTime - apiStartTime;
+      
+      console.log('Direct query result:', { data: data?.length || 0, error, duration: `${apiDuration.toFixed(1)}ms` });
+
+      if (error) {
+        throw error;
+      }
+
+      const processedProperties: Property[] = processPropertyData(data || []);
+      setDirectProperties(processedProperties);
+      setPropertyCache(prev => new Map(prev.set(cacheKey, processedProperties)));
+      
+    } catch (error) {
+      console.error('Error fetching direct properties:', error);
+      toast({
+        title: "Error",
+        description: "Failed to fetch properties. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setDirectLoading(false);
+    }
+  }, [directFilters.region, directFilters.market, directFilters.zipcodes, propertyCache, toast, processPropertyData]);
+
   const resetModalState = useCallback(() => {
     setSelectedProperties([]);
     setSearchTerm('');
@@ -554,6 +737,16 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
       inspectionType: 'routine',
       priority: 'medium',
       notes: ''
+    });
+    // Reset Direct Mode state
+    setDirectSearchTerm('');
+    setDirectCurrentPage(1);
+    setDirectProperties([]);
+    setDirectFilters({
+      region: 'all',
+      market: 'all',
+      inspectionType: 'annual',
+      zipcodes: []
     });
     setWorkflowProgress({
       isProcessing: false,
@@ -956,6 +1149,11 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
     }
   }, []);
 
+  // Direct property selection handler for single selection mode
+  const handleDirectPropertySelection = useCallback((property: Property) => {
+    setDirectInspectionData(prev => ({ ...prev, selectedProperty: property }));
+  }, []);
+
   // Memoized pagination computation
   const filteredAndPaginatedProperties = useMemo(() => {
     const totalCount = filteredProperties.length;
@@ -969,6 +1167,20 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
       totalCount
     };
   }, [filteredProperties, currentPage, itemsPerPage]);
+
+  // Memoized direct properties pagination computation
+  const filteredAndPaginatedDirectProperties = useMemo(() => {
+    const totalCount = filteredDirectProperties.length;
+    const totalPages = Math.ceil(totalCount / itemsPerPage);
+    const startIndex = (directCurrentPage - 1) * itemsPerPage;
+    const endIndex = startIndex + itemsPerPage;
+    
+    return {
+      properties: filteredDirectProperties.slice(startIndex, endIndex),
+      totalPages,
+      totalCount
+    };
+  }, [filteredDirectProperties, directCurrentPage, itemsPerPage]);
 
   const handleSelectAll = useCallback(() => {
     if (filteredProperties.length > 100) {
@@ -1105,56 +1317,208 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
               <div className="space-y-4 h-full flex flex-col">
 
               {directInspectionMode ? (
-                // Direct Inspection Form
-                <Card className="flex-1">
+                <>
+                {/* Direct Mode Filter Card */}
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base flex items-center space-x-2">
+                      <Filter className="h-4 w-4" />
+                      <span>Property Filters</span>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-2">
+                    {/* Filter Row Layout */}
+                    <div className="grid grid-cols-1 lg:grid-cols-6 gap-2 items-center">
+                      {/* Property Filters */}
+                      <Select value={directFilters.region} onValueChange={(value) => setDirectFilters(prev => ({ ...prev, region: value }))}>
+                        <SelectTrigger className="h-8">
+                          <SelectValue placeholder="Region" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Regions</SelectItem>
+                          <SelectItem value="Central">Central</SelectItem>
+                          <SelectItem value="East">East</SelectItem>
+                          <SelectItem value="West">West</SelectItem>
+                          <SelectItem value="North">North</SelectItem>
+                          <SelectItem value="South">South</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      <Select value={directFilters.market} onValueChange={(value) => setDirectFilters(prev => ({ ...prev, market: value }))}>
+                        <SelectTrigger className="h-8">
+                          <SelectValue placeholder="Market" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">All Markets</SelectItem>
+                          <SelectItem value="Dallas">Dallas</SelectItem>
+                          <SelectItem value="Houston">Houston</SelectItem>
+                          <SelectItem value="Austin">Austin</SelectItem>
+                          <SelectItem value="San Antonio">San Antonio</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      <Select value={directFilters.inspectionType} onValueChange={(value) => setDirectFilters(prev => ({ ...prev, inspectionType: value }))}>
+                        <SelectTrigger className="h-8">
+                          <SelectValue placeholder="Type" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="annual">Annual</SelectItem>
+                          <SelectItem value="preventative">Preventative</SelectItem>
+                          <SelectItem value="emergency">Emergency</SelectItem>
+                        </SelectContent>
+                      </Select>
+
+                      {/* Compact Zipcode Filter */}
+                      <div className="relative">
+                        <Select 
+                          value={directFilters.zipcodes.length === 0 ? "all" : "custom"}
+                          onValueChange={(value) => {
+                            if (value === "all") {
+                              setDirectFilters(prev => ({ ...prev, zipcodes: [] }));
+                            }
+                          }}
+                        >
+                          <SelectTrigger className="h-8">
+                            <SelectValue placeholder="Zipcodes" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="all">All Zipcodes</SelectItem>
+                            <SelectItem value="custom">
+                              {directFilters.zipcodes.length > 0 ? `${directFilters.zipcodes.length} selected` : "Select specific"}
+                            </SelectItem>
+                            <div className="p-2 border-t">
+                              <div className="max-h-32 overflow-y-auto space-y-1">
+                                {availableZipcodes.map((zipcode) => (
+                                  <div key={zipcode} className="flex items-center space-x-2">
+                                    <Checkbox
+                                      id={`direct-zipcode-${zipcode}`}
+                                      checked={directFilters.zipcodes.includes(zipcode)}
+                                      onCheckedChange={(checked) => {
+                                        if (checked) {
+                                          setDirectFilters(prev => ({ ...prev, zipcodes: [...prev.zipcodes, zipcode] }));
+                                        } else {
+                                          setDirectFilters(prev => ({ ...prev, zipcodes: prev.zipcodes.filter(z => z !== zipcode) }));
+                                        }
+                                      }}
+                                    />
+                                    <label htmlFor={`direct-zipcode-${zipcode}`} className="text-sm cursor-pointer">
+                                      {zipcode}
+                                    </label>
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <Button onClick={fetchDirectProperties} size="sm" className="h-8">
+                        Apply Filters
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Property Selection Card */}
+                <Card className="flex-1 min-h-0 flex flex-col">
+                  <CardHeader className="pb-2 flex-shrink-0">
+                    <div className="flex items-center justify-between">
+                      <CardTitle className="text-lg">
+                        Available Properties ({filteredAndPaginatedDirectProperties.totalCount})
+                      </CardTitle>
+                      <div className="flex items-center space-x-2">
+                        <Badge variant={directInspectionData.selectedProperty ? "default" : "secondary"} className="text-sm">
+                          {directInspectionData.selectedProperty ? '1 selected' : 'Select property'}
+                        </Badge>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center space-x-2">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Input
+                          placeholder="Search properties..."
+                          value={directSearchTerm}
+                          onChange={(e) => setDirectSearchTerm(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                    </div>
+                  </CardHeader>
+                  
+                  <CardContent className="flex-1 min-h-0 p-0">
+                    <ScrollArea className="h-[300px] w-full pointer-events-auto">
+                      <div className="space-y-2 p-6">
+                        {directLoading ? (
+                          <div className="text-center py-8">
+                            <div className="animate-spin h-8 w-8 border-2 border-blue-600 border-t-transparent rounded-full mx-auto mb-2" />
+                            <p className="text-gray-600">Loading properties...</p>
+                          </div>
+                        ) : filteredAndPaginatedDirectProperties.totalCount === 0 ? (
+                          <div className="text-center py-8">
+                            <MapPin className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+                            <p className="text-gray-600">No properties found matching your criteria.</p>
+                          </div>
+                        ) : (
+                          filteredAndPaginatedDirectProperties.properties.map((property) => {
+                            const isSelected = directInspectionData.selectedProperty?.id === property.id;
+                            
+                            return (
+                              <PropertyListItem
+                                key={property.id}
+                                property={property}
+                                isSelected={isSelected}
+                                selectedInspector={selectedInspector}
+                                singleSelectMode={true}
+                                onDirectSelection={handleDirectPropertySelection}
+                              />
+                            );
+                          })
+                        )}
+                      </div>
+                    </ScrollArea>
+                    
+                    {/* Pagination for Direct Mode */}
+                    {filteredAndPaginatedDirectProperties.totalPages > 1 && (
+                      <div className="flex items-center justify-between p-4 border-t">
+                        <div className="text-sm text-gray-600">
+                          Showing {((directCurrentPage - 1) * itemsPerPage) + 1} to {Math.min(directCurrentPage * itemsPerPage, filteredAndPaginatedDirectProperties.totalCount)} of {filteredAndPaginatedDirectProperties.totalCount} properties
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => setDirectCurrentPage(prev => Math.max(1, prev - 1))}
+                            disabled={directCurrentPage === 1}
+                          >
+                            Previous
+                          </Button>
+                          <span className="text-sm">
+                            Page {directCurrentPage} of {filteredAndPaginatedDirectProperties.totalPages}
+                          </span>
+                          <Button 
+                            variant="outline" 
+                            size="sm" 
+                            onClick={() => setDirectCurrentPage(prev => Math.min(filteredAndPaginatedDirectProperties.totalPages, prev + 1))}
+                            disabled={directCurrentPage === filteredAndPaginatedDirectProperties.totalPages}
+                          >
+                            Next
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Direct Inspection Form */}
+                <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center space-x-2">
                       <Zap className="h-5 w-5" />
-                      <span>Create Direct Inspection</span>
+                      <span>Inspection Details</span>
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    {/* Property Selection */}
-                    <div className="space-y-2">
-                      <Label htmlFor="property-select">Property *</Label>
-                      <Select 
-                        value={directInspectionData.selectedProperty?.id || ''} 
-                        onValueChange={(value) => {
-                          const property = filteredProperties.find(p => p.id === value);
-                          setDirectInspectionData(prev => ({ ...prev, selectedProperty: property || null }));
-                        }}
-                      >
-                        <SelectTrigger>
-                          <SelectValue placeholder="Select a property" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <div className="p-2">
-                            <div className="relative">
-                              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                              <Input
-                                placeholder="Search properties..."
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="pl-10 mb-2"
-                              />
-                            </div>
-                          </div>
-                          <ScrollArea className="h-48">
-                            {filteredProperties.map((property) => (
-                              <SelectItem key={property.id} value={property.id}>
-                                <div className="flex flex-col">
-                                  <span className="font-medium">{property.property_name}</span>
-                                  <span className="text-sm text-gray-500">
-                                    {property.address}, {property.city}, {property.state}
-                                  </span>
-                                </div>
-                              </SelectItem>
-                            ))}
-                          </ScrollArea>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
                     {/* Inspector Assignment */}
                     <div className="space-y-2">
                       <Label htmlFor="inspector-select">Inspector *</Label>
@@ -1271,6 +1635,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                     )}
                   </CardContent>
                 </Card>
+                </>
               ) : (
                 <>
                 {/* Compact Filter Card */}
