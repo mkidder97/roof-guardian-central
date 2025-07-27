@@ -88,13 +88,47 @@ export default defineConfig(({ mode }) => ({
     __BUILD_VERSION__: JSON.stringify(process.env.GITHUB_SHA || Date.now().toString()),
   },
   optimizeDeps: {
-    include: ['pdfjs-dist', '@supabase/supabase-js'],
-    exclude: ['@supabase/supabase-js/dist/module/index.js']
+    include: [
+      'pdfjs-dist', 
+      '@supabase/supabase-js',
+      'react',
+      'react-dom',
+      'react/jsx-runtime',
+      'xlsx',
+      '@radix-ui/react-accordion',
+      '@radix-ui/react-alert-dialog',
+      '@radix-ui/react-avatar',
+      '@radix-ui/react-checkbox',
+      '@radix-ui/react-dialog',
+      '@radix-ui/react-dropdown-menu',
+      '@radix-ui/react-popover',
+      '@radix-ui/react-select',
+      '@radix-ui/react-tabs',
+      '@radix-ui/react-toast',
+      '@radix-ui/react-tooltip'
+    ],
+    exclude: ['@supabase/supabase-js/dist/module/index.js'],
+    esbuildOptions: {
+      target: 'esnext'
+    }
   },
   build: {
+    target: 'esnext',
     commonjsOptions: {
-      include: [/pdfjs-dist/, /node_modules/]
+      include: [/pdfjs-dist/, /xlsx/, /node_modules/],
+      transformMixedEsModules: true
+    },
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom'],
+          'ui-vendor': ['@radix-ui/react-accordion', '@radix-ui/react-alert-dialog', '@radix-ui/react-avatar']
+        }
+      }
     }
+  },
+  esbuild: {
+    logOverride: { 'this-is-undefined-in-esm': 'silent' }
   },
   plugins: [
     react(),
