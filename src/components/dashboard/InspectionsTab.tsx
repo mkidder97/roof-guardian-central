@@ -10,7 +10,8 @@ import { useAuth } from "@/contexts/AuthContext";
 import { InspectionSchedulingModal } from "@/components/inspections/InspectionSchedulingModal";
 import { InspectionStatusBadge, InspectionStatus } from "@/components/ui/inspection-status-badge";
 import { useInspectionSync } from "@/hooks/useInspectionSync";
-import { useUnifiedInspectionEvents, useInspectionEventEmitter } from "@/hooks/useUnifiedInspectionEvents";
+import { useUnifiedInspectionEvents } from "@/hooks/useUnifiedInspectionEvents";
+import { INSPECTOR_EVENTS } from "@/lib/eventBus";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 
@@ -65,19 +66,20 @@ export function InspectionsTab() {
   });
 
   // Event system for real-time updates
-  const { on } = useUnifiedInspectionEvents();
-  const { emitDataRefresh } = useInspectionEventEmitter();
+  const { on, dataSync } = useUnifiedInspectionEvents();
 
   // Listen for real-time events
   useEffect(() => {
-    const unsubscribeInspectionCreated = on('inspectionCreated', ({ inspection }) => {
+    const unsubscribeInspectionCreated = on(INSPECTOR_EVENTS.INSPECTION_CREATED, (event) => {
+      const { inspection } = event.payload;
       toast({
         title: "New Inspection Created",
         description: `Inspection scheduled for ${inspection.roofs?.property_name || 'property'}`,
       });
     });
 
-    const unsubscribeInspectionUpdated = on('inspectionUpdated', ({ inspection, updates }) => {
+    const unsubscribeInspectionUpdated = on(INSPECTOR_EVENTS.INSPECTION_UPDATED, (event) => {
+      const { inspection, updates } = event.payload;
       if (updates.status) {
         toast({
           title: "Inspection Updated",
@@ -86,14 +88,16 @@ export function InspectionsTab() {
       }
     });
 
-    const unsubscribeStatusChanged = on('inspectionStatusChanged', ({ newStatus, inspection }) => {
+    const unsubscribeStatusChanged = on(INSPECTOR_EVENTS.INSPECTION_STATUS_CHANGED, (event) => {
+      const { newStatus, inspection } = event.payload;
       toast({
         title: "Status Changed",
         description: `Inspection status updated to ${newStatus}`,
       });
     });
 
-    const unsubscribeDataRefresh = on('dataRefresh', ({ components }) => {
+    const unsubscribeDataRefresh = on(INSPECTOR_EVENTS.INSPECTION_DATA_REFRESH, (event) => {
+      const { components } = event.payload;
       if (!components || components.includes('inspections_tab')) {
         // Data will automatically refresh via useInspectionSync
         console.log('InspectionsTab: Data refresh triggered');
@@ -229,12 +233,12 @@ export function InspectionsTab() {
 
   const handleManualRefresh = useCallback(() => {
     refresh();
-    emitDataRefresh(['inspections_tab']);
+    dataSync.refreshAll();
     toast({
       title: "Refreshing",
       description: "Updating inspection data...",
     });
-  }, [refresh, emitDataRefresh, toast]);
+  }, [refresh, dataSync, toast]);
 
   const handleStatusChange = useCallback(async (inspectionId: string, newStatus: string) => {
     try {

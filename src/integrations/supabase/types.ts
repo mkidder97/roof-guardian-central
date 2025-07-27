@@ -479,6 +479,39 @@ export type Database = {
           },
         ]
       }
+      inspection_sessions: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          inspector_id: string
+          last_updated: string
+          property_id: string
+          session_data: Json
+          status: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          inspector_id: string
+          last_updated?: string
+          property_id: string
+          session_data?: Json
+          status?: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          inspector_id?: string
+          last_updated?: string
+          property_id?: string
+          session_data?: Json
+          status?: string
+        }
+        Relationships: []
+      }
       inspections: {
         Row: {
           completed_date: string | null
@@ -1313,6 +1346,10 @@ export type Database = {
           property2_lng: number
         }
         Returns: number
+      }
+      cleanup_expired_sessions: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
       }
       generate_campaign_name: {
         Args: {
