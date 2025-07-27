@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef } from 'react';
-import { inspectorEventBus, INSPECTOR_EVENTS, InspectorEvent } from '@/lib/eventBus';
-import { useInspectorEvents, useInspectionState, usePropertySelection } from '@/hooks/useInspectorEvents';
+import { inspectorEventBus, InspectorEvent } from '@/lib/eventBus';
 import { useInspectionSync, type InspectionSyncData } from '@/hooks/useInspectionSync';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -557,3 +556,6 @@ export function useInspectionEventEmitter() {
     }, [emit])
   };
 }
+
+// Export the event emitter hook
+export { useInspectionEventEmitter };
