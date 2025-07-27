@@ -451,29 +451,32 @@ const InspectorInterface = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <div className="bg-primary text-white p-4">
+      <div className="bg-primary text-white p-3 sm:p-4">
         <div className="flex items-center justify-between max-w-7xl mx-auto">
-          <div className="flex items-center gap-3">
-            <Building2 className="h-8 w-8" />
-            <h1 className="text-2xl font-bold">Inspector Intelligence</h1>
+          <div className="flex items-center gap-2 sm:gap-3">
+            <Building2 className="h-6 w-6 sm:h-8 sm:w-8" />
+            <h1 className="text-lg sm:text-2xl font-bold">Inspector Intelligence</h1>
           </div>
           <Button 
             variant="secondary" 
+            size="sm"
             onClick={() => navigate("/")}
+            className="text-xs sm:text-sm"
           >
-            Back to Dashboard
+            <span className="hidden sm:inline">Back to Dashboard</span>
+            <span className="sm:hidden">Back</span>
           </Button>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto p-4">
+      <div className="max-w-7xl mx-auto p-2 sm:p-4">
         {!selectedProperty ? (
           // Property Selection
           <Card>
             <CardHeader>
-              <CardTitle>Select Property for Inspection</CardTitle>
-              <CardDescription>Choose a property to view pre-inspection intelligence</CardDescription>
+              <CardTitle className="text-lg sm:text-xl">Select Property for Inspection</CardTitle>
+              <CardDescription className="text-sm">Choose a property to view pre-inspection intelligence</CardDescription>
             </CardHeader>
             <CardContent>
               {loading ? (
@@ -486,7 +489,7 @@ const InspectorInterface = () => {
                   properties={availableProperties}
                   onPropertyClick={handleBuildingClick}
                   loading={loading}
-                  containerHeight={500}
+                  containerHeight={Math.max(350, Math.min(600, window.innerHeight - 300))}
                   className="mt-4"
                 />
               )}
@@ -519,8 +522,8 @@ const InspectorInterface = () => {
               <CardContent className="p-6">
                 <div className="flex items-start justify-between">
                   <div>
-                    <h2 className="text-2xl font-bold flex items-center gap-2">
-                      <MapPin className="h-6 w-6" />
+                    <h2 className="text-xl sm:text-2xl font-bold flex items-center gap-2">
+                      <MapPin className="h-5 w-5 sm:h-6 sm:w-6" />
                       {briefing.property.name}
                     </h2>
                     <p className="text-muted-foreground">{briefing.property.address}</p>
@@ -549,11 +552,11 @@ const InspectorInterface = () => {
             </Card>
 
             <Tabs defaultValue="briefing" className="space-y-4">
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="briefing">Intelligence Briefing</TabsTrigger>
-                <TabsTrigger value="patterns">Pattern Analysis</TabsTrigger>
-                <TabsTrigger value="photos">Historical Photos</TabsTrigger>
-                <TabsTrigger value="notes">Field Notes</TabsTrigger>
+              <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4">
+                <TabsTrigger value="briefing" className="text-xs sm:text-sm">Intelligence</TabsTrigger>
+                <TabsTrigger value="patterns" className="text-xs sm:text-sm">Patterns</TabsTrigger>
+                <TabsTrigger value="photos" className="text-xs sm:text-sm">Photos</TabsTrigger>
+                <TabsTrigger value="notes" className="text-xs sm:text-sm">Notes</TabsTrigger>
               </TabsList>
 
               <TabsContent value="briefing" className="space-y-4">
@@ -656,7 +659,7 @@ const InspectorInterface = () => {
                     <CardDescription>Previous damage locations and progression</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       {briefing.historicalPhotos.map((photo) => (
                         <div key={photo.id} className="border rounded-lg p-3">
                           <img 
@@ -686,19 +689,19 @@ const InspectorInterface = () => {
                   </CardHeader>
                   <CardContent>
                     <div className="space-y-4">
-                      <div className="flex gap-2">
+                      <div className="flex flex-col sm:flex-row gap-2">
                         <Button 
                           variant={isRecording ? "destructive" : "default"}
-                          size="lg"
+                          size="default"
                           className="flex-1"
                           onClick={handleVoiceNote}
                         >
-                          <Mic className="h-5 w-5 mr-2" />
-                          {isRecording ? "Stop Recording" : "Start Voice Note"}
+                          <Mic className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                          <span className="text-sm">{isRecording ? "Stop Recording" : "Start Voice Note"}</span>
                         </Button>
-                        <Button variant="outline" size="lg">
-                          <Camera className="h-5 w-5 mr-2" />
-                          Take Photo
+                        <Button variant="outline" size="default" className="flex-1 sm:flex-none">
+                          <Camera className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
+                          <span className="text-sm">Take Photo</span>
                         </Button>
                       </div>
 
@@ -727,13 +730,13 @@ const InspectorInterface = () => {
                     <div className="space-y-3">
                       <Button 
                         className="w-full bg-green-600 hover:bg-green-700 text-white"
-                        size="lg"
+                        size="default"
                         onClick={() => handleStartInspection(briefing.property.id, briefing.property.name)}
                       >
-                        <Camera className="h-5 w-5 mr-2" />
+                        <Camera className="h-4 w-4 sm:h-5 sm:w-5 mr-2" />
                         Start Inspection
                       </Button>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                         <Button variant="outline">
                           <FileText className="h-4 w-4 mr-2" />
                           Generate Report

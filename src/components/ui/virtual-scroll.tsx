@@ -22,17 +22,34 @@ export function VirtualScroll<T>({
   className = ''
 }: VirtualScrollProps<T>) {
   const [scrollTop, setScrollTop] = useState(0);
+  const [actualContainerHeight, setActualContainerHeight] = useState(containerHeight);
   const scrollElementRef = useRef<HTMLDivElement>(null);
+  
+  // Update container height based on available space
+  useEffect(() => {
+    const updateHeight = () => {
+      if (scrollElementRef.current) {
+        const rect = scrollElementRef.current.getBoundingClientRect();
+        const availableHeight = window.innerHeight - rect.top - 100; // Leave some margin
+        const maxHeight = Math.min(availableHeight, containerHeight);
+        setActualContainerHeight(Math.max(200, maxHeight)); // Minimum height of 200px
+      }
+    };
+    
+    updateHeight();
+    window.addEventListener('resize', updateHeight);
+    return () => window.removeEventListener('resize', updateHeight);
+  }, [containerHeight]);
 
   const visibleRange = useMemo(() => {
     const itemCount = items.length;
-    const visibleCount = Math.ceil(containerHeight / itemHeight);
+    const visibleCount = Math.ceil(actualContainerHeight / itemHeight);
     
     const start = Math.max(0, Math.floor(scrollTop / itemHeight) - overscan);
     const end = Math.min(itemCount - 1, start + visibleCount + overscan * 2);
     
     return { start, end };
-  }, [scrollTop, itemHeight, containerHeight, items.length, overscan]);
+  }, [scrollTop, itemHeight, actualContainerHeight, items.length, overscan]);
 
   const visibleItems = useMemo(() => {
     return items.slice(visibleRange.start, visibleRange.end + 1).map((item, index) => ({
@@ -63,7 +80,7 @@ export function VirtualScroll<T>({
     <div
       ref={scrollElementRef}
       className={`overflow-auto ${className}`}
-      style={{ height: containerHeight }}
+      style={{ height: actualContainerHeight }}
       onScroll={handleScroll}
     >
       <div style={{ height: totalHeight, position: 'relative' }}>
@@ -80,8 +97,8 @@ export function VirtualScroll<T>({
             <div
               key={index}
               style={{
-                height: itemHeight,
-                overflow: 'hidden'
+                minHeight: itemHeight,
+                paddingBottom: '12px'
               }}
             >
               {renderItem(item, index)}

@@ -134,11 +134,11 @@ export const VirtualizedPropertyList: React.FC<VirtualizedPropertyListProps> = (
         `}
         onClick={() => onPropertyClick(property.id)}
       >
-        <CardContent className="p-4">
-          <div className="flex items-center justify-between">
+        <CardContent className="p-3 sm:p-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-2">
-                <h3 className="font-semibold text-lg truncate">{property.name}</h3>
+                <h3 className="font-semibold text-base sm:text-lg truncate">{property.name}</h3>
                 {property.priority && (
                   <PriorityBadge priority={property.priority} size="sm" />
                 )}
@@ -168,8 +168,8 @@ export const VirtualizedPropertyList: React.FC<VirtualizedPropertyListProps> = (
               </div>
             </div>
             
-            <div className="flex flex-col items-end gap-2 ml-4">
-              <div className="flex flex-wrap gap-1 justify-end">
+            <div className="flex flex-col sm:items-end gap-2 sm:ml-4">
+              <div className="flex flex-wrap gap-1 justify-start sm:justify-end">
                 {property.criticalIssues > 0 && (
                   <Badge variant="destructive" className="text-xs">
                     {property.criticalIssues} Critical Issue{property.criticalIssues > 1 ? 's' : ''}
@@ -185,7 +185,7 @@ export const VirtualizedPropertyList: React.FC<VirtualizedPropertyListProps> = (
               
               {/* Urgency indicator */}
               {property.urgencyScore && property.urgencyScore > 60 && (
-                <div className="text-xs text-center">
+                <div className="text-xs text-left sm:text-center">
                   <div className="text-orange-600 font-medium">Urgency: {property.urgencyScore}%</div>
                   <div className="text-muted-foreground">High urgency</div>
                 </div>

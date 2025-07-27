@@ -182,34 +182,36 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogPortal>
-        <DialogOverlay className="bg-white" />
-        <DialogContent className="fixed inset-0 z-50 w-screen h-screen max-w-none max-h-none m-0 p-6 border-0 rounded-none bg-white translate-x-0 translate-y-0 overflow-y-auto"
-          style={{ left: 0, top: 0, transform: 'none' }}
+        <DialogOverlay className="bg-black/50 backdrop-blur-sm" />
+        <DialogContent className="fixed inset-2 sm:inset-4 z-50 w-full max-w-sm sm:max-w-2xl md:max-w-4xl lg:max-w-6xl max-h-[98vh] sm:max-h-[95vh] mx-auto my-auto p-0 border bg-white rounded-none sm:rounded-lg shadow-2xl overflow-hidden data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
         >
-        <DialogHeader>
-          <DialogTitle className="text-2xl font-bold flex items-center gap-2">
-            <Building2 className="h-6 w-6" />
-            {roofData.property_name}
-          </DialogTitle>
-          <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-            <span className="flex items-center gap-1">
-              <MapPin className="h-4 w-4" />
-              {roofData.address}, {roofData.city}, {roofData.state} {roofData.zip}
-            </span>
-            {roofData.roof_area && (
+        <div className="sticky top-0 z-10 bg-white border-b p-4 sm:p-6">
+          <DialogHeader>
+            <DialogTitle className="text-2xl font-bold flex items-center gap-2">
+              <Building2 className="h-6 w-6" />
+              {roofData.property_name}
+            </DialogTitle>
+            <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
               <span className="flex items-center gap-1">
-                <Ruler className="h-4 w-4" />
-                {roofData.roof_area.toLocaleString()} sq ft
+                <MapPin className="h-4 w-4" />
+                {roofData.address}, {roofData.city}, {roofData.state} {roofData.zip}
               </span>
-            )}
-          </div>
-        </DialogHeader>
+              {roofData.roof_area && (
+                <span className="flex items-center gap-1">
+                  <Ruler className="h-4 w-4" />
+                  {roofData.roof_area.toLocaleString()} sq ft
+                </span>
+              )}
+            </div>
+          </DialogHeader>
+        </div>
 
-        <Tabs defaultValue="overview" className="mt-6">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="overview">Roof Overview</TabsTrigger>
-            <TabsTrigger value="inspection">Inspection</TabsTrigger>
-          </TabsList>
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+          <Tabs defaultValue="overview" className="h-full">
+            <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2">
+              <TabsTrigger value="overview">Roof Overview</TabsTrigger>
+              <TabsTrigger value="inspection">Inspection</TabsTrigger>
+            </TabsList>
 
           <TabsContent value="overview" className="space-y-4">
             {/* Roof System Information */}
@@ -217,7 +219,7 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
               <CardHeader>
                 <CardTitle className="text-lg">Roof System Information</CardTitle>
               </CardHeader>
-              <CardContent className="grid grid-cols-2 gap-4">
+              <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">System Type</p>
                   <p className="font-medium">{roofData.roof_system || 'Not specified'}</p>
@@ -288,7 +290,7 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
               <CardHeader>
                 <CardTitle className="text-lg">Budget & Maintenance</CardTitle>
               </CardHeader>
-              <CardContent className="grid grid-cols-2 gap-4">
+              <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <p className="text-sm font-medium text-muted-foreground">Capital Budget</p>
                   <p className="font-medium flex items-center gap-1">
@@ -450,22 +452,26 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
               </CardContent>
             </Card>
           </TabsContent>
-        </Tabs>
 
-        <div className="flex justify-end gap-2 mt-6">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Close
-          </Button>
-          <Button 
-            className="flex items-center gap-2"
-            onClick={() => {
-              // Navigate to full property details if needed
-              window.location.href = `/properties/${roofData.id}`;
-            }}
-          >
-            <FileText className="h-4 w-4" />
-            View Full Details
-          </Button>
+          </Tabs>
+        </div>
+        
+        <div className="sticky bottom-0 bg-white border-t p-4 sm:p-6">
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => onOpenChange(false)}>
+              Close
+            </Button>
+            <Button 
+              className="flex items-center gap-2"
+              onClick={() => {
+                // Navigate to full property details if needed
+                window.location.href = `/properties/${roofData.id}`;
+              }}
+            >
+              <FileText className="h-4 w-4" />
+              View Full Details
+            </Button>
+          </div>
         </div>
         </DialogContent>
       </DialogPortal>
@@ -474,18 +480,20 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
     {/* Critical Info Dialog */}
     <CriticalInfoDialog open={showCriticalInfo} onOpenChange={setShowCriticalInfo}>
       <DialogPortal>
-        <DialogOverlay className="bg-white" />
-        <CriticalDialogContent className="fixed inset-0 z-50 w-screen h-screen max-w-none max-h-none m-0 p-6 border-0 rounded-none bg-white translate-x-0 translate-y-0 overflow-y-auto"
-          style={{ left: 0, top: 0, transform: 'none' }}
+        <DialogOverlay className="bg-black/50 backdrop-blur-sm" />
+        <CriticalDialogContent className="fixed inset-2 sm:inset-4 z-50 w-full max-w-sm sm:max-w-lg md:max-w-2xl lg:max-w-4xl max-h-[98vh] sm:max-h-[95vh] mx-auto my-auto p-0 border bg-white rounded-none sm:rounded-lg shadow-2xl overflow-hidden data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
         >
-        <CriticalDialogHeader>
-          <CriticalDialogTitle className="text-xl font-bold flex items-center gap-2">
-            <AlertTriangle className="h-6 w-6 text-destructive" />
-            Critical Focus Areas - {roofData?.property_name}
-          </CriticalDialogTitle>
-        </CriticalDialogHeader>
-
-        <div className="space-y-4 mt-4">
+        <div className="sticky top-0 z-10 bg-white border-b p-4 sm:p-6">
+          <CriticalDialogHeader>
+            <CriticalDialogTitle className="text-xl font-bold flex items-center gap-2">
+              <AlertTriangle className="h-6 w-6 text-destructive" />
+              Critical Focus Areas - {roofData?.property_name}
+            </CriticalDialogTitle>
+          </CriticalDialogHeader>
+        </div>
+        
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
+          <div className="space-y-4">
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
             <h3 className="font-semibold text-red-800 mb-2">⚠️ Pre-Inspection Briefing</h3>
             <p className="text-red-700 text-sm">
@@ -546,7 +554,11 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
             </Card>
           )}
 
-          <div className="flex justify-between items-center pt-4 border-t">
+          </div>
+        </div>
+        
+        <div className="sticky bottom-0 bg-white border-t p-4 sm:p-6">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
             <Button 
               variant="outline" 
               onClick={() => setShowCriticalInfo(false)}
