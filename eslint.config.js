@@ -24,6 +24,26 @@ export default tseslint.config(
         { allowConstantExport: true },
       ],
       "@typescript-eslint/no-unused-vars": "off",
+      // Custom TooltipProvider protection rule
+      "no-restricted-imports": [
+        "error",
+        {
+          "paths": [
+            {
+              "name": "@/components/ui/tooltip",
+              "importNames": ["TooltipProvider"],
+              "message": "🚨 FORBIDDEN: TooltipProvider can only be imported in App.tsx and test-utils.tsx. Use only Tooltip, TooltipTrigger, TooltipContent components. Global TooltipProvider already exists in App.tsx."
+            }
+          ],
+          "patterns": [
+            {
+              "group": ["**/ui/tooltip"],
+              "importNames": ["TooltipProvider"],
+              "message": "🚨 FORBIDDEN: Do not import TooltipProvider. Use individual tooltip components only."
+            }
+          ]
+        }
+      ]
     },
   }
 );

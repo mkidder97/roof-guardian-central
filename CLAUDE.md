@@ -115,3 +115,63 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Inspector interface has sophisticated keyboard navigation and accessibility features
 - Campaign system integrates with external n8n workflows
 - Supabase functions handle complex business logic for campaign creation and property analysis
+
+## 🚨 CRITICAL: TooltipProvider Rules for Lovable
+
+### ❌ ABSOLUTELY FORBIDDEN
+1. **NEVER** add `<TooltipProvider>` to any component file
+2. **NEVER** wrap components in `<TooltipProvider>`
+3. **NEVER** import `TooltipProvider` in component files except App.tsx and test-utils.tsx
+4. **NEVER** create nested TooltipProvider instances
+
+### ✅ REQUIRED PATTERNS
+```tsx
+// ✅ CORRECT - Use individual tooltip components
+import { Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip'
+
+function Component() {
+  return (
+    <Tooltip>
+      <TooltipTrigger>Button</TooltipTrigger>
+      <TooltipContent>Tooltip text</TooltipContent>
+    </Tooltip>
+  )
+}
+```
+
+```tsx
+// ❌ FORBIDDEN - Never do this
+import { TooltipProvider } from '@/components/ui/tooltip'
+
+function Component() {
+  return (
+    <TooltipProvider> {/* This will break React */}
+      {children}
+    </TooltipProvider>
+  )
+}
+```
+
+### 🚨 Error Recognition
+If you see these errors, it means nested TooltipProvider was added:
+- `TypeError: null is not an object (evaluating 'dispatcher.useState')`
+- `Invalid hook call`
+- `Hooks can only be called inside the body of a function component`
+
+### 🛠️ Required Fix
+1. Search for `TooltipProvider` in all files
+2. Remove any TooltipProvider outside of `src/App.tsx` and `src/test/utils/test-utils.tsx`
+3. Use only individual tooltip components
+
+### 📍 Allowed TooltipProvider Locations
+- `src/App.tsx` - Global provider (REQUIRED)
+- `src/test/utils/test-utils.tsx` - Test provider (REQUIRED)
+- `src/components/ui/tooltip.tsx` - Export only (NO USAGE)
+
+### 🛡️ Automated Protection
+The project includes automatic detection:
+- Development runtime checks catch violations
+- Build-time validation prevents deployment
+- ESLint rules warn about improper usage
+
+**FAILURE TO FOLLOW THESE RULES WILL BREAK THE APPLICATION**
