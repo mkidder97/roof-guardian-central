@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Search, Calendar, CheckCircle, X, FileDown, Filter, MapPin, AlertCircle, User, Clock, Zap } from 'lucide-react';
 
 import { useToast } from '@/hooks/use-toast';
+import { DirectInspectionWizard } from './DirectInspectionWizard';
 import { format } from 'date-fns';
 import type { InspectionStatus } from '@/types/inspection';
 import { useN8nWorkflow, type CampaignWorkflowData, type ProcessingResult } from '@/hooks/useN8nWorkflow';
@@ -81,6 +82,7 @@ interface Property {
 interface InspectionSchedulingModalProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  directMode?: boolean;
 }
 
 interface WorkflowProgress {
@@ -183,7 +185,7 @@ const PropertyListItem = memo(({
   );
 });
 
-export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSchedulingModalProps) {
+export function InspectionSchedulingModal({ open, onOpenChange, directMode = false }: InspectionSchedulingModalProps) {
   const { toast } = useToast();
   const { processCampaignsBatch } = useN8nWorkflow();
   const { inspectors, loading: inspectorsLoading } = useInspectors();
@@ -346,7 +348,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
   const [propertyInspectorOverrides, setPropertyInspectorOverrides] = useState<Record<string, Inspector>>({});
 
   // Direct Inspection Mode state
-  const [directInspectionMode, setDirectInspectionMode] = useState(false);
+  const [directInspectionMode, setDirectInspectionMode] = useState(directMode);
   const [directInspectionData, setDirectInspectionData] = useState({
     selectedProperty: null as Property | null,
     inspector: null as Inspector | null,
@@ -2143,6 +2145,16 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
           </DialogFooter>
     </>
   );
+
+  // Show Direct Inspection Wizard when in direct mode
+  if (directInspectionMode) {
+    return (
+      <DirectInspectionWizard
+        open={open}
+        onOpenChange={onOpenChange}
+      />
+    );
+  }
 
   // Return the wrapped component based on monitoring availability
   if (monitoringEnabled && ErrorBoundary && ComponentHealthMonitor) {
