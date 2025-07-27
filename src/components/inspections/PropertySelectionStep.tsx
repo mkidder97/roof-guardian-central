@@ -115,11 +115,11 @@ export function PropertySelectionStep({
       );
     }
 
-    if (zipFilter) {
+    if (zipFilter && zipFilter !== 'all') {
       filtered = filtered.filter(property => property.zip === zipFilter);
     }
 
-    if (cityFilter) {
+    if (cityFilter && cityFilter !== 'all') {
       filtered = filtered.filter(property => property.city === cityFilter);
     }
 
@@ -231,7 +231,7 @@ export function PropertySelectionStep({
                       <SelectValue placeholder="All cities" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All cities</SelectItem>
+                      <SelectItem value="all">All cities</SelectItem>
                       {availableCities.map((city) => (
                         <SelectItem key={city} value={city}>{city}</SelectItem>
                       ))}
@@ -246,7 +246,7 @@ export function PropertySelectionStep({
                       <SelectValue placeholder="All ZIP codes" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="">All ZIP codes</SelectItem>
+                      <SelectItem value="all">All ZIP codes</SelectItem>
                       {availableZips.map((zip) => (
                         <SelectItem key={zip} value={zip}>{zip}</SelectItem>
                       ))}
