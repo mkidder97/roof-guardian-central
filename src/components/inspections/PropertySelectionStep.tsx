@@ -196,7 +196,7 @@ export function PropertySelectionStep({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[95vh] flex flex-col">
+      <DialogContent className="max-w-[95vw] w-full h-[95vh] flex flex-col p-6">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CheckCircle className="h-5 w-5 text-primary" />
@@ -204,7 +204,7 @@ export function PropertySelectionStep({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 flex flex-col space-y-4 min-h-0">
+        <div className="flex-1 flex flex-col space-y-6 min-h-0 overflow-hidden">
           {/* Setup Summary */}
           <Card>
             <CardHeader className="pb-3">
@@ -311,7 +311,7 @@ export function PropertySelectionStep({
               </div>
             </CardHeader>
             <CardContent className="p-0 flex-1">
-              <ScrollArea className="h-[400px]">
+              <ScrollArea className="h-[50vh]">
                 <div className="p-4 space-y-2">
                   {loading ? (
                     <p className="text-center text-muted-foreground py-8">Loading properties...</p>
@@ -367,8 +367,13 @@ export function PropertySelectionStep({
           </Card>
 
           {/* Actions */}
-          <div className="flex justify-between items-center pt-4 border-t bg-background sticky bottom-0">
-            <Button variant="outline" onClick={onBack} className="flex items-center gap-2">
+          <div className="flex justify-between items-center pt-6 mt-auto border-t bg-background">
+            <Button 
+              variant="outline" 
+              onClick={onBack} 
+              className="flex items-center gap-2 px-6 py-3"
+              size="lg"
+            >
               <ArrowLeft className="h-4 w-4" />
               Back
             </Button>
@@ -376,7 +381,8 @@ export function PropertySelectionStep({
             <Button 
               onClick={handleScheduleInspection}
               disabled={selectedProperties.length === 0 || isCreatingInspection}
-              className="relative z-50"
+              className="px-6 py-3"
+              size="lg"
             >
               {isCreatingInspection 
                 ? 'Scheduling...' 
