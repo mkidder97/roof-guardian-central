@@ -1400,13 +1400,17 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
           </DialogTitle>
         </DialogHeader>
 
-          <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
-              <div className="space-y-4 h-full flex flex-col">
+          <div className="flex-1 flex flex-col min-h-0 overflow-y-auto">
+              <div className="space-y-4 p-1">{/* Added padding to prevent content cutoff */}
 
+              {(() => {
+                console.log('🔍 DEBUG: About to render directInspectionMode:', directInspectionMode);
+                console.log('🔍 DEBUG: directInspectionData:', directInspectionData);
+                return null;
+              })()}
+              
               {directInspectionMode ? (
                 <>
-                {console.log('🔍 DEBUG: Rendering Direct Mode. directInspectionMode =', directInspectionMode)}
-                {console.log('🔍 DEBUG: directInspectionData =', directInspectionData)}
                 {/* Direct Mode Filter Card */}
                 <Card>
                   <CardHeader className="pb-2">
@@ -1599,11 +1603,10 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                   </CardContent>
                 </Card>
 
-                {/* DEBUG MARKER - FORM SHOULD START HERE */}
-                <div style={{border: '3px solid red', padding: '5px', margin: '5px', backgroundColor: 'yellow', color: 'black'}}>
-                  🚨 DEBUG: Form rendering checkpoint reached
-                </div>
-                {console.log('🔍 FORM CHECKPOINT: About to render Inspection Details card')}
+                {(() => {
+                  console.log('🔍 FORM CHECKPOINT: About to render Inspection Details card');
+                  return null;
+                })()}
                 
                 {/* Direct Inspection Form - Always visible in Direct Mode */}
                 <Card>
@@ -2196,7 +2199,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
           }}
         >
           <Dialog key={remountKey} open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-w-7xl max-h-[90vh] flex flex-col">
+            <DialogContent className="max-w-7xl max-h-[90vh] flex flex-col overflow-hidden">
               {renderDialogContent()}
             </DialogContent>
           </Dialog>
@@ -2208,7 +2211,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
   // Return dialog without monitoring
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-7xl max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-7xl max-h-[90vh] flex flex-col overflow-hidden">
         {renderDialogContent()}
       </DialogContent>
     </Dialog>
