@@ -1,58 +1,27 @@
-import { useState, useEffect, useCallback } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Badge } from "@/components/ui/badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, FileDown, Calendar, User, Building, Loader2, Brain, RefreshCw, Wifi, WifiOff } from "lucide-react";
-import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/AuthContext";
-import { InspectionSchedulingModal } from "@/components/inspections/InspectionSchedulingModal";
-import { InspectionStatusBadge, InspectionStatus } from "@/components/ui/inspection-status-badge";
-import { useInspectionSync } from "@/hooks/useInspectionSync";
-import { useUnifiedInspectionEvents } from "@/hooks/useUnifiedInspectionEvents";
-import { INSPECTOR_EVENTS } from "@/lib/eventBus";
-import { format } from "date-fns";
-import { useToast } from "@/hooks/use-toast";
-
-interface Inspection {
-  id: string;
-  scheduled_date: string | null;
-  completed_date: string | null;
-  inspection_type: string | null;
-  status: string | null;
-  inspection_status?: InspectionStatus;
-  notes: string | null;
-  weather_conditions: string | null;
-  roof_id: string | null;
-  inspector_id: string | null;
-  created_at: string;
-  // Joined data
-  roofs?: {
-    property_name: string;
-  } | null;
-  users?: {
-    first_name: string | null;
-    last_name: string | null;
-  } | null;
-}
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Calendar, MapPin, User, Clock, AlertTriangle, Eye, Play, Pause, CheckCircle, Filter, Search, RefreshCw } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
+import { format } from 'date-fns';
+import { useInspectionSync } from '@/hooks/useInspectionSync';
+import type { InspectionSyncData, InspectionStatus } from '@/types/inspection';
 
 export function InspectionsTab() {
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState("all");
-  const [schedulingModalOpen, setSchedulingModalOpen] = useState(false);
-  const [filteredInspections, setFilteredInspections] = useState<Inspection[]>([]);
-  const navigate = useNavigate();
-  const { userRole } = useAuth();
   const { toast } = useToast();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [inspections, setInspections] = useState<InspectionSyncData[]>([]);
+  const [filteredInspections, setFilteredInspections] = useState<InspectionSyncData[]>([]);
 
-  // Use unified inspection synchronization
+  // Use the inspection sync hook for real-time data
   const {
-    inspections,
+    inspections: syncedInspections,
     loading,
     error,
-    syncStatus,
-    lastSyncTime,
     refresh,
     updateInspectionStatus,
     scheduledCount,
@@ -61,69 +30,26 @@ export function InspectionsTab() {
     pastDueCount
   } = useInspectionSync({
     autoRefresh: true,
-    refreshInterval: 30000,
     enableRealTimeSync: true
   });
 
-  // Event system for real-time updates
-  const { on, dataSync } = useUnifiedInspectionEvents();
-
-  // Listen for real-time events
+  // Update local state when synced data changes
   useEffect(() => {
-    const unsubscribeInspectionCreated = on(INSPECTOR_EVENTS.INSPECTION_CREATED, (event) => {
-      const { inspection } = event.payload;
-      toast({
-        title: "New Inspection Created",
-        description: `Inspection scheduled for ${inspection.roofs?.property_name || 'property'}`,
-      });
-    });
+    if (syncedInspections) {
+      setInspections(syncedInspections);
+    }
+  }, [syncedInspections]);
 
-    const unsubscribeInspectionUpdated = on(INSPECTOR_EVENTS.INSPECTION_UPDATED, (event) => {
-      const { inspection, updates } = event.payload;
-      if (updates.status) {
-        toast({
-          title: "Inspection Updated",
-          description: `Status changed to ${updates.status}`,
-        });
-      }
-    });
-
-    const unsubscribeStatusChanged = on(INSPECTOR_EVENTS.INSPECTION_STATUS_CHANGED, (event) => {
-      const { newStatus, inspection } = event.payload;
-      toast({
-        title: "Status Changed",
-        description: `Inspection status updated to ${newStatus}`,
-      });
-    });
-
-    const unsubscribeDataRefresh = on(INSPECTOR_EVENTS.INSPECTION_DATA_REFRESH, (event) => {
-      const { components } = event.payload;
-      if (!components || components.includes('inspections_tab')) {
-        // Data will automatically refresh via useInspectionSync
-        console.log('InspectionsTab: Data refresh triggered');
-      }
-    });
-
-    return () => {
-      unsubscribeInspectionCreated();
-      unsubscribeInspectionUpdated();
-      unsubscribeStatusChanged();
-      unsubscribeDataRefresh();
-    };
-  }, [on, toast]);
-
+  // Apply filters
   useEffect(() => {
-    filterInspections();
-  }, [searchTerm, statusFilter, inspections]);
-
-  const filterInspections = useCallback(() => {
-    let filtered = inspections;
+    let filtered = [...inspections];
 
     if (searchTerm) {
+      const term = searchTerm.toLowerCase();
       filtered = filtered.filter(inspection => 
-        inspection.roofs?.property_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        `${inspection.users?.first_name || ''} ${inspection.users?.last_name || ''}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        inspection.inspection_type?.toLowerCase().includes(searchTerm.toLowerCase())
+        inspection.roofs?.property_name?.toLowerCase().includes(term) ||
+        inspection.notes?.toLowerCase().includes(term) ||
+        `${inspection.users?.first_name || ''} ${inspection.users?.last_name || ''}`.toLowerCase().includes(term)
       );
     }
 
@@ -134,113 +60,24 @@ export function InspectionsTab() {
     setFilteredInspections(filtered);
   }, [inspections, searchTerm, statusFilter]);
 
-  const getInspectorName = (inspection: Inspection) => {
+  const getInspectorName = (inspection: InspectionSyncData) => {
     if (inspection.users?.first_name || inspection.users?.last_name) {
       return `${inspection.users.first_name || ''} ${inspection.users.last_name || ''}`.trim();
     }
-    return 'Unassigned';
+    return 'Not assigned';
   };
 
-  const getInspectionStatus = (inspection: Inspection): 'draft' | 'scheduled' | 'in-progress' | 'completed' | 'past-due' | 'cancelled' => {
-    if (!inspection.scheduled_date) return 'draft';
-    
-    const scheduledDate = new Date(inspection.scheduled_date);
-    const today = new Date();
-    const isPastDue = scheduledDate < today && !inspection.completed_date;
-    
-    if (inspection.completed_date) return 'completed';
-    if (isPastDue) return 'past-due';
-    if (inspection.status === 'in-progress') return 'in-progress';
-    if (inspection.status === 'cancelled') return 'cancelled';
-    return 'scheduled';
-  };
-
-  const getStatusBadge = (inspection: Inspection) => {
-    // Use new inspection status if available, otherwise fall back to old logic
-    if (inspection.inspection_status) {
-      return <InspectionStatusBadge status={inspection.inspection_status} size="sm" />;
-    }
-    
-    const status = getInspectionStatus(inspection);
-    
+  const getStatusBadgeVariant = (status: string | null) => {
     switch (status) {
-      case "scheduled":
-        return <InspectionStatusBadge status="scheduled" size="sm" />;
-      case "in-progress":
-        return <InspectionStatusBadge status="in_progress" size="sm" />;
-      case "completed":
-        return <InspectionStatusBadge status="completed" size="sm" />;
-      case "past-due":
-        return <Badge variant="destructive">Past Due</Badge>;
-      case "cancelled":
-        return <Badge variant="outline" className="bg-gray-100 text-gray-800">Cancelled</Badge>;
-      case "draft":
-        return <Badge variant="outline" className="bg-gray-100 text-gray-800">Draft</Badge>;
-      default:
-        return <Badge variant="outline">{status}</Badge>;
+      case 'scheduled': return 'secondary';
+      case 'in_progress': return 'default';
+      case 'completed': return 'default';
+      case 'cancelled': return 'destructive';
+      default: return 'secondary';
     }
   };
 
-  const getPriorityBadge = (inspection: Inspection) => {
-    // Determine priority based on inspection type and status
-    let priority = 'medium';
-    
-    if (inspection.inspection_type?.toLowerCase().includes('emergency')) {
-      priority = 'high';
-    } else if (inspection.inspection_type?.toLowerCase().includes('routine')) {
-      priority = 'low';
-    } else if (getInspectionStatus(inspection) === 'past-due') {
-      priority = 'high';
-    }
-
-    switch (priority) {
-      case "high":
-        return <Badge variant="destructive">High</Badge>;
-      case "medium":
-        return <Badge variant="secondary" className="bg-orange-100 text-orange-800">Medium</Badge>;
-      case "low":
-        return <Badge variant="outline" className="bg-gray-100 text-gray-800">Low</Badge>;
-      default:
-        return <Badge variant="outline">{priority}</Badge>;
-    }
-  };
-
-  const exportData = useCallback(() => {
-    const csvData = filteredInspections.map(inspection => ({
-      'Property': inspection.roofs?.property_name || 'Unknown Property',
-      'Inspector': getInspectorName(inspection),
-      'Scheduled Date': inspection.scheduled_date || '',
-      'Completed Date': inspection.completed_date || '',
-      'Type': inspection.inspection_type || '',
-      'Status': getInspectionStatus(inspection),
-      'Weather': inspection.weather_conditions || '',
-      'Notes': inspection.notes || ''
-    }));
-
-    const csvContent = [
-      Object.keys(csvData[0] || {}).join(','),
-      ...csvData.map(row => Object.values(row).join(','))
-    ].join('\n');
-
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `inspections-${new Date().toISOString().split('T')[0]}.csv`;
-    a.click();
-    window.URL.revokeObjectURL(url);
-  }, [filteredInspections]);
-
-  const handleManualRefresh = useCallback(() => {
-    refresh();
-    dataSync.refreshAll();
-    toast({
-      title: "Refreshing",
-      description: "Updating inspection data...",
-    });
-  }, [refresh, dataSync, toast]);
-
-  const handleStatusChange = useCallback(async (inspectionId: string, newStatus: string) => {
+  const handleStatusUpdate = async (inspectionId: string, newStatus: InspectionStatus) => {
     try {
       await updateInspectionStatus(inspectionId, newStatus);
       toast({
@@ -254,242 +91,256 @@ export function InspectionsTab() {
         variant: "destructive"
       });
     }
-  }, [updateInspectionStatus, toast]);
+  };
 
-  if (loading) {
+  const renderInspectionActions = (inspection: InspectionSyncData) => {
+    const currentStatus = inspection.status || 'scheduled';
+    
+    return (
+      <div className="flex items-center space-x-2">
+        {currentStatus === 'scheduled' && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={() => handleStatusUpdate(inspection.id, 'in_progress')}
+            className="flex items-center space-x-1"
+          >
+            <Play className="h-3 w-3" />
+            <span>Start</span>
+          </Button>
+        )}
+        
+        {currentStatus === 'in_progress' && (
+          <>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handleStatusUpdate(inspection.id, 'completed')}
+              className="flex items-center space-x-1"
+            >
+              <CheckCircle className="h-3 w-3" />
+              <span>Complete</span>
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => handleStatusUpdate(inspection.id, 'scheduled')}
+              className="flex items-center space-x-1"
+            >
+              <Pause className="h-3 w-3" />
+              <span>Pause</span>
+            </Button>
+          </>
+        )}
+        
+        <Button
+          size="sm"
+          variant="ghost"
+          className="flex items-center space-x-1"
+        >
+          <Eye className="h-3 w-3" />
+          <span>View</span>
+        </Button>
+      </div>
+    );
+  };
+
+  if (error) {
     return (
       <div className="p-6">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-center">
-            <Loader2 className="h-8 w-8 animate-spin text-blue-600 mx-auto" />
-            <p className="mt-2 text-sm text-gray-600">Loading inspections...</p>
-          </div>
-        </div>
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center space-x-2 text-red-600">
+              <AlertTriangle className="h-5 w-5" />
+              <span>Error loading inspections: {error}</span>
+              <Button variant="outline" size="sm" onClick={() => refresh()}>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Retry
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header Actions */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search inspections..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 w-64"
-            />
-          </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Filter by status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Status</SelectItem>
-              <SelectItem value="scheduled">Scheduled</SelectItem>
-              <SelectItem value="in-progress">In Progress</SelectItem>
-              <SelectItem value="completed">Completed</SelectItem>
-              <SelectItem value="past-due">Past Due</SelectItem>
-            </SelectContent>
-          </Select>
-          
-          {/* Sync Status Indicator */}
-          <div className="flex items-center space-x-2 text-sm text-gray-500">
-            {syncStatus === 'syncing' ? (
-              <Loader2 className="h-4 w-4 animate-spin text-blue-600" />
-            ) : syncStatus === 'error' ? (
-              <WifiOff className="h-4 w-4 text-red-600" />
-            ) : syncStatus === 'stale' ? (
-              <Badge variant="outline" className="text-yellow-600 border-yellow-600">Stale</Badge>
-            ) : (
-              <Wifi className="h-4 w-4 text-green-600" />
-            )}
-            {lastSyncTime && (
-              <span className="text-xs">
-                Last sync: {format(lastSyncTime, 'HH:mm:ss')}
-              </span>
-            )}
-          </div>
-        </div>
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Scheduled</p>
+                <p className="text-2xl font-bold">{scheduledCount}</p>
+              </div>
+              <Calendar className="h-8 w-8 text-blue-600" />
+            </div>
+          </CardContent>
+        </Card>
         
-        <div className="flex items-center space-x-3">
-          {/* Manual Refresh Button */}
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={handleManualRefresh}
-            disabled={loading || syncStatus === 'syncing'}
-            className="text-gray-600"
-          >
-            <RefreshCw className={`h-4 w-4 mr-2 ${(loading || syncStatus === 'syncing') ? 'animate-spin' : ''}`} />
-            Refresh
-          </Button>
-          
-          {(userRole === 'inspector' || userRole === 'super_admin') && (
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => navigate('/inspector')}
-              className="bg-blue-50 border-blue-300 text-blue-700 hover:bg-blue-100"
-            >
-              <Brain className="h-4 w-4 mr-2" />
-              Inspector Intelligence
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">In Progress</p>
+                <p className="text-2xl font-bold">{inProgressCount}</p>
+              </div>
+              <Play className="h-8 w-8 text-orange-600" />
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Completed</p>
+                <p className="text-2xl font-bold">{completedCount}</p>
+              </div>
+              <CheckCircle className="h-8 w-8 text-green-600" />
+            </div>
+          </CardContent>
+        </Card>
+        
+        <Card>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-medium text-gray-600">Past Due</p>
+                <p className="text-2xl font-bold">{pastDueCount}</p>
+              </div>
+              <AlertTriangle className="h-8 w-8 text-red-600" />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Filters */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center justify-between">
+            <span>All Inspections</span>
+            <Button variant="outline" size="sm" onClick={() => refresh()} disabled={loading}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
+              Refresh
             </Button>
-          )}
-          <Button variant="outline" size="sm" onClick={exportData}>
-            <FileDown className="h-4 w-4 mr-2" />
-            Export
-          </Button>
-          <Button 
-            variant="outline" 
-            size="sm"
-            onClick={() => setSchedulingModalOpen(true)}
-          >
-            <Calendar className="h-4 w-4 mr-2" />
-            Schedule Inspection
-          </Button>
-          <Button variant="outline" size="sm">
-            Assign Review
-          </Button>
-          <Button size="sm">
-            <Plus className="h-4 w-4 mr-2" />
-            New Inspection
-          </Button>
-        </div>
-      </div>
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row gap-4 mb-6">
+            <div className="flex-1">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                <Input
+                  placeholder="Search inspections..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            <div className="w-full sm:w-48">
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger>
+                  <Filter className="h-4 w-4 mr-2" />
+                  <SelectValue placeholder="Filter by status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">All Statuses</SelectItem>
+                  <SelectItem value="scheduled">Scheduled</SelectItem>
+                  <SelectItem value="in_progress">In Progress</SelectItem>
+                  <SelectItem value="completed">Completed</SelectItem>
+                  <SelectItem value="cancelled">Cancelled</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
 
-      {/* Data Table */}
-      <div className="border rounded-lg bg-white">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-gray-50">
-              <TableHead className="font-semibold">Property</TableHead>
-              <TableHead className="font-semibold">Inspector</TableHead>
-              <TableHead className="font-semibold">Scheduled Date</TableHead>
-              <TableHead className="font-semibold">Type</TableHead>
-              <TableHead className="font-semibold">Status</TableHead>
-              <TableHead className="font-semibold">Priority</TableHead>
-              <TableHead className="font-semibold">Weather</TableHead>
-              <TableHead className="font-semibold">Actions</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {filteredInspections.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={8} className="text-center py-8">
-                  <div className="text-center">
-                    <Calendar className="mx-auto h-12 w-12 text-gray-400" />
-                    <h3 className="mt-2 text-sm font-medium text-gray-900">No inspections found</h3>
-                    <p className="mt-1 text-sm text-gray-500">
-                      {inspections.length === 0 
-                        ? "Get started by scheduling your first inspection."
-                        : "No inspections match your current filters."
-                      }
-                    </p>
-                    <Button 
-                      className="mt-4" 
-                      size="sm"
-                      onClick={() => setSchedulingModalOpen(true)}
-                    >
-                      <Plus className="h-4 w-4 mr-2" />
-                      Schedule Inspection
-                    </Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredInspections.map((inspection) => (
-              <TableRow key={inspection.id} className="hover:bg-gray-50">
-                <TableCell>
-                  <div className="flex items-center">
-                    <Building className="h-4 w-4 mr-2 text-gray-400" />
-                    <span className="font-medium">{inspection.roofs?.property_name || 'Unknown Property'}</span>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center">
-                    <User className="h-4 w-4 mr-2 text-gray-400" />
-                    {getInspectorName(inspection)}
-                  </div>
-                </TableCell>
-                <TableCell>
-                  {inspection.scheduled_date 
-                    ? format(new Date(inspection.scheduled_date), 'MMM dd, yyyy')
-                    : 'Not Scheduled'
-                  }
-                  {inspection.completed_date && (
-                    <div className="text-sm text-green-600">
-                      Completed: {format(new Date(inspection.completed_date), 'MMM dd')}
+          {/* Inspections List */}
+          {loading ? (
+            <div className="space-y-4">
+              {[...Array(5)].map((_, i) => (
+                <div key={i} className="border rounded-lg p-4 animate-pulse">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-2">
+                      <div className="h-4 bg-gray-200 rounded w-48"></div>
+                      <div className="h-3 bg-gray-200 rounded w-32"></div>
                     </div>
-                  )}
-                </TableCell>
-                <TableCell>{inspection.inspection_type || 'Not Specified'}</TableCell>
-                <TableCell>{getStatusBadge(inspection)}</TableCell>
-                <TableCell>{getPriorityBadge(inspection)}</TableCell>
-                <TableCell>{inspection.weather_conditions || 'Not Recorded'}</TableCell>
-                <TableCell>
-                  <div className="flex space-x-2">
-                    <Button variant="outline" size="sm">View</Button>
-                    <Button variant="outline" size="sm">Edit</Button>
-                    {getInspectionStatus(inspection) === "completed" && (
-                      <Button variant="outline" size="sm">Report</Button>
-                    )}
+                    <div className="h-6 bg-gray-200 rounded w-20"></div>
                   </div>
-                </TableCell>
-              </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </div>
-
-      {/* Enhanced Statistics */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center space-x-4">
-          <p className="text-sm text-gray-600">
-            Showing {filteredInspections.length} of {inspections.length} inspections
-          </p>
-          {error && (
-            <Badge variant="destructive" className="text-xs">
-              Sync Error
-            </Badge>
+                </div>
+              ))}
+            </div>
+          ) : filteredInspections.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              {inspections.length === 0 ? (
+                <div>
+                  <Calendar className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                  <p>No inspections found</p>
+                </div>
+              ) : (
+                <div>
+                  <Search className="h-12 w-12 mx-auto mb-4 text-gray-300" />
+                  <p>No inspections match your search criteria</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredInspections.map((inspection) => (
+                <div key={inspection.id} className="border rounded-lg p-4 hover:bg-gray-50 transition-colors">
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1">
+                      <div className="flex items-center space-x-3 mb-2">
+                        <h3 className="font-semibold text-lg">
+                          {inspection.roofs?.property_name || 'Unknown Property'}
+                        </h3>
+                        <Badge variant={getStatusBadgeVariant(inspection.status)}>
+                          {inspection.status || 'Unknown'}
+                        </Badge>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
+                        <div className="flex items-center space-x-2">
+                          <User className="h-4 w-4" />
+                          <span>Inspector: {getInspectorName(inspection)}</span>
+                        </div>
+                        
+                        <div className="flex items-center space-x-2">
+                          <Clock className="h-4 w-4" />
+                          <span>
+                            Scheduled: {inspection.scheduled_date 
+                              ? format(new Date(inspection.scheduled_date), 'MMM dd, yyyy')
+                              : 'Not scheduled'
+                            }
+                          </span>
+                        </div>
+                        
+                        <div className="flex items-center space-x-2">
+                          <MapPin className="h-4 w-4" />
+                          <span>Type: {inspection.inspection_type || 'Standard'}</span>
+                        </div>
+                      </div>
+                      
+                      {inspection.notes && (
+                        <div className="mt-2 text-sm text-gray-700">
+                          <span className="font-medium">Notes:</span> {inspection.notes}
+                        </div>
+                      )}
+                    </div>
+                    
+                    <div className="ml-4">
+                      {renderInspectionActions(inspection)}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           )}
-        </div>
-        <div className="flex items-center space-x-4 text-sm text-gray-600">
-          <span className="flex items-center">
-            <Badge variant="outline" className="mr-1">
-              {scheduledCount}
-            </Badge>
-            Scheduled
-          </span>
-          <span className="flex items-center">
-            <Badge variant="outline" className="mr-1 bg-blue-50 text-blue-700">
-              {inProgressCount}
-            </Badge>
-            In Progress
-          </span>
-          <span className="flex items-center">
-            <Badge variant="outline" className="mr-1 bg-green-50 text-green-700">
-              {completedCount}
-            </Badge>
-            Completed
-          </span>
-          <span className="flex items-center">
-            <Badge variant="destructive" className="mr-1">
-              {pastDueCount}
-            </Badge>
-            Past Due
-          </span>
-        </div>
-      </div>
-
-      <InspectionSchedulingModal
-        open={schedulingModalOpen}
-        onOpenChange={setSchedulingModalOpen}
-      />
+        </CardContent>
+      </Card>
     </div>
   );
 }

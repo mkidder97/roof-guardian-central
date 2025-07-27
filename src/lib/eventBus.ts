@@ -150,6 +150,14 @@ export const INSPECTOR_EVENTS = {
   PROPERTY_SELECTED: 'property.selected',
   PROPERTY_DESELECTED: 'property.deselected',
   PROPERTY_NAVIGATE: 'property.navigate',
+
+  // New typed events for inspection management
+  inspectionCreated: 'inspectionCreated',
+  inspectionUpdated: 'inspectionUpdated',
+  inspectionStatusChanged: 'inspectionStatusChanged',
+  inspectionDeleted: 'inspectionDeleted',
+  dataRefresh: 'dataRefresh',
+  buildingInspectionHistoryUpdated: 'buildingInspectionHistoryUpdated',
   
   // Inspection events
   INSPECTION_STARTED: 'inspection.started',
