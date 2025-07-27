@@ -151,10 +151,11 @@ export function PropertySelectionStep({
     try {
       setIsCreatingInspection(true);
       
-      // Combine notes with scheduled time information
+      // Combine notes with scheduled time and priority information
       const combinedNotes = [
         setupData.notes,
-        setupData.scheduledTime ? `Scheduled Time: ${setupData.scheduledTime}` : ''
+        setupData.scheduledTime ? `Scheduled Time: ${setupData.scheduledTime}` : '',
+        setupData.priority ? `Priority: ${setupData.priority}` : ''
       ].filter(Boolean).join('\n');
       
       // Create inspection records for all selected properties
@@ -165,7 +166,6 @@ export function PropertySelectionStep({
             roof_id: property.id,
             inspector_id: setupData.inspectorId,
             scheduled_date: setupData.scheduledDate,
-            priority: setupData.priority,
             inspection_type: setupData.inspectionType,
             status: 'scheduled',
             notes: combinedNotes
