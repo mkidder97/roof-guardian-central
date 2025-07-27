@@ -162,7 +162,7 @@ export function DatabasePerformanceMonitor() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{stats?.slow_queries || 0}</div>
-            <p className="text-xs text-muted-foreground">Queries >1s</p>
+            <p className="text-xs text-muted-foreground">Queries &gt;1s</p>
           </CardContent>
         </Card>
       </div>
