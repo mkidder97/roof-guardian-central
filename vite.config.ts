@@ -86,7 +86,7 @@ export default defineConfig(({ mode }) => ({
   plugins: [
     react(),
     mode === 'development' && componentTagger(),
-    tooltipProviderPlugin(),
+    // tooltipProviderPlugin(), // Temporarily disabled
   ].filter(Boolean),
   resolve: {
     alias: {
