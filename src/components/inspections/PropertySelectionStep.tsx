@@ -196,7 +196,7 @@ export function PropertySelectionStep({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-[95vw] w-full h-[90vh] flex flex-col p-6">
+      <DialogContent className="max-w-[95vw] w-full h-[90vh] flex flex-col p-6 overflow-hidden">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CheckCircle className="h-5 w-5 text-primary" />
@@ -204,7 +204,7 @@ export function PropertySelectionStep({
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 flex flex-col space-y-6 min-h-0 overflow-hidden">
+        <div className="flex-1 flex flex-col space-y-4 min-h-0 overflow-hidden">
           {/* Filters */}
           <Card>
             <CardHeader className="pb-3">
@@ -259,8 +259,8 @@ export function PropertySelectionStep({
           </Card>
 
           {/* Property List */}
-          <Card className="flex-1 min-h-0">
-            <CardHeader className="pb-3">
+          <Card className="flex-1 min-h-0 flex flex-col">
+            <CardHeader className="pb-3 flex-shrink-0">
               <div className="flex justify-between items-center">
                 <CardTitle className="text-lg flex items-center gap-2">
                   <Building className="h-5 w-5" />
@@ -286,8 +286,8 @@ export function PropertySelectionStep({
                 </div>
               </div>
             </CardHeader>
-            <CardContent className="p-0 flex-1">
-              <ScrollArea className="h-[55vh]">
+            <CardContent className="p-0 flex-1 min-h-0 overflow-hidden">
+              <ScrollArea className="h-full">
                 <div className="p-4 space-y-2">
                   {loading ? (
                     <p className="text-center text-muted-foreground py-8">Loading properties...</p>
@@ -338,12 +338,14 @@ export function PropertySelectionStep({
                     })
                   )}
                 </div>
+                {/* Add bottom padding to ensure content doesn't get cut off */}
+                <div className="h-4"></div>
               </ScrollArea>
             </CardContent>
           </Card>
 
           {/* Actions */}
-          <div className="flex justify-between items-center pt-6 mt-4 border-t bg-background flex-shrink-0">
+          <div className="flex justify-between items-center pt-6 mt-4 border-t bg-background flex-shrink-0 relative z-10">
             <Button 
               variant="outline" 
               onClick={onBack} 
