@@ -46,7 +46,7 @@ export function InspectionSetupStep({ open, onOpenChange, onComplete }: Inspecti
       if (!dateRange.from || !dateRange.to) newErrors.scheduledDate = 'Date range is required';
     }
     
-    if (!formData.scheduledTime) newErrors.scheduledTime = 'Time is required';
+    
     
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -60,7 +60,7 @@ export function InspectionSetupStep({ open, onOpenChange, onComplete }: Inspecti
       scheduledDate: dateMode === 'specific' 
         ? format(selectedDate!, 'yyyy-MM-dd')
         : `${format(dateRange.from!, 'yyyy-MM-dd')} to ${format(dateRange.to!, 'yyyy-MM-dd')}`,
-      scheduledTime: formData.scheduledTime!,
+      scheduledTime: formData.scheduledTime || '',
       priority: formData.priority!,
       inspectionType: formData.inspectionType!,
       notes: formData.notes
@@ -203,7 +203,7 @@ export function InspectionSetupStep({ open, onOpenChange, onComplete }: Inspecti
 
               {/* Time Selection */}
               <div className="space-y-2">
-                <Label htmlFor="time">Inspection Time *</Label>
+                <Label htmlFor="time">Inspection Time (Optional)</Label>
                 <Select
                   value={formData.scheduledTime}
                   onValueChange={(value) => setFormData(prev => ({ ...prev, scheduledTime: value }))}
