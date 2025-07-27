@@ -149,7 +149,7 @@ const MonitoringTestComponent: React.FC = () => {
 };
 
 const MonitoredTestComponent = () => (
-  <ErrorBoundary componentName="MonitoringTestComponent" level="component">
+  <ErrorBoundary componentName="MonitoringTestComponent">
     <ComponentHealthMonitor
       componentName="MonitoringTestComponent"
       criticalComponent={false}
