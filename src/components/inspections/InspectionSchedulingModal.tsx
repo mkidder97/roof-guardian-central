@@ -949,7 +949,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
         .from('inspections')
         .insert({
           roof_id: selectedProperty.id,
-          inspector_id: inspector.id,
+          inspector_id: inspector.auth_user_id, // Use auth_user_id for proper assignment
           scheduled_date: scheduledDate,
           status: 'scheduled',
           inspection_type: inspectionType,
@@ -965,7 +965,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
         .from('inspection_sessions')
         .insert({
           property_id: selectedProperty.id,
-          inspector_id: inspector.id,
+          inspector_id: inspector.auth_user_id, // Use auth_user_id for proper assignment
           inspection_status: 'scheduled',
           session_data: {
             inspectionType,

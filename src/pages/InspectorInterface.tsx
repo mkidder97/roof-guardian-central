@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -235,30 +236,61 @@ const InspectorInterface = () => {
   const loadProperties = useCallback(async () => {
     setLoading(true);
     try {
-      const properties = await InspectorIntelligenceService.getAvailableProperties();
+      // Get current user to filter inspections by inspector
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        throw new Error('No authenticated user');
+      }
+
+      // Get inspections assigned to current inspector
+      const { data: inspections, error: inspectionsError } = await supabase
+        .from('inspections')
+        .select(`
+          id,
+          roof_id,
+          scheduled_date,
+          completed_date,
+          status,
+          inspection_type,
+          notes,
+          roofs (
+            id,
+            property_name,
+            address,
+            city,
+            state,
+            roof_type,
+            roof_area,
+            last_inspection_date
+          ),
+          inspection_sessions (
+            id,
+            status,
+            session_data
+          )
+        `)
+        .eq('inspector_id', user.id)
+        .order('scheduled_date', { ascending: true });
+
+      if (inspectionsError) throw inspectionsError;
+
+      // Transform to the expected format for the interface
+      const propertiesWithInspections = (inspections || []).map(inspection => ({
+        id: inspection.roofs?.id || inspection.roof_id,
+        name: inspection.roofs?.property_name || 'Unknown Property',
+        roofType: inspection.roofs?.roof_type || 'Unknown',
+        squareFootage: inspection.roofs?.roof_area || 0,
+        lastInspectionDate: inspection.roofs?.last_inspection_date,
+        criticalIssues: 0,
+        status: 'good',
+        inspectionStatus: inspection.status,
+        inspectionId: inspection.id,
+        scheduledDate: inspection.scheduled_date,
+        inspectionType: inspection.inspection_type,
+        sessionData: inspection.inspection_sessions?.[0]
+      }));
       
-      // Get property summaries with critical issue counts and inspection status
-      const propertiesWithSummary = await Promise.all(
-        properties.slice(0, 10).map(async (property) => {
-          const summary = await InspectorIntelligenceService.getPropertySummary(property.id);
-          
-          // Get the latest inspection status from inspection_sessions
-          const inspectionStatus = (property as any).inspection_sessions?.[0]?.inspection_status || 'scheduled';
-          
-          return summary || {
-            id: property.id,
-            name: property.property_name,
-            roofType: property.roof_type || 'Unknown',
-            squareFootage: property.roof_area || 0,
-            lastInspectionDate: property.last_inspection_date,
-            criticalIssues: 0,
-            status: 'good',
-            inspectionStatus
-          };
-        })
-      );
-      
-      setAvailableProperties(propertiesWithSummary);
+      setAvailableProperties(propertiesWithInspections);
     } catch (error) {
       console.error('Error loading properties:', error);
       

@@ -38,6 +38,7 @@ interface CommandPaletteProps {
   onCreateInspection?: () => void;
   onCreateWorkOrder?: () => void;
   onCreateCampaign?: () => void;
+  onNavigateToInspector?: () => void;
 }
 
 export function CommandPalette({
@@ -46,7 +47,8 @@ export function CommandPalette({
   onNavigate,
   onCreateInspection,
   onCreateWorkOrder,
-  onCreateCampaign
+  onCreateCampaign,
+  onNavigateToInspector
 }: CommandPaletteProps) {
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
@@ -89,6 +91,15 @@ export function CommandPalette({
       keywords: ['search', 'find', 'filter', 'ai'],
       badge: 'AI',
       action: () => onNavigate?.('search')
+    },
+    {
+      id: 'nav-inspector',
+      title: 'Inspector Dashboard',
+      subtitle: 'View your assigned inspections',
+      icon: Users,
+      category: 'Navigation',
+      keywords: ['inspector', 'dashboard', 'assigned', 'my inspections'],
+      action: () => onNavigateToInspector?.()
     },
 
     // Quick Actions

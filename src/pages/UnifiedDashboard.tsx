@@ -247,6 +247,15 @@ export function UnifiedDashboard() {
                   <Command className="h-3 w-3 mr-1" />
                   Press ⌘K for quick actions
                 </Button>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={() => navigate("/inspector")}
+                  className="text-xs"
+                >
+                  <User className="h-3 w-3 mr-1" />
+                  Inspector Dashboard
+                </Button>
               </div>
               
               <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -278,6 +287,9 @@ export function UnifiedDashboard() {
         onCreateInspection={() => {
           setInspectionModalOpen(true);
           setCommandPaletteOpen(false);
+        }}
+        onNavigateToInspector={() => {
+          navigate("/inspector");
         }}
         onCreateWorkOrder={() => {
           // Handle create work order
