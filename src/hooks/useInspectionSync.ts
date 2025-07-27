@@ -53,8 +53,15 @@ export function useInspectionSync(options: UseInspectionSyncOptions = {}) {
   const toastRef = useRef(toast);
   toastRef.current = toast;
 
+  const previousDataRef = useRef<InspectionSyncData[]>([]);
+  const isLoadingRef = useRef(false);
+
   const fetchInspections = useCallback(async (showLoading = true) => {
+    // Prevent concurrent fetches
+    if (isLoadingRef.current) return;
+    
     try {
+      isLoadingRef.current = true;
       if (showLoading) {
         setLoading(true);
         setSyncStatus('syncing');
@@ -98,19 +105,28 @@ export function useInspectionSync(options: UseInspectionSyncOptions = {}) {
         inspection_status: (inspection.status || 'scheduled') as InspectionStatus
       })) as InspectionSyncData[];
 
-      setInspections(transformedData);
-      setSyncStatus('idle');
-      setLastSyncTime(new Date());
+      // Deep comparison to prevent unnecessary updates
+      const hasChanged = transformedData.length !== previousDataRef.current.length || 
+        transformedData.some((item, index) => 
+          !previousDataRef.current[index] || 
+          item.id !== previousDataRef.current[index].id ||
+          item.status !== previousDataRef.current[index].status ||
+          item.updated_at !== previousDataRef.current[index].updated_at
+        );
 
-      // Only emit sync event if data actually changed to prevent loops
-      if (transformedData.length !== inspections.length || 
-          JSON.stringify(transformedData) !== JSON.stringify(inspections)) {
+      if (hasChanged) {
+        setInspections(transformedData);
+        previousDataRef.current = transformedData;
+        
         inspectorEventBus.emit(INSPECTOR_EVENTS.INSPECTION_DATA_SYNC, {
           inspections: transformedData,
           syncTime: new Date(),
           filters: stableFilters
         }, 'inspection_sync_hook');
       }
+
+      setSyncStatus('idle');
+      setLastSyncTime(new Date());
 
     } catch (err) {
       console.error('Error fetching inspections:', err);
@@ -124,11 +140,12 @@ export function useInspectionSync(options: UseInspectionSyncOptions = {}) {
         variant: "destructive"
       });
     } finally {
+      isLoadingRef.current = false;
       if (showLoading) {
         setLoading(false);
       }
     }
-  }, [stableFilters, inspections]);
+  }, [stableFilters]);
 
   const updateInspectionStatus = useCallback(async (
     inspectionId: string,
@@ -163,10 +180,14 @@ export function useInspectionSync(options: UseInspectionSyncOptions = {}) {
     }
   }, []);
 
+  // Create stable function references to prevent recreation
+  const fetchInspectionsRef = useRef(fetchInspections);
+  fetchInspectionsRef.current = fetchInspections;
+
   // Create debounced fetch to prevent rapid-fire events
   const debouncedFetch = useMemo(
-    () => debounce(() => fetchInspections(false), 500),
-    [fetchInspections]
+    () => debounce(() => fetchInspectionsRef.current(false), 500),
+    []
   );
 
   // Single refresh coordinator to consolidate all refresh mechanisms
@@ -175,9 +196,9 @@ export function useInspectionSync(options: UseInspectionSyncOptions = {}) {
   // Unified refresh effect
   useEffect(() => {
     if (refreshTrigger > 0) {
-      fetchInspections();
+      fetchInspectionsRef.current();
     }
-  }, [refreshTrigger, fetchInspections]);
+  }, [refreshTrigger]);
 
   // Real-time event listeners with debouncing
   useEffect(() => {
