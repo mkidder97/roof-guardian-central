@@ -196,7 +196,7 @@ export function PropertySelectionStep({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] flex flex-col">
+      <DialogContent className="max-w-4xl max-h-[95vh] flex flex-col">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CheckCircle className="h-5 w-5 text-primary" />
@@ -367,7 +367,7 @@ export function PropertySelectionStep({
           </Card>
 
           {/* Actions */}
-          <div className="flex justify-between">
+          <div className="flex justify-between items-center pt-4 border-t bg-background sticky bottom-0">
             <Button variant="outline" onClick={onBack} className="flex items-center gap-2">
               <ArrowLeft className="h-4 w-4" />
               Back
@@ -376,6 +376,7 @@ export function PropertySelectionStep({
             <Button 
               onClick={handleScheduleInspection}
               disabled={selectedProperties.length === 0 || isCreatingInspection}
+              className="relative z-50"
             >
               {isCreatingInspection 
                 ? 'Scheduling...' 
