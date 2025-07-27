@@ -205,7 +205,6 @@ export const MonitoringDashboard: React.FC<MonitoringDashboardProps> = ({
                   <Switch
                     checked={autoRefresh}
                     onCheckedChange={setAutoRefresh}
-                    size="sm"
                   />
                   <span className="text-xs">Auto</span>
                 </div>
@@ -343,7 +342,7 @@ export const MonitoringDashboard: React.FC<MonitoringDashboardProps> = ({
       </div>
 
       {/* Main Content */}
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+      <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as typeof activeTab)} className="space-y-4">
         <TabsList className="grid w-full grid-cols-4">
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="performance">Performance</TabsTrigger>

@@ -601,7 +601,6 @@ export const AlertingSystem: React.FC<AlertingSystemProps> = ({
               <Switch
                 checked={isEnabled}
                 onCheckedChange={setIsEnabled}
-                size="sm"
               />
               <Button
                 variant="ghost"

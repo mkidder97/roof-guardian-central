@@ -153,7 +153,7 @@ const PropertyListItem = memo(({
       ) : (
         <Checkbox
           checked={isSelected}
-          onCheckedChange={(checked) => onPropertySelection?.(property, checked)}
+          onCheckedChange={(checked) => onPropertySelection?.(property, Boolean(checked))}
         />
       )}
       <div className="flex-1">
@@ -1014,6 +1014,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
         processedCount: 1,
         results: [{
           success: true,
+          attempts: 1,
           campaignData: {
             campaign_id: inspectionData.id,
             campaign_name: `Direct Inspection - ${selectedProperty.property_name}`,

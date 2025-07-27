@@ -7,7 +7,7 @@ import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { inspectorEventBus, INSPECTOR_EVENTS } from '@/lib/eventBus';
-import type { UnifiedInspection, InspectionStatus } from '@/types/inspection';
+import type { UnifiedInspection, InspectionStatus, InspectionType, InspectionPriority } from '@/types/inspection';
 
 interface InspectionHistoryTabProps {
   roof: {
@@ -61,8 +61,8 @@ export function InspectionHistoryTab({ roof }: InspectionHistoryTabProps) {
         scheduled_date: inspection.scheduled_date,
         completed_date: inspection.completed_date,
         status: (inspection.status || 'scheduled') as InspectionStatus,
-        inspection_type: inspection.inspection_type || 'routine',
-        priority: inspection.priority || 'medium',
+        inspection_type: (inspection.inspection_type || 'routine') as InspectionType,
+        priority: ('medium') as InspectionPriority, // Default priority since it may not exist in DB
         notes: inspection.notes,
         weather_conditions: inspection.weather_conditions,
         created_at: inspection.created_at,
