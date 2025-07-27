@@ -18,6 +18,7 @@ import { Search, Calendar, CheckCircle, X, FileDown, Filter, MapPin, AlertCircle
 
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
+import type { InspectionStatus } from '@/types/inspection';
 import { useN8nWorkflow, type CampaignWorkflowData, type ProcessingResult } from '@/hooks/useN8nWorkflow';
 import { useInspectors, type Inspector } from '@/hooks/useInspectors';
 import { useUnifiedInspectionEvents, useInspectionEventEmitter } from '@/hooks/useUnifiedInspectionEvents';
@@ -996,7 +997,7 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
           last_name: inspector.full_name.split(' ').slice(1).join(' '),
           email: inspector.email
         },
-        inspection_status: 'scheduled'
+        inspection_status: 'scheduled' as InspectionStatus
       };
 
       // Emit unified events for real-time synchronization

@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef } from 'react';
 import { inspectorEventBus, INSPECTOR_EVENTS, InspectorEvent } from '@/lib/eventBus';
 import { useInspectorEvents, useInspectionState, usePropertySelection } from '@/hooks/useInspectorEvents';
 import { useInspectionSync } from '@/hooks/useInspectionSync';
-import type { InspectionSyncData } from '@/types/inspection';
+import type { InspectionSyncData, InspectionStatus } from '@/types/inspection';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface UnifiedInspectionEventPayloads {
@@ -323,8 +323,8 @@ export function useUnifiedInspectionEvents() {
 
         // Update in database
         const updatedInspection = await inspectionLifecycle.update(id, { 
-          status: newStatus,
-          inspection_status: newStatus 
+          status: newStatus as InspectionStatus,
+          inspection_status: newStatus as InspectionStatus
         });
 
         // Additional status-specific actions

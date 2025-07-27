@@ -4,7 +4,7 @@ export { DatabasePerformanceMonitor } from './DatabasePerformanceMonitor';
 export { AlertingSystem } from './AlertingSystem';
 export { MonitoringDashboard } from './MonitoringDashboard';
 export { ErrorBoundary } from './ErrorBoundary';
-export { AutoRecoverySystem } from './AutoRecoverySystem';
+export { AutoRecoveryProvider, useAutoRecovery } from './AutoRecoverySystem';
 export { PerformanceMonitoringDashboard } from './PerformanceMonitoringDashboard';
 
 // Simplified monitoring service exports
@@ -34,3 +34,14 @@ export const useAlertSystem = () => ({
   addAlert: () => {},
   removeAlert: () => {}
 });
+
+// Additional compatibility exports for MonitoringDemo
+export const useHealthReporting = (componentName?: string) => ({
+  reportHealth: () => {},
+  getHealthStatus: () => 'healthy',
+  reportApiCall: (time?: number) => {},
+  reportCustomMetric: () => {},
+  updateHealthStatus: (status?: string, issues?: string[], metrics?: any) => {}
+});
+
+export const monitoringService = MonitoringService;
