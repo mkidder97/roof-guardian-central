@@ -205,30 +205,6 @@ export function PropertySelectionStep({
         </DialogHeader>
 
         <div className="flex-1 flex flex-col space-y-6 min-h-0 overflow-hidden">
-          {/* Setup Summary */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="text-lg">Inspection Details</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                <div>
-                  <span className="font-medium">Date:</span> {setupData.scheduledDate}
-                </div>
-                <div>
-                  <span className="font-medium">Time:</span> {setupData.scheduledTime}
-                </div>
-                <div>
-                  <span className="font-medium">Priority:</span> 
-                  <Badge variant="outline" className="ml-1">{setupData.priority}</Badge>
-                </div>
-                <div>
-                  <span className="font-medium">Type:</span> {setupData.inspectionType}
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
           {/* Filters */}
           <Card>
             <CardHeader className="pb-3">
@@ -311,7 +287,7 @@ export function PropertySelectionStep({
               </div>
             </CardHeader>
             <CardContent className="p-0 flex-1">
-              <ScrollArea className="h-[40vh]">
+              <ScrollArea className="h-[55vh]">
                 <div className="p-4 space-y-2">
                   {loading ? (
                     <p className="text-center text-muted-foreground py-8">Loading properties...</p>
