@@ -37,7 +37,7 @@ export function useInspectors() {
       if (error) throw error;
 
       const processedInspectors: Inspector[] = (inspectorUsers || []).map(user => ({
-        id: user.auth_user_id,
+        id: user.id,
         first_name: user.first_name || '',
         last_name: user.last_name || '',
         email: user.email,
