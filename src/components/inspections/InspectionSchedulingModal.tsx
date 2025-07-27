@@ -1616,12 +1616,17 @@ export function InspectionSchedulingModal({ open, onOpenChange }: InspectionSche
                   </CardContent>
                 </Card>
 
-                {/* Direct Inspection Form */}
+                {/* Direct Inspection Form - Always visible in Direct Mode */}
                 <Card>
                   <CardHeader>
                     <CardTitle className="flex items-center space-x-2">
                       <Zap className="h-5 w-5" />
                       <span>Inspection Details</span>
+                      {directInspectionData.selectedProperty && (
+                        <Badge variant="outline" className="text-xs">
+                          Property Selected
+                        </Badge>
+                      )}
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-6">
