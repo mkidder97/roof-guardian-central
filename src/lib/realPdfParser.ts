@@ -1,7 +1,7 @@
-import * as pdfjsLib from 'pdfjs-dist';
+import { getDocument, GlobalWorkerOptions } from 'pdfjs-dist';
 
 // Set worker path for pdfjs-dist
-pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
+GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js`;
 
 export interface ExtractedPDFData {
   // Property Information
@@ -55,7 +55,7 @@ export class RealPDFParser {
       const arrayBuffer = await file.arrayBuffer();
       
       // Load PDF document
-      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      const pdf = await getDocument({ data: arrayBuffer }).promise;
       console.log('PDF loaded successfully, pages:', pdf.numPages);
       
       // Extract text from all pages

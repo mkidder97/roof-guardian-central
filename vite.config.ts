@@ -84,10 +84,17 @@ export default defineConfig(({ mode }) => ({
     }
   },
   define: {
+    global: 'globalThis',
     __BUILD_VERSION__: JSON.stringify(process.env.GITHUB_SHA || Date.now().toString()),
   },
   optimizeDeps: {
-    exclude: ['@supabase/supabase-js'] // Prevent auth lib from HMR corruption
+    include: ['pdfjs-dist', '@supabase/supabase-js'],
+    exclude: ['@supabase/supabase-js/dist/module/index.js']
+  },
+  build: {
+    commonjsOptions: {
+      include: [/pdfjs-dist/, /node_modules/]
+    }
   },
   plugins: [
     react(),

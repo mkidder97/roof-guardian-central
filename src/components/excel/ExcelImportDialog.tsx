@@ -6,7 +6,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Progress } from "@/components/ui/progress";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useToast } from "@/hooks/use-toast";
-import * as XLSX from 'xlsx';
+import { read, utils } from 'xlsx';
 import { supabase } from "@/integrations/supabase/client";
 
 interface ExcelImportDialogProps {
@@ -49,9 +49,9 @@ export function ExcelImportDialog({ open, onOpenChange, onImportComplete }: Exce
 
     try {
       const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data);
+      const workbook = read(data);
       const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 });
+      const jsonData = utils.sheet_to_json(worksheet, { header: 1 });
 
       // Remove header row and filter empty rows
       const [headers, ...rows] = jsonData as string[][];
