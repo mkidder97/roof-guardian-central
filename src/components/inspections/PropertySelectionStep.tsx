@@ -166,6 +166,7 @@ export function PropertySelectionStep({
             roof_id: property.id,
             inspector_id: setupData.inspectorId,
             scheduled_date: setupData.scheduledDate,
+            priority: setupData.priority,
             inspection_type: setupData.inspectionType,
             status: 'scheduled',
             notes: combinedNotes
