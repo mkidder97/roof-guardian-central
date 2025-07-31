@@ -85,6 +85,8 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
         .single();
 
       if (error) throw error;
+      
+      console.log('Fetched roof data:', data); // Debug logging
       setRoofData(data);
       
       // Extract critical areas from inspection reports
@@ -92,6 +94,7 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
       setCriticalAreas(criticalInsights);
     } catch (error) {
       console.error('Error fetching roof data:', error);
+      console.error('Error details:', error);
     } finally {
       setLoading(false);
     }
@@ -189,12 +192,12 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold flex items-center gap-2">
               <Building2 className="h-6 w-6" />
-              {roofData.property_name}
+              {roofData.property_name || 'Unknown Property'}
             </DialogTitle>
             <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
               <span className="flex items-center gap-1">
                 <MapPin className="h-4 w-4" />
-                {roofData.address}, {roofData.city}, {roofData.state} {roofData.zip}
+                {roofData.address || 'Address not available'}, {roofData.city || 'Unknown'}, {roofData.state || 'Unknown'} {roofData.zip || ''}
               </span>
               {roofData.roof_area && (
                 <span className="flex items-center gap-1">
