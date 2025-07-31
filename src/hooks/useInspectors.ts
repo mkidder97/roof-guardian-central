@@ -22,15 +22,16 @@ export function useInspectors() {
   const fetchInspectors = async () => {
     setLoading(true);
     try {
-      // Fetch users with inspector role
+      // Fetch company users (employees who can inspect)
       const { data: inspectorUsers, error } = await supabase
-        .from('profiles')
+        .from('users')
         .select(`
           id,
           auth_user_id,
           first_name,
           last_name,
-          email
+          email,
+          role
         `)
         .eq('is_active', true);
 
