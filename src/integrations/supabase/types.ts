@@ -520,7 +520,6 @@ export type Database = {
           inspection_type: string | null
           inspector_id: string | null
           notes: string | null
-          priority: string | null
           roof_id: string | null
           scheduled_date: string | null
           status: string | null
@@ -534,7 +533,6 @@ export type Database = {
           inspection_type?: string | null
           inspector_id?: string | null
           notes?: string | null
-          priority?: string | null
           roof_id?: string | null
           scheduled_date?: string | null
           status?: string | null
@@ -548,7 +546,6 @@ export type Database = {
           inspection_type?: string | null
           inspector_id?: string | null
           notes?: string | null
-          priority?: string | null
           roof_id?: string | null
           scheduled_date?: string | null
           status?: string | null
