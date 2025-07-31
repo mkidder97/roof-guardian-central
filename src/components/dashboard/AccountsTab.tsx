@@ -25,27 +25,6 @@ export function AccountsTab() {
     }
   });
 
-  // Process and filter users
-  const accounts = useMemo(() => {
-    if (!users) return [];
-    
-    return users
-      .filter(user => {
-        const matchesSearch = !searchTerm || 
-          `${user.first_name} ${user.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          user.email?.toLowerCase().includes(searchTerm.toLowerCase());
-        
-        const matchesRole = roleFilter === 'all' || user.role === roleFilter;
-        
-        return matchesSearch && matchesRole;
-      })
-      .map(user => ({
-        ...user,
-        permissions: getPermissionsForRole(user.role || 'inspector'),
-        last_login: user.updated_at ? new Date(user.updated_at).toLocaleString() : 'Never'
-      }));
-  }, [users, searchTerm, roleFilter]);
-
   // Get permissions based on role
   const getPermissionsForRole = (role: string) => {
     switch (role) {
@@ -59,6 +38,32 @@ export function AccountsTab() {
         return ['basic_access'];
     }
   };
+
+  // Process and filter users
+  const accounts = useMemo(() => {
+    if (!users) return [];
+    
+    try {
+      return users
+        .filter(user => {
+          const matchesSearch = !searchTerm || 
+            `${user.first_name} ${user.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+            user.email?.toLowerCase().includes(searchTerm.toLowerCase());
+          
+          const matchesRole = roleFilter === 'all' || user.role === roleFilter;
+          
+          return matchesSearch && matchesRole;
+        })
+        .map(user => ({
+          ...user,
+          permissions: getPermissionsForRole(user.role || 'inspector'),
+          last_login: user.updated_at ? new Date(user.updated_at).toLocaleString() : 'Never'
+        }));
+    } catch (error) {
+      console.error('Error processing users:', error);
+      return [];
+    }
+  }, [users, searchTerm, roleFilter]);
 
   const getRoleBadge = (role: string) => {
     switch (role) {
