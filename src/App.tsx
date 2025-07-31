@@ -75,7 +75,7 @@ const App = () => (
           sessionStorage.clear();
         }}
       >
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
           <TooltipProvider>
             <Toaster />
             <Sonner />

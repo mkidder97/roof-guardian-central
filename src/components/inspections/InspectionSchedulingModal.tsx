@@ -19,7 +19,7 @@ import { Search, Calendar, CheckCircle, X, FileDown, Filter, MapPin, AlertCircle
 import { useToast } from '@/hooks/use-toast';
 import { DirectInspectionWizard } from './DirectInspectionWizard';
 import { format } from 'date-fns';
-import type { InspectionStatus } from '@/types/inspection';
+import type { InspectionStatus, InspectionType, InspectionPriority, DirectInspectionData, InspectionItem } from '@/types/inspection';
 import { useN8nWorkflow, type CampaignWorkflowData, type ProcessingResult } from '@/hooks/useN8nWorkflow';
 import { useInspectors, type Inspector } from '@/hooks/useInspectors';
 import { useUnifiedInspectionEvents, useInspectionEventEmitter } from '@/hooks/useUnifiedInspectionEvents';
@@ -936,6 +936,7 @@ export function InspectionSchedulingModal({ open, onOpenChange, directMode = fal
           scheduled_date: scheduledDate,
           status: 'scheduled',
           inspection_type: inspectionType,
+          priority: priority as InspectionPriority,
           notes: notes || `Direct inspection scheduled for ${selectedProperty.property_name}`
         })
         .select()
@@ -969,6 +970,7 @@ export function InspectionSchedulingModal({ open, onOpenChange, directMode = fal
       // Transform inspection data for unified event system
       const createdInspection = {
         ...inspectionData,
+        priority: priority as InspectionPriority,
         roofs: {
           property_name: selectedProperty.property_name,
           address: selectedProperty.address,
