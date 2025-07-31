@@ -7,7 +7,6 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Search, Plus, FileDown, DollarSign, Calendar, User, Shield, Loader2 } from "lucide-react";
-import { PopulateUsersButton } from "@/components/admin/PopulateUsersButton";
 
 export function AccountsTab() {
   const [searchTerm, setSearchTerm] = useState("");
@@ -112,9 +111,6 @@ export function AccountsTab() {
         </div>
         
         <div className="flex items-center space-x-3">
-          {users && users.length === 0 && (
-            <PopulateUsersButton onSuccess={() => refetch()} />
-          )}
           <Button variant="outline" size="sm">
             <FileDown className="h-4 w-4 mr-2" />
             Export Users
