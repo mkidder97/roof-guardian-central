@@ -6,7 +6,6 @@ export interface InspectionSetupData {
   inspectorId: string;
   scheduledDate: string;
   scheduledTime: string;
-  priority: 'low' | 'medium' | 'high' | 'urgent';
   inspectionType: 'routine' | 'warranty' | 'damage' | 'maintenance';
   notes?: string;
 }

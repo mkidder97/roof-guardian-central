@@ -24,7 +24,6 @@ interface InspectionSetupStepProps {
 export function InspectionSetupStep({ open, onOpenChange, onComplete }: InspectionSetupStepProps) {
   const { inspectors } = useInspectors();
   const [formData, setFormData] = useState<Partial<InspectionSetupData>>({
-    priority: 'medium',
     inspectionType: 'routine'
   });
   const [dateMode, setDateMode] = useState<'specific' | 'range'>('specific');
@@ -61,7 +60,6 @@ export function InspectionSetupStep({ open, onOpenChange, onComplete }: Inspecti
         ? format(selectedDate!, 'yyyy-MM-dd')
         : `${format(dateRange.from!, 'yyyy-MM-dd')} to ${format(dateRange.to!, 'yyyy-MM-dd')}`,
       scheduledTime: formData.scheduledTime || '',
-      priority: formData.priority!,
       inspectionType: formData.inspectionType!,
       notes: formData.notes
     };
@@ -251,27 +249,6 @@ export function InspectionSetupStep({ open, onOpenChange, onComplete }: Inspecti
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
-              {/* Priority */}
-              <div className="space-y-2">
-                <Label>Priority</Label>
-                <Select
-                  value={formData.priority}
-                  onValueChange={(value: 'low' | 'medium' | 'high' | 'urgent') => 
-                    setFormData(prev => ({ ...prev, priority: value }))
-                  }
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="low">Low</SelectItem>
-                    <SelectItem value="medium">Medium</SelectItem>
-                    <SelectItem value="high">High</SelectItem>
-                    <SelectItem value="urgent">Urgent</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
               {/* Inspection Type */}
               <div className="space-y-2">
                 <Label>Inspection Type</Label>
