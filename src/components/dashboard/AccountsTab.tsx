@@ -1,84 +1,75 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, Plus, FileDown, DollarSign, Calendar, User, Shield } from "lucide-react";
+import { Search, Plus, FileDown, DollarSign, Calendar, User, Shield, Loader2 } from "lucide-react";
 
 export function AccountsTab() {
   const [searchTerm, setSearchTerm] = useState("");
   const [roleFilter, setRoleFilter] = useState("all");
 
-  // Mock data
-  const accounts = [
-    {
-      id: "1",
-      first_name: "John",
-      last_name: "Smith",
-      email: "john.smith@roofcontroller.com",
-      role: "admin",
-      phone: "(555) 100-1001",
-      is_active: true,
-      last_login: "2024-01-17 09:30",
-      permissions: ["full_access"]
-    },
-    {
-      id: "2",
-      first_name: "Sarah",
-      last_name: "Johnson",
-      email: "sarah.johnson@roofcontroller.com",
-      role: "inspector",
-      phone: "(555) 100-1002",
-      is_active: true,
-      last_login: "2024-01-17 14:15",
-      permissions: ["inspections", "reports"]
-    },
-    {
-      id: "3",
-      first_name: "Mike",
-      last_name: "Davis",
-      email: "mike.davis@roofcontroller.com",
-      role: "inspector",
-      phone: "(555) 100-1003",
-      is_active: true,
-      last_login: "2024-01-16 16:45",
-      permissions: ["inspections", "reports"]
-    },
-    {
-      id: "4",
-      first_name: "Emily",
-      last_name: "Chen",
-      email: "emily.chen@roofcontroller.com",
-      role: "manager",
-      phone: "(555) 100-1004",
-      is_active: true,
-      last_login: "2024-01-17 11:20",
-      permissions: ["inspections", "reports", "clients", "vendors"]
-    },
-    {
-      id: "5",
-      first_name: "Robert",
-      last_name: "Wilson",
-      email: "robert.wilson@roofcontroller.com",
-      role: "inspector",
-      phone: "(555) 100-1005",
-      is_active: false,
-      last_login: "2024-01-10 13:30",
-      permissions: ["inspections"]
+  // Fetch real users from database
+  const { data: users, isLoading, error } = useQuery({
+    queryKey: ['users'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('users')
+        .select('*')
+        .order('first_name');
+      if (error) throw error;
+      return data;
     }
-  ];
+  });
+
+  // Process and filter users
+  const accounts = useMemo(() => {
+    if (!users) return [];
+    
+    return users
+      .filter(user => {
+        const matchesSearch = !searchTerm || 
+          `${user.first_name} ${user.last_name}`.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          user.email?.toLowerCase().includes(searchTerm.toLowerCase());
+        
+        const matchesRole = roleFilter === 'all' || user.role === roleFilter;
+        
+        return matchesSearch && matchesRole;
+      })
+      .map(user => ({
+        ...user,
+        permissions: getPermissionsForRole(user.role || 'inspector'),
+        last_login: user.updated_at ? new Date(user.updated_at).toLocaleString() : 'Never'
+      }));
+  }, [users, searchTerm, roleFilter]);
+
+  // Get permissions based on role
+  const getPermissionsForRole = (role: string) => {
+    switch (role) {
+      case 'super_admin':
+        return ['full_access', 'user_management', 'system_settings'];
+      case 'manager':
+        return ['inspections', 'reports', 'clients', 'vendors'];
+      case 'inspector':
+        return ['inspections', 'reports'];
+      default:
+        return ['basic_access'];
+    }
+  };
 
   const getRoleBadge = (role: string) => {
     switch (role) {
-      case "admin":
-        return <Badge variant="destructive" className="bg-red-100 text-red-800">Admin</Badge>;
+      case "super_admin":
+        return <Badge variant="destructive" className="bg-red-100 text-red-800">Super Admin</Badge>;
       case "manager":
         return <Badge variant="default" className="bg-blue-100 text-blue-800">Manager</Badge>;
       case "inspector":
         return <Badge variant="secondary" className="bg-green-100 text-green-800">Inspector</Badge>;
-      case "viewer":
-        return <Badge variant="outline" className="bg-gray-100 text-gray-800">Viewer</Badge>;
+      case "admin":
+        return <Badge variant="destructive" className="bg-red-100 text-red-800">Admin</Badge>;
       default:
         return <Badge variant="outline">{role}</Badge>;
     }
@@ -112,10 +103,9 @@ export function AccountsTab() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">All Roles</SelectItem>
-              <SelectItem value="admin">Admin</SelectItem>
+              <SelectItem value="super_admin">Super Admin</SelectItem>
               <SelectItem value="manager">Manager</SelectItem>
               <SelectItem value="inspector">Inspector</SelectItem>
-              <SelectItem value="viewer">Viewer</SelectItem>
             </SelectContent>
           </Select>
         </div>
@@ -152,7 +142,29 @@ export function AccountsTab() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {accounts.map((account) => (
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={8} className="h-32 text-center">
+                  <div className="flex items-center justify-center">
+                    <Loader2 className="h-6 w-6 animate-spin mr-2" />
+                    Loading users...
+                  </div>
+                </TableCell>
+              </TableRow>
+            ) : error ? (
+              <TableRow>
+                <TableCell colSpan={8} className="h-32 text-center text-red-600">
+                  Error loading users: {error.message}
+                </TableCell>
+              </TableRow>
+            ) : accounts.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={8} className="h-32 text-center text-gray-500">
+                  No users found
+                </TableCell>
+              </TableRow>
+            ) : (
+              accounts.map((account) => (
               <TableRow key={account.id} className="hover:bg-gray-50">
                 <TableCell>
                   <div className="flex items-center">
@@ -162,7 +174,7 @@ export function AccountsTab() {
                 </TableCell>
                 <TableCell>{account.email}</TableCell>
                 <TableCell>{getRoleBadge(account.role)}</TableCell>
-                <TableCell>{account.phone}</TableCell>
+                <TableCell>{account.phone || 'N/A'}</TableCell>
                 <TableCell>{getStatusBadge(account.is_active)}</TableCell>
                 <TableCell>
                   <div className="flex items-center">
@@ -196,7 +208,8 @@ export function AccountsTab() {
                   </div>
                 </TableCell>
               </TableRow>
-            ))}
+              ))
+            )}
           </TableBody>
         </Table>
       </div>
@@ -207,7 +220,7 @@ export function AccountsTab() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">Total Users</p>
-              <p className="text-2xl font-bold">24</p>
+              <p className="text-2xl font-bold">{users?.length || 0}</p>
             </div>
             <User className="h-8 w-8 text-blue-500" />
           </div>
@@ -216,7 +229,7 @@ export function AccountsTab() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">Active Users</p>
-              <p className="text-2xl font-bold">22</p>
+              <p className="text-2xl font-bold">{users?.filter(u => u.is_active).length || 0}</p>
             </div>
             <div className="h-8 w-8 bg-green-100 rounded-full flex items-center justify-center">
               <div className="h-4 w-4 bg-green-500 rounded-full"></div>
@@ -227,7 +240,7 @@ export function AccountsTab() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">Admins</p>
-              <p className="text-2xl font-bold">3</p>
+              <p className="text-2xl font-bold">{users?.filter(u => u.role === 'super_admin' || u.role === 'manager').length || 0}</p>
             </div>
             <Shield className="h-8 w-8 text-red-500" />
           </div>
@@ -236,7 +249,7 @@ export function AccountsTab() {
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm text-gray-600">Inspectors</p>
-              <p className="text-2xl font-bold">15</p>
+              <p className="text-2xl font-bold">{users?.filter(u => u.role === 'inspector').length || 0}</p>
             </div>
             <User className="h-8 w-8 text-green-500" />
           </div>
@@ -245,13 +258,15 @@ export function AccountsTab() {
 
       {/* Pagination */}
       <div className="flex items-center justify-between">
-        <p className="text-sm text-gray-600">Showing 1 to 5 of 24 entries</p>
+        <p className="text-sm text-gray-600">
+          Showing {accounts.length} of {users?.length || 0} entries
+          {searchTerm && ` (filtered by "${searchTerm}")`}
+          {roleFilter !== 'all' && ` (filtered by ${roleFilter})`}
+        </p>
         <div className="flex space-x-2">
           <Button variant="outline" size="sm" disabled>Previous</Button>
           <Button variant="outline" size="sm">1</Button>
-          <Button variant="outline" size="sm">2</Button>
-          <Button variant="outline" size="sm">3</Button>
-          <Button variant="outline" size="sm">Next</Button>
+          <Button variant="outline" size="sm" disabled>Next</Button>
         </div>
       </div>
     </div>
