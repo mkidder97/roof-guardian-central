@@ -4,8 +4,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogOverlay,
-  DialogPortal,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -184,11 +182,8 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogPortal>
-        <DialogOverlay className="bg-black/50 backdrop-blur-sm" />
-        <DialogContent className="fixed inset-2 sm:inset-4 z-50 w-full max-w-sm sm:max-w-2xl md:max-w-4xl lg:max-w-6xl max-h-[98vh] sm:max-h-[95vh] mx-auto my-auto p-0 border bg-white rounded-none sm:rounded-lg shadow-2xl overflow-hidden data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto"
         >
-        <div className="sticky top-0 z-10 bg-white border-b p-4 sm:p-6">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold flex items-center gap-2">
               <Building2 className="h-6 w-6" />
@@ -207,10 +202,8 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
               )}
             </div>
           </DialogHeader>
-        </div>
 
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
-          <Tabs defaultValue="overview" className="h-full">
+          <Tabs defaultValue="overview" className="mt-6">
             <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2">
               <TabsTrigger value="overview">Roof Overview</TabsTrigger>
               <TabsTrigger value="inspection">Inspection</TabsTrigger>
@@ -457,10 +450,8 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
           </TabsContent>
 
           </Tabs>
-        </div>
         
-        <div className="sticky bottom-0 bg-white border-t p-4 sm:p-6">
-          <div className="flex justify-end gap-2">
+          <div className="flex justify-end gap-2 mt-6 pt-4 border-t">
             <Button variant="outline" onClick={() => onOpenChange(false)}>
               Close
             </Button>
@@ -475,9 +466,7 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
               View Full Details
             </Button>
           </div>
-        </div>
         </DialogContent>
-      </DialogPortal>
     </Dialog>
 
     {/* Critical Info Dialog */}
