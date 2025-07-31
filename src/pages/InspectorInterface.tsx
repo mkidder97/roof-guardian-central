@@ -242,9 +242,21 @@ const InspectorInterface = () => {
         throw new Error('No authenticated user');
       }
 
+      // Get the user's record from users table to get the correct inspector_id
+      const { data: userRecord, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('auth_user_id', user.id)
+        .single();
+
+      if (userError || !userRecord) {
+        console.error('Error fetching user record:', userError);
+        throw new Error('User record not found in users table');
+      }
+
       // Use the new database function to get inspector's inspections with property details
       const { data: inspectionData, error } = await supabase.rpc('get_inspector_inspections', {
-        p_inspector_id: user.id
+        p_inspector_id: userRecord.id
       });
 
       if (error) throw error;
