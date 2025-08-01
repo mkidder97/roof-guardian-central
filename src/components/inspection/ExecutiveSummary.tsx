@@ -236,8 +236,7 @@ export function ExecutiveSummary({
     });
     
     // Calculate next inspection date
-    const nextInspectionMonths = overallCondition === 'Critical' ? 3 : 
-                                overallCondition === 'Poor' ? 6 : 12;
+    const nextInspectionMonths = overallCondition === 'Poor' ? 6 : 12;
     const nextInspection = new Date();
     nextInspection.setMonth(nextInspection.getMonth() + nextInspectionMonths);
     

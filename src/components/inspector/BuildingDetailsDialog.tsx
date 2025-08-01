@@ -196,250 +196,364 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
             </div>
           </DialogHeader>
 
-          <Tabs defaultValue="overview" className="mt-6">
+          <Tabs defaultValue="roof-summary" className="mt-6">
             <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2">
-              <TabsTrigger value="overview">Roof Overview</TabsTrigger>
-              <TabsTrigger value="inspection">Inspection</TabsTrigger>
+              <TabsTrigger value="roof-summary">Roof Summary</TabsTrigger>
+              <TabsTrigger value="my-inspection">My Inspection</TabsTrigger>
             </TabsList>
 
-          <TabsContent value="overview" className="space-y-4">
-            {/* Roof System Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Roof System Information</CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">System Type</p>
-                  <p className="font-medium">{roofData.roof_system || 'Not specified'}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Installation Year</p>
-                  <p className="font-medium">{roofData.roof_install_year || 'Unknown'}</p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Warranty Expiration</p>
-                  <p className="font-medium">
-                    {roofData.warranty_expiration_date 
-                      ? format(new Date(roofData.warranty_expiration_date), 'MMM dd, yyyy')
-                      : 'No warranty info'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Overall Rating</p>
-                  <div className="flex items-center gap-2">
-                    <Badge variant={roofData.roof_rating >= 8 ? "default" : roofData.roof_rating >= 5 ? "secondary" : "destructive"}>
-                      {roofData.roof_rating || 'N/A'}/10
-                    </Badge>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
+          <TabsContent value="roof-summary" className="space-y-4">
+            <Tabs defaultValue="overview" className="mb-4">
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="overview">Overview</TabsTrigger>
+                <TabsTrigger value="roof-assembly">Roof Assembly</TabsTrigger>
+                <TabsTrigger value="repair-history">Repair History</TabsTrigger>
+                <TabsTrigger value="daylighting">Daylighting</TabsTrigger>
+              </TabsList>
 
-            {/* Inspection History */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center justify-between">
-                  Inspection History
-                  <Badge variant="outline">
-                    <FileText className="h-3 w-3 mr-1" />
-                    {roofData.inspections?.length || 0} Total
-                  </Badge>
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                {lastInspection && (
-                  <div className="p-4 bg-muted/50 rounded-lg">
-                    <p className="text-sm font-medium text-muted-foreground mb-1">Last Inspection</p>
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">
-                        {format(new Date(lastInspection.completed_date), 'MMM dd, yyyy')}
-                      </span>
-                      <Badge variant="secondary">{lastInspection.inspection_type}</Badge>
+              <TabsContent value="overview" className="space-y-4">
+                {/* Roof System Information */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Roof System Information</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">System Type</p>
+                      <p className="font-medium">{roofData.roof_system || 'Not specified'}</p>
                     </div>
-                  </div>
-                )}
-                
-                {upcomingInspection && (
-                  <div className="p-4 bg-primary/10 rounded-lg border border-primary/20">
-                    <p className="text-sm font-medium text-muted-foreground mb-1">Upcoming Inspection</p>
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">
-                        {format(new Date(upcomingInspection.scheduled_date), 'MMM dd, yyyy')}
-                      </span>
-                      <Badge>{upcomingInspection.inspection_type}</Badge>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Installation Year</p>
+                      <p className="font-medium">{roofData.roof_install_year || 'Unknown'}</p>
                     </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Warranty Expiration</p>
+                      <p className="font-medium">
+                        {roofData.warranty_expiration_date 
+                          ? format(new Date(roofData.warranty_expiration_date), 'MMM dd, yyyy')
+                          : 'No warranty info'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Overall Rating</p>
+                      <div className="flex items-center gap-2">
+                        <Badge variant={roofData.roof_rating >= 8 ? "default" : roofData.roof_rating >= 5 ? "secondary" : "destructive"}>
+                          {roofData.roof_rating || 'N/A'}/10
+                        </Badge>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
 
-            {/* Budget & Maintenance */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Budget & Maintenance</CardTitle>
-              </CardHeader>
-              <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Capital Budget</p>
-                  <p className="font-medium flex items-center gap-1">
-                    <DollarSign className="h-4 w-4" />
-                    {roofData.capital_budget_estimated 
-                      ? `$${roofData.capital_budget_estimated.toLocaleString()}`
-                      : 'Not set'}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">Budget Year</p>
-                  <p className="font-medium">{roofData.capital_budget_year || 'Not scheduled'}</p>
-                </div>
-                <div className="col-span-2">
-                  <p className="text-sm font-medium text-muted-foreground">Repair Contractor</p>
-                  <p className="font-medium">{roofData.repair_contractor || 'Not assigned'}</p>
-                </div>
-              </CardContent>
-            </Card>
+                {/* Budget & Maintenance */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Budget & Maintenance</CardTitle>
+                  </CardHeader>
+                  <CardContent className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Capital Budget</p>
+                      <p className="font-medium flex items-center gap-1">
+                        <DollarSign className="h-4 w-4" />
+                        {roofData.capital_budget_estimated 
+                          ? `$${roofData.capital_budget_estimated.toLocaleString()}`
+                          : 'Not set'}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground">Budget Year</p>
+                      <p className="font-medium">{roofData.capital_budget_year || 'Not scheduled'}</p>
+                    </div>
+                    <div className="col-span-2">
+                      <p className="text-sm font-medium text-muted-foreground">Repair Contractor</p>
+                      <p className="font-medium">{roofData.repair_contractor || 'Not assigned'}</p>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="roof-assembly" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Roof Assembly Details</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <p className="text-muted-foreground">Detailed roof assembly information will be displayed here.</p>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="repair-history" className="space-y-4">
+                {/* Inspection History */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center justify-between">
+                      Inspection History
+                      <Badge variant="outline">
+                        <FileText className="h-3 w-3 mr-1" />
+                        {roofData.inspections?.length || 0} Total
+                      </Badge>
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {lastInspection && (
+                      <div className="p-4 bg-muted/50 rounded-lg">
+                        <p className="text-sm font-medium text-muted-foreground mb-1">Last Inspection</p>
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">
+                            {format(new Date(lastInspection.completed_date), 'MMM dd, yyyy')}
+                          </span>
+                          <Badge variant="secondary">{lastInspection.inspection_type}</Badge>
+                        </div>
+                      </div>
+                    )}
+                    
+                    {upcomingInspection && (
+                      <div className="p-4 bg-primary/10 rounded-lg border border-primary/20">
+                        <p className="text-sm font-medium text-muted-foreground mb-1">Upcoming Inspection</p>
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium">
+                            {format(new Date(upcomingInspection.scheduled_date), 'MMM dd, yyyy')}
+                          </span>
+                          <Badge>{upcomingInspection.inspection_type}</Badge>
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="daylighting" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Daylighting Systems</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <p className="text-muted-foreground">Skylights and daylighting system information will be displayed here.</p>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
           </TabsContent>
 
-          <TabsContent value="inspection" className="space-y-4">
-            {/* Inspection Action */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Camera className="h-5 w-5" />
-                  Start New Inspection
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="text-center">
-                  <p className="text-muted-foreground mb-4">
-                    Begin a comprehensive roof inspection for {roofData.property_name}
-                  </p>
-                  <Button 
-                    onClick={handleStartInspection}
-                    className="w-full bg-green-600 hover:bg-green-700 text-white h-12 text-lg"
-                  >
-                    <Camera className="h-5 w-5 mr-2" />
-                    Start Inspection
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
+          <TabsContent value="my-inspection" className="space-y-4">
+            <Tabs defaultValue="deficiencies" className="mb-4">
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="deficiencies">Deficiencies</TabsTrigger>
+                <TabsTrigger value="overview-photos">Overview Photos</TabsTrigger>
+                <TabsTrigger value="notes">Notes</TabsTrigger>
+                <TabsTrigger value="files">Files</TabsTrigger>
+              </TabsList>
 
-            {/* Inspection Readiness */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg">Inspection Readiness</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                  <span className="text-sm">Property data loaded</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                  <span className="text-sm">Historical insights available</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                  <span className="text-sm">Access information verified</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  {criticalAreas.length > 0 ? (
-                    <CheckCircle className="h-5 w-5 text-green-500" />
-                  ) : (
-                    <Clock className="h-5 w-5 text-yellow-500" />
-                  )}
-                  <span className="text-sm">
-                    {criticalAreas.length > 0 
-                      ? `${criticalAreas.length} critical areas identified`
-                      : 'No critical areas found'}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
+              <TabsContent value="deficiencies" className="space-y-4">
+                {/* Inspection Checklist */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <CheckCircle className="h-5 w-5" />
+                      Inspection Checklist
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <p className="text-muted-foreground">Inspection checklist will be displayed here.</p>
+                  </CardContent>
+                </Card>
 
-            {/* Access & Safety Information */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-lg flex items-center gap-2">
-                  <Shield className="h-5 w-5" />
-                  Access & Safety
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground mb-2">Roof Access</p>
-                  <Badge variant="outline" className="capitalize">
-                    <Shield className="h-3 w-3 mr-1" />
-                    {roofData.roof_access || 'Standard ladder access'}
-                  </Badge>
-                </div>
+                {/* Executive Summary */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <FileText className="h-5 w-5" />
+                      Executive Summary
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <p className="text-muted-foreground">Executive summary of findings will be displayed here.</p>
+                  </CardContent>
+                </Card>
 
-                {roofData.roof_access_location && (
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground mb-1">Access Location</p>
-                    <p className="text-sm">{roofData.roof_access_location}</p>
-                  </div>
-                )}
-
-                {roofData.roof_access_requirements && (
-                  <div>
-                    <p className="text-sm font-medium text-muted-foreground mb-1">Access Requirements</p>
-                    <p className="text-sm bg-muted/50 p-3 rounded-md">{roofData.roof_access_requirements}</p>
-                  </div>
-                )}
-
-                {roofData.roof_access_safety_concern && (
-                  <div className="p-4 bg-destructive/10 rounded-lg border border-destructive/20">
-                    <p className="text-sm font-medium flex items-center gap-2 mb-1">
-                      <AlertTriangle className="h-4 w-4 text-destructive" />
-                      Safety Concerns
-                    </p>
-                    <p className="text-sm">{roofData.roof_access_safety_concern}</p>
-                  </div>
-                )}
-
-                {/* Contact Information */}
-                {(roofData.property_manager_name || roofData.onsite_contact) && (
-                  <div className="pt-4 border-t">
-                    <p className="text-sm font-medium text-muted-foreground mb-2">Emergency Contacts</p>
-                    <div className="space-y-2">
-                      {roofData.property_manager_name && (
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">{roofData.property_manager_name}</span>
-                          {roofData.property_manager_phone && (
-                            <a 
-                              href={`tel:${roofData.property_manager_phone}`}
-                              className="text-sm text-primary hover:underline flex items-center gap-1"
-                            >
-                              <Phone className="h-3 w-3" />
-                              {roofData.property_manager_phone}
-                            </a>
-                          )}
-                        </div>
-                      )}
-                      {roofData.onsite_contact && (
-                        <div className="flex items-center gap-2">
-                          <User className="h-4 w-4 text-muted-foreground" />
-                          <span className="text-sm">{roofData.onsite_contact} (On-site)</span>
-                          {roofData.onsite_contact_phone && (
-                            <a 
-                              href={`tel:${roofData.onsite_contact_phone}`}
-                              className="text-sm text-primary hover:underline flex items-center gap-1"
-                            >
-                              <Phone className="h-3 w-3" />
-                              {roofData.onsite_contact_phone}
-                            </a>
-                          )}
-                        </div>
-                      )}
+                {/* Inspection Action */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Camera className="h-5 w-5" />
+                      Start New Inspection
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div className="text-center">
+                      <p className="text-muted-foreground mb-4">
+                        Begin a comprehensive roof inspection for {roofData.property_name}
+                      </p>
+                      <Button 
+                        onClick={handleStartInspection}
+                        className="w-full bg-green-600 hover:bg-green-700 text-white h-12 text-lg"
+                      >
+                        <Camera className="h-5 w-5 mr-2" />
+                        Start Inspection
+                      </Button>
                     </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="overview-photos" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Camera className="h-5 w-5" />
+                      Overview Photos
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <p className="text-muted-foreground">Overview photos will be displayed here.</p>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="notes" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <FileText className="h-5 w-5" />
+                      Inspection Notes
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <p className="text-muted-foreground">Inspection notes will be displayed here.</p>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+
+              <TabsContent value="files" className="space-y-4">
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <FileText className="h-5 w-5" />
+                      Related Files
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <p className="text-muted-foreground">Related files will be displayed here.</p>
+                  </CardContent>
+                </Card>
+
+                {/* Access & Safety Information */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg flex items-center gap-2">
+                      <Shield className="h-5 w-5" />
+                      Access & Safety
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <div>
+                      <p className="text-sm font-medium text-muted-foreground mb-2">Roof Access</p>
+                      <Badge variant="outline" className="capitalize">
+                        <Shield className="h-3 w-3 mr-1" />
+                        {roofData.roof_access || 'Standard ladder access'}
+                      </Badge>
+                    </div>
+
+                    {roofData.roof_access_location && (
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground mb-1">Access Location</p>
+                        <p className="text-sm">{roofData.roof_access_location}</p>
+                      </div>
+                    )}
+
+                    {roofData.roof_access_requirements && (
+                      <div>
+                        <p className="text-sm font-medium text-muted-foreground mb-1">Access Requirements</p>
+                        <p className="text-sm bg-muted/50 p-3 rounded-md">{roofData.roof_access_requirements}</p>
+                      </div>
+                    )}
+
+                    {roofData.roof_access_safety_concern && (
+                      <div className="p-4 bg-destructive/10 rounded-lg border border-destructive/20">
+                        <p className="text-sm font-medium flex items-center gap-2 mb-1">
+                          <AlertTriangle className="h-4 w-4 text-destructive" />
+                          Safety Concerns
+                        </p>
+                        <p className="text-sm">{roofData.roof_access_safety_concern}</p>
+                      </div>
+                    )}
+
+                    {/* Contact Information */}
+                    {(roofData.property_manager_name || roofData.onsite_contact) && (
+                      <div className="pt-4 border-t">
+                        <p className="text-sm font-medium text-muted-foreground mb-2">Emergency Contacts</p>
+                        <div className="space-y-2">
+                          {roofData.property_manager_name && (
+                            <div className="flex items-center gap-2">
+                              <User className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-sm">{roofData.property_manager_name}</span>
+                              {roofData.property_manager_phone && (
+                                <a 
+                                  href={`tel:${roofData.property_manager_phone}`}
+                                  className="text-sm text-primary hover:underline flex items-center gap-1"
+                                >
+                                  <Phone className="h-3 w-3" />
+                                  {roofData.property_manager_phone}
+                                </a>
+                              )}
+                            </div>
+                          )}
+                          {roofData.onsite_contact && (
+                            <div className="flex items-center gap-2">
+                              <User className="h-4 w-4 text-muted-foreground" />
+                              <span className="text-sm">{roofData.onsite_contact} (On-site)</span>
+                              {roofData.onsite_contact_phone && (
+                                <a 
+                                  href={`tel:${roofData.onsite_contact_phone}`}
+                                  className="text-sm text-primary hover:underline flex items-center gap-1"
+                                >
+                                  <Phone className="h-3 w-3" />
+                                  {roofData.onsite_contact_phone}
+                                </a>
+                              )}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+
+                {/* Inspection Readiness */}
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-lg">Inspection Readiness</CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    <div className="flex items-center gap-3">
+                      <CheckCircle className="h-5 w-5 text-green-500" />
+                      <span className="text-sm">Property data loaded</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <CheckCircle className="h-5 w-5 text-green-500" />
+                      <span className="text-sm">Historical insights available</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <CheckCircle className="h-5 w-5 text-green-500" />
+                      <span className="text-sm">Access information verified</span>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {criticalAreas.length > 0 ? (
+                        <CheckCircle className="h-5 w-5 text-green-500" />
+                      ) : (
+                        <Clock className="h-5 w-5 text-yellow-500" />
+                      )}
+                      <span className="text-sm">
+                        {criticalAreas.length > 0 
+                          ? `${criticalAreas.length} critical areas identified`
+                          : 'No critical areas found'}
+                      </span>
+                    </div>
+                  </CardContent>
+                </Card>
+              </TabsContent>
+            </Tabs>
           </TabsContent>
 
           </Tabs>
