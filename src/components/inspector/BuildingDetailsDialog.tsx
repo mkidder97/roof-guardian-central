@@ -337,223 +337,26 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
           </TabsContent>
 
           <TabsContent value="my-inspection" className="space-y-4">
-            <Tabs defaultValue="deficiencies" className="mb-4">
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="deficiencies">Deficiencies</TabsTrigger>
-                <TabsTrigger value="overview-photos">Overview Photos</TabsTrigger>
-                <TabsTrigger value="notes">Notes</TabsTrigger>
-                <TabsTrigger value="files">Files</TabsTrigger>
-              </TabsList>
-
-              <TabsContent value="deficiencies" className="space-y-4">
-                {/* Inspection Checklist */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <CheckCircle className="h-5 w-5" />
-                      Inspection Checklist
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <p className="text-muted-foreground">Inspection checklist will be displayed here.</p>
-                  </CardContent>
-                </Card>
-
-                {/* Executive Summary */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <FileText className="h-5 w-5" />
-                      Executive Summary
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <p className="text-muted-foreground">Executive summary of findings will be displayed here.</p>
-                  </CardContent>
-                </Card>
-
-                {/* Inspection Action */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Camera className="h-5 w-5" />
-                      Start New Inspection
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div className="text-center">
-                      <p className="text-muted-foreground mb-4">
-                        Begin a comprehensive roof inspection for {roofData.property_name}
-                      </p>
-                      <Button 
-                        onClick={handleStartInspection}
-                        className="w-full bg-green-600 hover:bg-green-700 text-white h-12 text-lg"
-                      >
-                        <Camera className="h-5 w-5 mr-2" />
-                        Start Inspection
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="overview-photos" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Camera className="h-5 w-5" />
-                      Overview Photos
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <p className="text-muted-foreground">Overview photos will be displayed here.</p>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="notes" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <FileText className="h-5 w-5" />
-                      Inspection Notes
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <p className="text-muted-foreground">Inspection notes will be displayed here.</p>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-
-              <TabsContent value="files" className="space-y-4">
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <FileText className="h-5 w-5" />
-                      Related Files
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <p className="text-muted-foreground">Related files will be displayed here.</p>
-                  </CardContent>
-                </Card>
-
-                {/* Access & Safety Information */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg flex items-center gap-2">
-                      <Shield className="h-5 w-5" />
-                      Access & Safety
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-4">
-                    <div>
-                      <p className="text-sm font-medium text-muted-foreground mb-2">Roof Access</p>
-                      <Badge variant="outline" className="capitalize">
-                        <Shield className="h-3 w-3 mr-1" />
-                        {roofData.roof_access || 'Standard ladder access'}
-                      </Badge>
-                    </div>
-
-                    {roofData.roof_access_location && (
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground mb-1">Access Location</p>
-                        <p className="text-sm">{roofData.roof_access_location}</p>
-                      </div>
-                    )}
-
-                    {roofData.roof_access_requirements && (
-                      <div>
-                        <p className="text-sm font-medium text-muted-foreground mb-1">Access Requirements</p>
-                        <p className="text-sm bg-muted/50 p-3 rounded-md">{roofData.roof_access_requirements}</p>
-                      </div>
-                    )}
-
-                    {roofData.roof_access_safety_concern && (
-                      <div className="p-4 bg-destructive/10 rounded-lg border border-destructive/20">
-                        <p className="text-sm font-medium flex items-center gap-2 mb-1">
-                          <AlertTriangle className="h-4 w-4 text-destructive" />
-                          Safety Concerns
-                        </p>
-                        <p className="text-sm">{roofData.roof_access_safety_concern}</p>
-                      </div>
-                    )}
-
-                    {/* Contact Information */}
-                    {(roofData.property_manager_name || roofData.onsite_contact) && (
-                      <div className="pt-4 border-t">
-                        <p className="text-sm font-medium text-muted-foreground mb-2">Emergency Contacts</p>
-                        <div className="space-y-2">
-                          {roofData.property_manager_name && (
-                            <div className="flex items-center gap-2">
-                              <User className="h-4 w-4 text-muted-foreground" />
-                              <span className="text-sm">{roofData.property_manager_name}</span>
-                              {roofData.property_manager_phone && (
-                                <a 
-                                  href={`tel:${roofData.property_manager_phone}`}
-                                  className="text-sm text-primary hover:underline flex items-center gap-1"
-                                >
-                                  <Phone className="h-3 w-3" />
-                                  {roofData.property_manager_phone}
-                                </a>
-                              )}
-                            </div>
-                          )}
-                          {roofData.onsite_contact && (
-                            <div className="flex items-center gap-2">
-                              <User className="h-4 w-4 text-muted-foreground" />
-                              <span className="text-sm">{roofData.onsite_contact} (On-site)</span>
-                              {roofData.onsite_contact_phone && (
-                                <a 
-                                  href={`tel:${roofData.onsite_contact_phone}`}
-                                  className="text-sm text-primary hover:underline flex items-center gap-1"
-                                >
-                                  <Phone className="h-3 w-3" />
-                                  {roofData.onsite_contact_phone}
-                                </a>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </CardContent>
-                </Card>
-
-                {/* Inspection Readiness */}
-                <Card>
-                  <CardHeader>
-                    <CardTitle className="text-lg">Inspection Readiness</CardTitle>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    <div className="flex items-center gap-3">
-                      <CheckCircle className="h-5 w-5 text-green-500" />
-                      <span className="text-sm">Property data loaded</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <CheckCircle className="h-5 w-5 text-green-500" />
-                      <span className="text-sm">Historical insights available</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <CheckCircle className="h-5 w-5 text-green-500" />
-                      <span className="text-sm">Access information verified</span>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      {criticalAreas.length > 0 ? (
-                        <CheckCircle className="h-5 w-5 text-green-500" />
-                      ) : (
-                        <Clock className="h-5 w-5 text-yellow-500" />
-                      )}
-                      <span className="text-sm">
-                        {criticalAreas.length > 0 
-                          ? `${criticalAreas.length} critical areas identified`
-                          : 'No critical areas found'}
-                      </span>
-                    </div>
-                  </CardContent>
-                </Card>
-              </TabsContent>
-            </Tabs>
+            {/* Simple Start Inspection Card - matching screenshot */}
+            <Card>
+              <CardContent className="p-8 text-center">
+                <div className="space-y-4">
+                  <Camera className="h-16 w-16 text-muted-foreground mx-auto" />
+                  <div>
+                    <h3 className="text-xl font-semibold mb-2">Ready to inspect</h3>
+                    <p className="text-muted-foreground mb-6">
+                      Begin your comprehensive roof inspection for {roofData.property_name}
+                    </p>
+                  </div>
+                  <Button 
+                    onClick={handleStartInspection}
+                    className="w-full max-w-md bg-green-600 hover:bg-green-700 text-white h-14 text-lg font-semibold"
+                  >
+                    Start Inspection
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           </Tabs>
@@ -576,7 +379,7 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
         </DialogContent>
     </Dialog>
 
-    {/* Critical Info Dialog */}
+    {/* Critical Info Dialog - Pre-Inspection Briefing */}
     <Dialog open={showCriticalInfo} onOpenChange={setShowCriticalInfo}>
         <DialogContent className="fixed left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] max-w-2xl max-h-[95vh] overflow-y-auto">
           <DialogHeader>
@@ -586,66 +389,65 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <h3 className="font-semibold text-red-800 mb-2">⚠️ Pre-Inspection Briefing</h3>
-            <p className="text-red-700 text-sm">
-              Review these critical areas identified from previous annual inspections before beginning your inspection.
-            </p>
-          </div>
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <h3 className="font-semibold text-red-800 mb-2">⚠️ Pre-Inspection Briefing</h3>
+              <p className="text-red-700 text-sm">
+                Review these critical areas identified from previous annual inspections before beginning your inspection.
+              </p>
+            </div>
 
-          {criticalAreas.length > 0 ? (
-            <div className="space-y-3">
-              {criticalAreas.map((area, index) => (
-                <Card key={index} className={`border-l-4 ${
-                  area.severity === 'high' ? 'border-l-red-500 bg-red-50' : 
-                  area.severity === 'medium' ? 'border-l-yellow-500 bg-yellow-50' : 
-                  'border-l-blue-500 bg-blue-50'
-                }`}>
-                  <CardContent className="p-4">
-                    <div className="flex items-start justify-between">
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-2">
-                          <Badge variant={area.severity === 'high' ? 'destructive' : 'secondary'}>
-                            {area.severity?.toUpperCase() || 'HIGH'}
-                          </Badge>
-                          <Badge variant="outline">
-                            <MapPin className="h-3 w-3 mr-1" />
-                            {area.location}
-                          </Badge>
-                          {area.estimatedCost && (
-                            <Badge variant="outline">
-                              <DollarSign className="h-3 w-3 mr-1" />
-                              ${area.estimatedCost.toLocaleString()}
+            {criticalAreas.length > 0 ? (
+              <div className="space-y-3">
+                {criticalAreas.map((area, index) => (
+                  <Card key={index} className={`border-l-4 ${
+                    area.severity === 'high' ? 'border-l-red-500 bg-red-50' : 
+                    area.severity === 'medium' ? 'border-l-yellow-500 bg-yellow-50' : 
+                    'border-l-blue-500 bg-blue-50'
+                  }`}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Badge variant={area.severity === 'high' ? 'destructive' : 'secondary'}>
+                              {area.severity?.toUpperCase() || 'HIGH'}
                             </Badge>
+                            <Badge variant="outline">
+                              <MapPin className="h-3 w-3 mr-1" />
+                              {area.location}
+                            </Badge>
+                            {area.estimatedCost && (
+                              <Badge variant="outline">
+                                <DollarSign className="h-3 w-3 mr-1" />
+                                ${area.estimatedCost.toLocaleString()}
+                              </Badge>
+                            )}
+                          </div>
+                          <h4 className="font-semibold text-lg">{area.issueType}</h4>
+                          <p className="text-muted-foreground mt-1">{area.description}</p>
+                          {area.lastReported && (
+                            <p className="text-xs text-muted-foreground mt-2">
+                              Last reported: {new Date(area.lastReported).toLocaleDateString()}
+                            </p>
                           )}
                         </div>
-                        <h4 className="font-semibold text-lg">{area.issueType}</h4>
-                        <p className="text-muted-foreground mt-1">{area.description}</p>
-                        {area.lastReported && (
-                          <p className="text-xs text-muted-foreground mt-2">
-                            Last reported: {new Date(area.lastReported).toLocaleDateString()}
-                          </p>
-                        )}
+                        <AlertTriangle className="h-6 w-6 text-red-500" />
                       </div>
-                      <AlertTriangle className="h-6 w-6 text-red-500" />
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-          ) : (
-            <Card>
-              <CardContent className="p-6 text-center">
-                <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-3" />
-                <h3 className="font-semibold mb-2">No Critical Issues Found</h3>
-                <p className="text-muted-foreground">
-                  This property has no high-priority issues identified from previous inspections.
-                  Proceed with a standard comprehensive inspection.
-                </p>
-              </CardContent>
-            </Card>
-          )}
-
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="p-6 text-center">
+                  <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-3" />
+                  <h3 className="font-semibold mb-2">No Critical Issues Found</h3>
+                  <p className="text-muted-foreground">
+                    This property has no high-priority issues identified from previous inspections.
+                    Proceed with a standard comprehensive inspection.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           <div className="flex flex-col sm:flex-row justify-between items-center gap-3 mt-6 pt-4 border-t">

@@ -429,16 +429,20 @@ const InspectorInterface = () => {
 
   const handleBuildingClick = useCallback((propertyId: string) => {
     const property = availableProperties.find(p => p.id === propertyId);
-    setSelectedBuildingId(propertyId);
-    setShowBuildingDetails(true);
-    selectProperty(propertyId);
     
-    // Sync building-specific inspection history when property is selected
-    dataSync.syncBuildingHistory(propertyId);
-    
-    // Announce selection for screen readers
     if (property) {
-      announcePropertySelection(property.name, property.criticalIssues || 0);
+      // Go directly to ActiveInspectionInterface instead of modal
+      setActiveInspection({ propertyId, propertyName: property.property_name });
+      selectProperty(propertyId);
+      
+      // Sync building-specific inspection history when property is selected
+      dataSync.syncBuildingHistory(propertyId);
+      
+      // Announce selection for screen readers
+      announcePropertySelection(property.property_name, property.criticalIssues || 0);
+      
+      // Track navigation in analytics/monitoring
+      console.log('Inspector Interface: Navigating to property inspection view', propertyId);
     }
   }, [selectProperty, availableProperties, announcePropertySelection, dataSync]);
 
