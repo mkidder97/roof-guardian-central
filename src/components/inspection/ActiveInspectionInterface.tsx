@@ -42,6 +42,7 @@ import { RoofCompositionCapture } from "./RoofCompositionCapture";
 import { InspectionChecklist } from "./InspectionChecklist";
 import { ExecutiveSummary } from "./ExecutiveSummary";
 import { WorkflowDataExporter } from "./WorkflowDataExporter";
+import { FloatingCameraButton } from "./FloatingCameraButton";
 
 interface Photo {
   id: string;
@@ -269,6 +270,34 @@ export function ActiveInspectionInterface({
 
     // Reset file input
     event.target.value = '';
+  };
+
+  // Enhanced photo capture handler for FloatingCameraButton
+  const handleFloatingCameraCapture = async (files: File[], type: 'overview' | 'deficiency') => {
+    const photos: Photo[] = files.map(file => ({
+      id: `photo-${Date.now()}-${Math.random()}`,
+      url: URL.createObjectURL(file),
+      file,
+      type,
+      timestamp: new Date()
+    }));
+
+    if (type === 'overview') {
+      setOverviewPhotos(prev => [...prev, ...photos]);
+    } else {
+      // For deficiency photos, add them to a temporary state or handle differently
+      // For now, we'll add them as overview photos, but in a real implementation
+      // you might want to open a deficiency creation modal
+      setOverviewPhotos(prev => [...prev, ...photos]);
+      
+      // Optional: Auto-open deficiency modal if deficiency photos are captured
+      if (photos.length > 0) {
+        toast({
+          title: "Deficiency Photos Captured",
+          description: "Consider adding these to a specific deficiency record",
+        });
+      }
+    }
   };
 
   const handleCreateDeficiency = () => {
@@ -1583,6 +1612,16 @@ export function ActiveInspectionInterface({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Floating Camera Button - Only show during active inspection */}
+      {inspectionStarted && (
+        <FloatingCameraButton
+          onPhotoCapture={handleFloatingCameraCapture}
+          isTablet={isTablet}
+          disabled={isUploading}
+          className="z-50"
+        />
+      )}
     </div>
   );
 }
