@@ -105,6 +105,11 @@ export function ActiveInspectionInterface({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const overviewFileInputRef = useRef<HTMLInputElement>(null);
   
+  // Inspection state
+  const [currentTab, setCurrentTab] = useState('roof-summary');
+  const [currentSubTab, setCurrentSubTab] = useState('overview');
+  const [inspectionStarted, setInspectionStarted] = useState(false);
+  
   // iPad-specific state
   const [isTablet, setIsTablet] = useState(false);
   const [isVoiceRecording, setIsVoiceRecording] = useState(false);
@@ -132,11 +137,6 @@ export function ActiveInspectionInterface({
       setShowStartInspectionModal(true);
     }
   }, [currentTab, inspectionStarted]);
-
-  // Inspection state
-  const [currentTab, setCurrentTab] = useState('roof-summary');
-  const [currentSubTab, setCurrentSubTab] = useState('overview');
-  const [inspectionStarted, setInspectionStarted] = useState(false);
   const [startTime, setStartTime] = useState<Date | null>(null);
   const [showStartInspectionModal, setShowStartInspectionModal] = useState(false);
   const [showPreInspectionBriefing, setShowPreInspectionBriefing] = useState(false);

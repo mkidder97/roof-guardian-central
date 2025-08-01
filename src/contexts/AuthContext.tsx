@@ -74,24 +74,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       // Fetch profile data with timeout protection
       const { data: profileData } = await withTimeout(
-        supabase
-          .from('profiles')
-          .select('*')
-          .eq('auth_user_id', userId)
-          .single(),
+        Promise.resolve(
+          supabase
+            .from('profiles')
+            .select('*')
+            .eq('auth_user_id', userId)
+            .single()
+        ),
         8000,
         'Profile fetch'
       );
 
       // Fetch role data with timeout protection
       const { data: roleData } = await withTimeout(
-        supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', userId)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .single(),
+        Promise.resolve(
+          supabase
+            .from('user_roles')
+            .select('role')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .single()
+        ),
         8000,
         'Role fetch'
       );

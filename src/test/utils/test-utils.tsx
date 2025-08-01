@@ -23,9 +23,12 @@ const mockAuthContext = {
   profile: null,
   userRole: 'inspector' as const,
   loading: false,
+  error: null,
+  isRetrying: false,
   signIn: vi.fn(),
   signOut: vi.fn(),
-  signUp: vi.fn()
+  signUp: vi.fn(),
+  retryAuth: vi.fn()
 }
 
 // Custom render function with providers
