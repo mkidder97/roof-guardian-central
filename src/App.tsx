@@ -15,14 +15,34 @@ import InspectorInterface from "./pages/InspectorInterface";
 const queryClient = new QueryClient();
 
 const AppRoutes = () => {
-  const { user, loading } = useAuth();
+  const { user, loading, error, isRetrying, retryAuth } = useAuth();
 
-  if (loading) {
+  if (loading || isRetrying) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center space-y-4">
+        <div className="text-center space-y-4 max-w-md mx-auto p-6">
           <div className="text-2xl font-bold text-primary">RoofMind</div>
-          <div className="text-muted-foreground">Loading...</div>
+          <div className="text-muted-foreground">
+            {isRetrying ? 'Retrying connection...' : 'Loading...'}
+          </div>
+          
+          {error && (
+            <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-lg">
+              <div className="text-red-800 font-semibold mb-2">Connection Issue</div>
+              <div className="text-red-700 text-sm mb-4">{error}</div>
+              <button 
+                onClick={retryAuth}
+                disabled={isRetrying}
+                className="px-4 py-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 disabled:opacity-50"
+              >
+                {isRetrying ? 'Retrying...' : 'Retry Connection'}
+              </button>
+            </div>
+          )}
+          
+          {!error && (
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          )}
         </div>
       </div>
     );
