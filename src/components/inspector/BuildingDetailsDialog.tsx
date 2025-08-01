@@ -4,8 +4,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogOverlay,
-  DialogPortal,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,12 +28,6 @@ import {
 } from 'lucide-react';
 import { supabase } from "@/integrations/supabase/client";
 import { format } from 'date-fns';
-import { 
-  Dialog as CriticalInfoDialog,
-  DialogContent as CriticalDialogContent,
-  DialogHeader as CriticalDialogHeader,
-  DialogTitle as CriticalDialogTitle,
-} from "@/components/ui/dialog";
 
 interface BuildingDetailsDialogProps {
   open: boolean;
@@ -184,10 +176,7 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
   return (
     <>
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogPortal>
-        <DialogOverlay />
-        <DialogContent className="fixed left-[50%] top-[50%] z-50 grid w-full max-w-4xl max-h-[95vh] translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 overflow-y-auto data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg"
-        >
+        <DialogContent className="fixed left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] max-w-4xl max-h-[95vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold flex items-center gap-2">
               <Building2 className="h-6 w-6" />
@@ -471,21 +460,17 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
             </Button>
           </div>
         </DialogContent>
-      </DialogPortal>
     </Dialog>
 
     {/* Critical Info Dialog */}
-    <CriticalInfoDialog open={showCriticalInfo} onOpenChange={setShowCriticalInfo}>
-      <DialogPortal>
-        <DialogOverlay className="bg-black/50 backdrop-blur-sm" />
-        <CriticalDialogContent className="fixed left-[50%] top-[50%] z-50 grid w-full max-w-2xl max-h-[95vh] translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 overflow-y-auto data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg"
-        >
-          <CriticalDialogHeader>
-            <CriticalDialogTitle className="text-xl font-bold flex items-center gap-2">
+    <Dialog open={showCriticalInfo} onOpenChange={setShowCriticalInfo}>
+        <DialogContent className="fixed left-[50%] top-[50%] translate-x-[-50%] translate-y-[-50%] max-w-2xl max-h-[95vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
               <AlertTriangle className="h-6 w-6 text-destructive" />
               Critical Focus Areas - {roofData?.property_name}
-            </CriticalDialogTitle>
-          </CriticalDialogHeader>
+            </DialogTitle>
+          </DialogHeader>
           <div className="space-y-4">
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
             <h3 className="font-semibold text-red-800 mb-2">⚠️ Pre-Inspection Briefing</h3>
@@ -571,9 +556,8 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
               Begin Inspection
             </Button>
           </div>
-        </CriticalDialogContent>
-      </DialogPortal>
-    </CriticalInfoDialog>
+        </DialogContent>
+    </Dialog>
     </>
   );
 };
