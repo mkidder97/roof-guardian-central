@@ -28,7 +28,13 @@ import {
   Layers,
   ClipboardList,
   FileBarChart,
-  Workflow
+  Workflow,
+  Home,
+  History,
+  Sun,
+  FolderOpen,
+  Building2,
+  Download
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -120,10 +126,21 @@ export function ActiveInspectionInterface({
     return () => window.removeEventListener('resize', checkDevice);
   }, []);
 
+  // Handle tab change to My Inspection
+  useEffect(() => {
+    if (currentTab === 'my-inspection' && !inspectionStarted) {
+      setShowStartInspectionModal(true);
+    }
+  }, [currentTab, inspectionStarted]);
+
   // Inspection state
-  const [currentTab, setCurrentTab] = useState('deficiencies');
+  const [currentTab, setCurrentTab] = useState('roof-summary');
+  const [currentSubTab, setCurrentSubTab] = useState('overview');
   const [inspectionStarted, setInspectionStarted] = useState(false);
   const [startTime, setStartTime] = useState<Date | null>(null);
+  const [showStartInspectionModal, setShowStartInspectionModal] = useState(false);
+  const [showPreInspectionBriefing, setShowPreInspectionBriefing] = useState(false);
+  const [criticalAreas, setCriticalAreas] = useState<any[]>([]);
   
   // Deficiencies
   const [deficiencies, setDeficiencies] = useState<Deficiency[]>([]);
@@ -141,6 +158,20 @@ export function ActiveInspectionInterface({
   const [capitalExpenses, setCapitalExpenses] = useState<CapitalExpense[]>([]);
   const [showCapitalExpenseModal, setShowCapitalExpenseModal] = useState(false);
   const [editingCapitalExpense, setEditingCapitalExpense] = useState<CapitalExpense | null>(null);
+  
+  // File management
+  const [uploadedFiles, setUploadedFiles] = useState<Array<{
+    id: string;
+    name: string;
+    type: 'warranty' | 'cad' | 'other';
+    url: string;
+    size: number;
+    uploadedAt: Date;
+  }>>([]);
+  const [isUploading, setIsUploading] = useState(false);
+  const warrantyFileInputRef = useRef<HTMLInputElement>(null);
+  const cadFileInputRef = useRef<HTMLInputElement>(null);
+  const otherFileInputRef = useRef<HTMLInputElement>(null);
 
   // New inspection components state
   const [roofCompositionData, setRoofCompositionData] = useState<any>({});
@@ -309,6 +340,113 @@ export function ActiveInspectionInterface({
       title: "Capital Expense Added",
       description: `$${expense.estimatedCost.toLocaleString()} expense documented`,
     });
+  };
+
+  // File upload functions
+  const handleFileUpload = async (files: FileList | null, type: 'warranty' | 'cad' | 'other') => {
+    if (!files || files.length === 0) return;
+    
+    setIsUploading(true);
+    
+    try {
+      const uploadPromises = Array.from(files).map(async (file) => {
+        const fileName = `${propertyId}/${type}/${Date.now()}-${file.name}`;
+        
+        const { data, error } = await supabase.storage
+          .from('inspection-files')
+          .upload(fileName, file, {
+            cacheControl: '3600',
+            upsert: false
+          });
+          
+        if (error) throw error;
+        
+        const { data: { publicUrl } } = supabase.storage
+          .from('inspection-files')
+          .getPublicUrl(fileName);
+          
+        return {
+          id: `file-${Date.now()}-${Math.random()}`,
+          name: file.name,
+          type,
+          url: publicUrl,
+          size: file.size,
+          uploadedAt: new Date()
+        };
+      });
+      
+      const uploadedFiles = await Promise.all(uploadPromises);
+      setUploadedFiles(prev => [...prev, ...uploadedFiles]);
+      
+      toast({
+        title: "Files Uploaded",
+        description: `${uploadedFiles.length} file(s) uploaded successfully`,
+      });
+    } catch (error) {
+      console.error('File upload error:', error);
+      toast({
+        title: "Upload Failed",
+        description: "Failed to upload files. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const handleDownloadFile = (fileUrl: string, fileName: string) => {
+    const link = document.createElement('a');
+    link.href = fileUrl;
+    link.download = fileName;
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleDeleteFile = (fileId: string) => {
+    setUploadedFiles(prev => prev.filter(file => file.id !== fileId));
+    toast({
+      title: "File Deleted",
+      description: "File removed from inspection",
+    });
+  };
+
+  const handleStartInspection = () => {
+    setShowStartInspectionModal(false);
+    setShowPreInspectionBriefing(true);
+    // Fetch critical areas here if needed
+    fetchCriticalAreas();
+  };
+
+  const handleBeginInspection = () => {
+    setShowPreInspectionBriefing(false);
+    setInspectionStarted(true);
+    setStartTime(new Date());
+    setCurrentSubTab('deficiencies'); // Default to deficiencies tab
+  };
+
+  const fetchCriticalAreas = async () => {
+    // Sample critical areas for demo
+    const sampleCriticalAreas = [
+      {
+        location: "Northwest corner",
+        severity: "high",
+        issueType: "Recurring leak potential",
+        description: "Historical pattern suggests vulnerability in this area during heavy rain",
+        estimatedCost: 12500,
+        lastReported: "2024-10-15"
+      },
+      {
+        location: "HVAC penetrations",
+        severity: "medium", 
+        issueType: "Sealant degradation",
+        description: "Typical wear pattern for this roof age and type",
+        estimatedCost: 3500,
+        lastReported: "2024-09-20"
+      }
+    ];
+    setCriticalAreas(sampleCriticalAreas);
   };
 
   const handleCompleteInspection = async () => {
@@ -514,355 +652,595 @@ export function ActiveInspectionInterface({
         <Card className="shadow-lg">
           <CardContent className="p-0">
             <Tabs value={currentTab} onValueChange={setCurrentTab}>
-              <TabsList className={`w-full ${isTablet ? 'h-16' : 'h-12 md:h-14'} bg-gray-100 rounded-none border-b overflow-x-auto flex-nowrap`}>
-                <TabsTrigger value="deficiencies" className={`flex items-center gap-1 md:gap-2 ${isTablet ? 'px-6 py-4 text-base' : 'px-2 md:px-4 text-xs md:text-sm'} whitespace-nowrap min-h-[44px]`}>
-                  <AlertTriangle className={isTablet ? 'h-5 w-5' : 'h-3 w-3 md:h-4 md:w-4'} />
-                  <span className="hidden sm:inline">Deficiencies</span>
-                  <span className="sm:hidden">Def</span>
-                  {getTabCount('deficiencies') > 0 && (
-                    <Badge variant="secondary" className="ml-1 text-xs">{getTabCount('deficiencies')}</Badge>
+              {/* Main Tabs - RoofController Style */}
+              <TabsList className={`w-full ${isTablet ? 'h-16' : 'h-12 md:h-14'} bg-gray-100 rounded-none border-b`}>
+                <TabsTrigger value="roof-summary" className={`flex items-center gap-1 md:gap-2 ${isTablet ? 'px-8 py-4 text-lg font-medium' : 'px-6 py-3 text-base font-medium'} whitespace-nowrap min-h-[44px]`}>
+                  <Home className={isTablet ? 'h-6 w-6' : 'h-5 w-5'} />
+                  <span>Roof Summary</span>
+                </TabsTrigger>
+                <TabsTrigger value="my-inspection" className={`flex items-center gap-1 md:gap-2 ${isTablet ? 'px-8 py-4 text-lg font-medium' : 'px-6 py-3 text-base font-medium'} whitespace-nowrap min-h-[44px]`}>
+                  <ClipboardList className={isTablet ? 'h-6 w-6' : 'h-5 w-5'} />
+                  <span>My Inspection</span>
+                  {(deficiencies.length > 0 || overviewPhotos.length > 0 || inspectionNotes) && (
+                    <Badge variant="default" className="ml-2">
+                      {deficiencies.length + overviewPhotos.length + (inspectionNotes ? 1 : 0)}
+                    </Badge>
                   )}
-                </TabsTrigger>
-                <TabsTrigger value="overview" className={`flex items-center gap-1 md:gap-2 ${isTablet ? 'px-6 py-4 text-base' : 'px-2 md:px-4 text-xs md:text-sm'} whitespace-nowrap min-h-[44px]`}>
-                  <ImageIcon className={isTablet ? 'h-5 w-5' : 'h-3 w-3 md:h-4 md:w-4'} />
-                  <span className="hidden sm:inline">Overview Photos</span>
-                  <span className="sm:hidden">Photos</span>
-                  {getTabCount('overview') > 0 && (
-                    <Badge variant="secondary" className="ml-1 text-xs">{getTabCount('overview')}</Badge>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger value="notes" className={`flex items-center gap-1 md:gap-2 ${isTablet ? 'px-6 py-4 text-base' : 'px-2 md:px-4 text-xs md:text-sm'} whitespace-nowrap min-h-[44px]`}>
-                  <FileText className={isTablet ? 'h-5 w-5' : 'h-3 w-3 md:h-4 md:w-4'} />
-                  <span>Notes</span>
-                </TabsTrigger>
-                <TabsTrigger value="files" className={`flex items-center gap-1 md:gap-2 ${isTablet ? 'px-6 py-4 text-base' : 'px-2 md:px-4 text-xs md:text-sm'} whitespace-nowrap min-h-[44px]`}>
-                  <DollarSign className={isTablet ? 'h-5 w-5' : 'h-3 w-3 md:h-4 md:w-4'} />
-                  <span className="hidden sm:inline">Capital Expenses</span>
-                  <span className="sm:hidden">Capital</span>
-                  {getTabCount('files') > 0 && (
-                    <Badge variant="secondary" className="ml-1 text-xs">{getTabCount('files')}</Badge>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger value="composition" className={`flex items-center gap-1 md:gap-2 ${isTablet ? 'px-6 py-4 text-base' : 'px-2 md:px-4 text-xs md:text-sm'} whitespace-nowrap min-h-[44px]`}>
-                  <Layers className={isTablet ? 'h-5 w-5' : 'h-3 w-3 md:h-4 md:w-4'} />
-                  <span className="hidden sm:inline">Roof Composition</span>
-                  <span className="sm:hidden">Roof</span>
-                </TabsTrigger>
-                <TabsTrigger value="checklist" className={`flex items-center gap-1 md:gap-2 ${isTablet ? 'px-6 py-4 text-base' : 'px-2 md:px-4 text-xs md:text-sm'} whitespace-nowrap min-h-[44px]`}>
-                  <ClipboardList className={isTablet ? 'h-5 w-5' : 'h-3 w-3 md:h-4 md:w-4'} />
-                  <span className="hidden sm:inline">Checklist</span>
-                  <span className="sm:hidden">Check</span>
-                  {checklistData.completionPercentage && (
-                    <Badge variant="secondary" className="ml-1 text-xs">{checklistData.completionPercentage}%</Badge>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger value="summary" className={`flex items-center gap-1 md:gap-2 ${isTablet ? 'px-6 py-4 text-base' : 'px-2 md:px-4 text-xs md:text-sm'} whitespace-nowrap min-h-[44px]`}>
-                  <FileBarChart className={isTablet ? 'h-5 w-5' : 'h-3 w-3 md:h-4 md:w-4'} />
-                  <span className="hidden sm:inline">Executive Summary</span>
-                  <span className="sm:hidden">Summary</span>
-                </TabsTrigger>
-                <TabsTrigger value="workflow" className={`flex items-center gap-1 md:gap-2 ${isTablet ? 'px-6 py-4 text-base' : 'px-2 md:px-4 text-xs md:text-sm'} whitespace-nowrap min-h-[44px]`}>
-                  <Workflow className={isTablet ? 'h-5 w-5' : 'h-3 w-3 md:h-4 md:w-4'} />
-                  <span className="hidden sm:inline">Workflow Export</span>
-                  <span className="sm:hidden">Export</span>
                 </TabsTrigger>
               </TabsList>
 
-              {/* Deficiencies Tab */}
-              <TabsContent 
-                value="deficiencies" 
-                className={`${isTablet ? 'p-6' : 'p-3 md:p-6'}`}
-                onTouchStart={handleTouchStart}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={handleTouchEnd}
-              >
-                <div className="space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-                    <h2 className="text-lg md:text-xl font-semibold">Roof Deficiencies</h2>
-                    <Button 
-                      onClick={() => setShowDeficiencyModal(true)}
-                      className="w-full sm:w-auto"
-                      size={isTablet ? "lg" : "lg"}
-                      style={{ minHeight: isTablet ? '56px' : 'auto' }}
-                    >
-                      <Plus className={`${isTablet ? 'h-6 w-6' : 'h-4 w-4'} mr-2`} />
-                      Add New Deficiency
-                    </Button>
-                  </div>
+              {/* Roof Summary Tab */}
+              <TabsContent value="roof-summary" className="p-0">
+                <Tabs value={currentSubTab} onValueChange={setCurrentSubTab}>
+                  <TabsList className={`w-full ${isTablet ? 'h-14' : 'h-10 md:h-12'} bg-muted/50 rounded-none border-b overflow-x-auto flex-nowrap`}>
+                    <TabsTrigger value="overview" className={`flex items-center gap-1 md:gap-2 ${isTablet ? 'px-6 py-3 text-base' : 'px-3 md:px-4 text-xs md:text-sm'} whitespace-nowrap`}>
+                      <Building2 className={isTablet ? 'h-5 w-5' : 'h-3 w-3 md:h-4 md:w-4'} />
+                      <span>Overview</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="repair-history" className={`flex items-center gap-1 md:gap-2 ${isTablet ? 'px-6 py-3 text-base' : 'px-3 md:px-4 text-xs md:text-sm'} whitespace-nowrap`}>
+                      <History className={isTablet ? 'h-5 w-5' : 'h-3 w-3 md:h-4 md:w-4'} />
+                      <span>Repair History</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="roof-assembly" className={`flex items-center gap-1 md:gap-2 ${isTablet ? 'px-6 py-3 text-base' : 'px-3 md:px-4 text-xs md:text-sm'} whitespace-nowrap`}>
+                      <Layers className={isTablet ? 'h-5 w-5' : 'h-3 w-3 md:h-4 md:w-4'} />
+                      <span>Roof Assembly</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="daylight" className={`flex items-center gap-1 md:gap-2 ${isTablet ? 'px-6 py-3 text-base' : 'px-3 md:px-4 text-xs md:text-sm'} whitespace-nowrap`}>
+                      <Sun className={isTablet ? 'h-5 w-5' : 'h-3 w-3 md:h-4 md:w-4'} />
+                      <span>Daylight</span>
+                    </TabsTrigger>
+                  </TabsList>
 
-                  {deficiencies.length === 0 ? (
-                    <Card className="p-8 text-center">
-                      <AlertTriangle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">No Deficiencies Documented</h3>
-                      <p className="text-gray-600 mb-4">Start by adding deficiencies found during your inspection.</p>
-                      <Button onClick={() => setShowDeficiencyModal(true)}>
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add First Deficiency
-                      </Button>
-                    </Card>
-                  ) : (
-                    <div className="grid gap-4">
-                      {deficiencies.map((deficiency) => (
-                        <Card key={deficiency.id} className="p-4">
-                          <div className="flex justify-between items-start">
-                            <div className="flex-1">
-                              <div className="flex items-center gap-2 mb-2">
-                                <Badge className={getSeverityColor(deficiency.severity)}>
-                                  {deficiency.severity.toUpperCase()}
-                                </Badge>
-                                <Badge variant="outline">{deficiency.category}</Badge>
+                  {/* Overview Sub-tab */}
+                  <TabsContent value="overview" className={`${isTablet ? 'p-6' : 'p-3 md:p-6'}`}>
+                    <div className="space-y-6">
+                      <div>
+                        <h2 className={`font-semibold mb-4 ${isTablet ? 'text-xl' : 'text-lg'}`}>Property Overview</h2>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <Card>
+                            <CardHeader>
+                              <CardTitle className={isTablet ? 'text-lg' : 'text-base'}>Property Information</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                              <div>
+                                <p className="text-muted-foreground text-sm">Property Name</p>
+                                <p className="font-medium">{propertyName}</p>
                               </div>
-                              <h3 className="font-semibold">{deficiency.location}</h3>
-                              {deficiency.description && (
-                                <p className="text-gray-600 mt-1">{deficiency.description}</p>
-                              )}
-                              {deficiency.budgetAmount > 0 && (
-                                <p className="text-sm text-green-600 mt-1">
-                                  Budget: ${deficiency.budgetAmount.toLocaleString()}
+                              <div>
+                                <p className="text-muted-foreground text-sm">Inspection Date</p>
+                                <p className="font-medium">{new Date().toLocaleDateString()}</p>
+                              </div>
+                              <div>
+                                <p className="text-muted-foreground text-sm">Square Footage Confirmed</p>
+                                <p className="font-medium">
+                                  {roofSquareFootageConfirmed === true ? 'Yes' : 
+                                   roofSquareFootageConfirmed === false ? 'No' : 'Not confirmed'}
                                 </p>
-                              )}
-                            </div>
-                            <div className="flex gap-2">
-                              <Button variant="outline" size="sm">
-                                <Camera className="h-4 w-4" />
-                              </Button>
-                              <Button variant="outline" size="sm">
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                            </div>
-                          </div>
-                        </Card>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              </TabsContent>
-
-              {/* Overview Photos Tab */}
-              <TabsContent 
-                value="overview" 
-                className={`${isTablet ? 'p-6' : 'p-3 md:p-6'}`}
-                onTouchStart={handleTouchStart}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={handleTouchEnd}
-              >
-                <div className="space-y-4">
-                  <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-                    <h2 className={`${isTablet ? 'text-2xl' : 'text-lg md:text-xl'} font-semibold`}>Overview Photos</h2>
-                    <Button 
-                      onClick={() => isTablet ? handleEnhancedCameraCapture('overview') : handleCameraCapture('overview')}
-                      className="w-full sm:w-auto"
-                      size="lg"
-                      style={{ minHeight: isTablet ? '56px' : 'auto' }}
-                    >
-                      <Camera className={`${isTablet ? 'h-6 w-6' : 'h-4 w-4'} mr-2`} />
-                      {isTablet ? 'Capture Photo' : 'Take Photo'}
-                    </Button>
-                  </div>
-
-                  <div className={`grid ${isTablet ? 'grid-cols-3 gap-6' : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4'}`}>
-                    {/* Upload placeholder */}
-                    <Card 
-                      className="aspect-square flex items-center justify-center cursor-pointer hover:bg-gray-50 border-dashed"
-                      onClick={() => handleCameraCapture('overview')}
-                    >
-                      <div className="text-center">
-                        <Camera className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-                        <p className="text-sm text-gray-600">Upload Photo</p>
-                        <p className="text-xs text-gray-500">(max 20 MB)</p>
-                      </div>
-                    </Card>
-
-                    {/* Existing photos */}
-                    {overviewPhotos.map((photo) => (
-                      <Card key={photo.id} className="aspect-square overflow-hidden relative group">
-                        <img 
-                          src={photo.url} 
-                          alt="Overview" 
-                          className="w-full h-full object-cover"
-                        />
-                        <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                          <Button 
-                            variant="destructive" 
-                            size="sm"
-                            onClick={() => setOverviewPhotos(prev => prev.filter(p => p.id !== photo.id))}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                              </div>
+                            </CardContent>
+                          </Card>
+                          
+                          <Card>
+                            <CardHeader>
+                              <CardTitle className={isTablet ? 'text-lg' : 'text-base'}>Inspection Progress</CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-3">
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm">Deficiencies</span>
+                                <Badge variant="secondary">{deficiencies.length}</Badge>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm">Overview Photos</span>
+                                <Badge variant="secondary">{overviewPhotos.length}</Badge>
+                              </div>
+                              <div className="flex items-center justify-between">
+                                <span className="text-sm">Checklist Progress</span>
+                                <Badge variant="secondary">{checklistData.completionPercentage || 0}%</Badge>
+                              </div>
+                            </CardContent>
+                          </Card>
                         </div>
-                      </Card>
-                    ))}
-                  </div>
-                </div>
-              </TabsContent>
-
-              {/* Notes Tab */}
-              <TabsContent 
-                value="notes" 
-                className={`${isTablet ? 'p-6' : 'p-6'}`}
-                onTouchStart={handleTouchStart}
-                onTouchMove={handleTouchMove}
-                onTouchEnd={handleTouchEnd}
-              >
-                <div className="space-y-6">
-                  <div>
-                    <h2 className={`${isTablet ? 'text-2xl' : 'text-xl'} font-semibold mb-4`}>Inspection Findings</h2>
-                    
-                    <div className="mb-6">
-                      <label className={`block ${isTablet ? 'text-base' : 'text-sm'} font-medium mb-3`}>
-                        Did you confirm roof square footage? *
-                      </label>
-                      <div className="flex gap-6">
-                        <label className="flex items-center">
-                          <input
-                            type="radio"
-                            name="roofFootage"
-                            checked={roofSquareFootageConfirmed === true}
-                            onChange={() => setRoofSquareFootageConfirmed(true)}
-                            className={`mr-3 ${isTablet ? 'w-5 h-5' : 'w-4 h-4'}`}
-                          />
-                          <span className={isTablet ? 'text-lg' : 'text-base'}>Yes</span>
-                        </label>
-                        <label className="flex items-center">
-                          <input
-                            type="radio"
-                            name="roofFootage"
-                            checked={roofSquareFootageConfirmed === false}
-                            onChange={() => setRoofSquareFootageConfirmed(false)}
-                            className={`mr-3 ${isTablet ? 'w-5 h-5' : 'w-4 h-4'}`}
-                          />
-                          <span className={isTablet ? 'text-lg' : 'text-base'}>No</span>
-                        </label>
                       </div>
                     </div>
+                  </TabsContent>
 
-                    <div>
-                      <div className="flex items-center justify-between mb-3">
-                        <label className={`block ${isTablet ? 'text-base' : 'text-sm'} font-medium`}>
-                          Inspection Findings *
-                        </label>
-                        {isTablet && (
-                          <Button
-                            onClick={startVoiceRecording}
-                            disabled={isVoiceRecording}
-                            variant="outline"
-                            size="sm"
-                            className="ml-2"
-                          >
-                            <Mic className={`h-4 w-4 mr-2 ${isVoiceRecording ? 'text-red-500 animate-pulse' : ''}`} />
-                            {isVoiceRecording ? 'Recording...' : 'Voice Input'}
-                          </Button>
-                        )}
-                      </div>
-                      <Textarea
-                        value={inspectionNotes}
-                        onChange={(e) => setInspectionNotes(e.target.value)}
-                        placeholder="Enter detailed inspection findings, observations, and recommendations..."
-                        rows={isTablet ? 16 : 12}
-                        className={`resize-none ${isTablet ? 'text-base p-4' : 'text-sm'}`}
-                        style={{ minHeight: isTablet ? '400px' : 'auto' }}
+                  {/* Repair History Sub-tab */}
+                  <TabsContent value="repair-history" className={`${isTablet ? 'p-6' : 'p-3 md:p-6'}`}>
+                    <div className="space-y-6">
+                      <h2 className={`font-semibold mb-4 ${isTablet ? 'text-xl' : 'text-lg'}`}>Repair History</h2>
+                      <Card>
+                        <CardContent className="p-6 text-center">
+                          <History className="h-12 w-12 text-muted-foreground mx-auto mb-3" />
+                          <p className="text-muted-foreground">
+                            Repair history will be populated from previous inspection data and work orders.
+                          </p>
+                        </CardContent>
+                      </Card>
+                    </div>
+                  </TabsContent>
+
+                  {/* Roof Assembly Sub-tab */}
+                  <TabsContent value="roof-assembly" className={`${isTablet ? 'p-6' : 'p-3 md:p-6'}`}>
+                    <div className="space-y-6">
+                      <h2 className={`font-semibold mb-4 ${isTablet ? 'text-xl' : 'text-lg'}`}>Roof Assembly</h2>
+                      <RoofCompositionCapture
+                        initialData={roofCompositionData}
+                        onDataChange={setRoofCompositionData}
+                        isTablet={isTablet}
                       />
                     </div>
-                  </div>
-                </div>
-              </TabsContent>
+                  </TabsContent>
 
-              {/* Capital Expenses Tab */}
-              <TabsContent value="files" className="p-6">
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <h2 className="text-xl font-semibold">Capital Expenses</h2>
-                    <Button onClick={() => setShowCapitalExpenseModal(true)}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Add Capital Expense
-                    </Button>
-                  </div>
+                  {/* Daylight Sub-tab */}
+                  <TabsContent value="daylight" className={`${isTablet ? 'p-6' : 'p-3 md:p-6'}`}>
+                    <div className="space-y-6">
+                      <h2 className={`font-semibold mb-4 ${isTablet ? 'text-xl' : 'text-lg'}`}>Daylight & Solar</h2>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                              <Sun className="h-5 w-5" />
+                              Solar Information
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-4">
+                              <div>
+                                <p className="text-muted-foreground text-sm mb-2">Has Solar Installation?</p>
+                                <Badge variant={checklistData.hasSolar === 'YES' ? 'default' : 'secondary'}>
+                                  {checklistData.hasSolar || 'Not specified'}
+                                </Badge>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
 
-                  {capitalExpenses.length === 0 ? (
-                    <Card className="p-8 text-center">
-                      <DollarSign className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                      <h3 className="text-lg font-medium text-gray-900 mb-2">No Capital Expenses</h3>
-                      <p className="text-gray-600 mb-4">Add capital expenses identified during inspection.</p>
-                    </Card>
-                  ) : (
-                    <div className="space-y-4">
-                      {capitalExpenses.map((expense) => (
-                        <Card key={expense.id} className="p-4">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <h3 className="font-semibold">{expense.description}</h3>
-                              <p className="text-2xl font-bold text-green-600">
-                                ${expense.estimatedCost.toLocaleString()}
-                              </p>
-                              <p className="text-sm text-gray-600">Year: {expense.year}</p>
-                              {expense.scopeOfWork && (
-                                <p className="text-sm text-gray-600 mt-1">{expense.scopeOfWork}</p>
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="flex items-center gap-2">
+                              <Sun className="h-5 w-5" />
+                              Daylighting Information
+                            </CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-4">
+                              <div>
+                                <p className="text-muted-foreground text-sm mb-2">Has Daylighting?</p>
+                                <Badge variant={checklistData.hasDaylighting === 'YES' ? 'default' : 'secondary'}>
+                                  {checklistData.hasDaylighting || 'Not specified'}
+                                </Badge>
+                              </div>
+                              {checklistData.hasDaylighting === 'YES' && checklistData.daylightFactor && (
+                                <div>
+                                  <p className="text-muted-foreground text-sm mb-2">Daylight Factor</p>
+                                  <p className="font-medium">{checklistData.daylightFactor}%</p>
+                                </div>
                               )}
                             </div>
-                            <Button variant="outline" size="sm">
-                              <Edit className="h-4 w-4" />
+                          </CardContent>
+                        </Card>
+                      </div>
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </TabsContent>
+
+              {/* My Inspection Tab */}
+              <TabsContent value="my-inspection" className="p-0">
+                <Tabs value={currentSubTab} onValueChange={setCurrentSubTab}>
+                  <TabsList className={`w-full ${isTablet ? 'h-14' : 'h-10 md:h-12'} bg-muted/50 rounded-none border-b overflow-x-auto flex-nowrap`}>
+                    <TabsTrigger value="deficiencies" className={`flex items-center gap-1 md:gap-2 ${isTablet ? 'px-6 py-3 text-base' : 'px-3 md:px-4 text-xs md:text-sm'} whitespace-nowrap`}>
+                      <AlertTriangle className={isTablet ? 'h-5 w-5' : 'h-3 w-3 md:h-4 md:w-4'} />
+                      <span>Deficiencies</span>
+                      {deficiencies.length > 0 && (
+                        <Badge variant="secondary" className="ml-1 text-xs">{deficiencies.length}</Badge>
+                      )}
+                    </TabsTrigger>
+                    <TabsTrigger value="overview-photos" className={`flex items-center gap-1 md:gap-2 ${isTablet ? 'px-6 py-3 text-base' : 'px-3 md:px-4 text-xs md:text-sm'} whitespace-nowrap`}>
+                      <ImageIcon className={isTablet ? 'h-5 w-5' : 'h-3 w-3 md:h-4 md:w-4'} />
+                      <span>Overview Photos</span>
+                      {overviewPhotos.length > 0 && (
+                        <Badge variant="secondary" className="ml-1 text-xs">{overviewPhotos.length}</Badge>
+                      )}
+                    </TabsTrigger>
+                    <TabsTrigger value="notes" className={`flex items-center gap-1 md:gap-2 ${isTablet ? 'px-6 py-3 text-base' : 'px-3 md:px-4 text-xs md:text-sm'} whitespace-nowrap`}>
+                      <FileText className={isTablet ? 'h-5 w-5' : 'h-3 w-3 md:h-4 md:w-4'} />
+                      <span>Notes</span>
+                    </TabsTrigger>
+                    <TabsTrigger value="files" className={`flex items-center gap-1 md:gap-2 ${isTablet ? 'px-6 py-3 text-base' : 'px-3 md:px-4 text-xs md:text-sm'} whitespace-nowrap`}>
+                      <FolderOpen className={isTablet ? 'h-5 w-5' : 'h-3 w-3 md:h-4 md:w-4'} />
+                      <span>Files</span>
+                    </TabsTrigger>
+                  </TabsList>
+
+                  {/* Deficiencies Sub-tab - All sections in one scrollable page */}
+                  <TabsContent value="deficiencies" className={`${isTablet ? 'p-6' : 'p-3 md:p-6'} space-y-8`}>
+                    {/* Deficiencies Section */}
+                    <section>
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
+                        <h3 className="text-lg font-semibold">Roof Deficiencies</h3>
+                        <Button 
+                          onClick={() => setShowDeficiencyModal(true)}
+                          className="w-full sm:w-auto"
+                          size={isTablet ? "lg" : "default"}
+                        >
+                          <Plus className={`${isTablet ? 'h-5 w-5' : 'h-4 w-4'} mr-2`} />
+                          Add New Deficiency
+                        </Button>
+                      </div>
+
+                      {deficiencies.length === 0 ? (
+                        <Card className="p-8 text-center">
+                          <AlertTriangle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                          <h3 className="text-lg font-medium text-gray-900 mb-2">No Deficiencies Documented</h3>
+                          <p className="text-gray-600 mb-4">Start by adding deficiencies found during your inspection.</p>
+                          <Button onClick={() => setShowDeficiencyModal(true)}>
+                            <Plus className="h-4 w-4 mr-2" />
+                            Add First Deficiency
+                          </Button>
+                        </Card>
+                      ) : (
+                        <div className="grid gap-4">
+                          {deficiencies.map((deficiency) => (
+                            <Card key={deficiency.id} className="p-4">
+                              <div className="flex justify-between items-start">
+                                <div className="flex-1">
+                                  <div className="flex items-center gap-2 mb-2">
+                                    <Badge className={getSeverityColor(deficiency.severity)}>
+                                      {deficiency.severity.toUpperCase()}
+                                    </Badge>
+                                    <Badge variant="outline">{deficiency.category}</Badge>
+                                  </div>
+                                  <h3 className="font-semibold">{deficiency.location}</h3>
+                                  {deficiency.description && (
+                                    <p className="text-gray-600 mt-1">{deficiency.description}</p>
+                                  )}
+                                  {deficiency.budgetAmount > 0 && (
+                                    <p className="text-sm text-green-600 mt-1">
+                                      Budget: ${deficiency.budgetAmount.toLocaleString()}
+                                    </p>
+                                  )}
+                                </div>
+                                <div className="flex gap-2">
+                                  <Button variant="outline" size="sm">
+                                    <Camera className="h-4 w-4" />
+                                  </Button>
+                                  <Button variant="outline" size="sm">
+                                    <Edit className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                      )}
+                    </section>
+
+                    {/* Capital Expenses Section */}
+                    <section>
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
+                        <h3 className="text-lg font-semibold">Capital Expenses</h3>
+                        <Button 
+                          onClick={() => setShowCapitalExpenseModal(true)}
+                          size={isTablet ? "lg" : "default"}
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add Capital Expense
+                        </Button>
+                      </div>
+
+                      {capitalExpenses.length === 0 ? (
+                        <Card className="p-8 text-center">
+                          <DollarSign className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                          <h3 className="text-lg font-medium text-gray-900 mb-2">No Capital Expenses Planned</h3>
+                          <p className="text-gray-600 mb-4">Add future capital expenses for budget planning.</p>
+                        </Card>
+                      ) : (
+                        <div className="space-y-3">
+                          {capitalExpenses.map((expense) => (
+                            <Card key={expense.id} className="p-4">
+                              <div className="flex justify-between items-start">
+                                <div>
+                                  <h3 className="font-semibold">{expense.description}</h3>
+                                  <p className="text-sm text-gray-600 mt-1">{expense.scopeOfWork}</p>
+                                  <div className="flex items-center gap-4 mt-2">
+                                    <span className="text-sm font-medium">
+                                      Year: {expense.year}
+                                    </span>
+                                    <span className="text-sm font-medium text-green-600">
+                                      ${expense.estimatedCost.toLocaleString()}
+                                    </span>
+                                    <Badge variant={expense.completed ? "default" : "secondary"}>
+                                      {expense.completed ? "Completed" : "Planned"}
+                                    </Badge>
+                                  </div>
+                                </div>
+                              </div>
+                            </Card>
+                          ))}
+                        </div>
+                      )}
+                    </section>
+
+                    {/* Inspection Checklist Section */}
+                    <section>
+                      <h3 className="text-lg font-semibold mb-4">Inspection Checklist</h3>
+                      <Card>
+                        <CardContent className="p-6">
+                          <InspectionChecklist
+                            initialData={checklistData}
+                            onDataChange={setChecklistData}
+                            isTablet={isTablet}
+                          />
+                        </CardContent>
+                      </Card>
+                    </section>
+
+                    {/* Executive Summary Section */}
+                    <section>
+                      <h3 className="text-lg font-semibold mb-4">Executive Summary</h3>
+                      <Card>
+                        <CardContent className="p-6">
+                          <ExecutiveSummary
+                            inspectionData={{
+                              ...roofCompositionData,
+                              ...checklistData,
+                              deficiencies,
+                              inspectionNotes,
+                              roofSquareFootageConfirmed,
+                              overviewPhotos
+                            }}
+                            onSummaryGenerated={setExecutiveSummaryData}
+                            isTablet={isTablet}
+                          />
+                        </CardContent>
+                      </Card>
+                    </section>
+                  </TabsContent>
+
+                  {/* Overview Photos Sub-tab */}
+                  <TabsContent value="overview-photos" className={`${isTablet ? 'p-6' : 'p-3 md:p-6'}`}>
+                    <div className="space-y-4">
+                      <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
+                        <h3 className="text-lg font-semibold">Overview Photos</h3>
+                        <Button 
+                          onClick={() => handleCameraCapture('overview')}
+                          size={isTablet ? "lg" : "default"}
+                        >
+                          <Camera className="h-4 w-4 mr-2" />
+                          Take Overview Photo
+                        </Button>
+                      </div>
+
+                      {overviewPhotos.length === 0 ? (
+                        <Card className="p-8 text-center">
+                          <ImageIcon className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                          <h3 className="text-lg font-medium text-gray-900 mb-2">No Overview Photos</h3>
+                          <p className="text-gray-600 mb-4">Take overview photos to document the roof condition.</p>
+                          <Button onClick={() => handleCameraCapture('overview')}>
+                            <Camera className="h-4 w-4 mr-2" />
+                            Take First Photo
+                          </Button>
+                        </Card>
+                      ) : (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                          {overviewPhotos.map((photo) => (
+                            <Card key={photo.id} className="overflow-hidden">
+                              <div className="aspect-video bg-gray-100">
+                                <img 
+                                  src={photo.url} 
+                                  alt={`Overview ${photo.id}`}
+                                  className="w-full h-full object-cover"
+                                />
+                              </div>
+                              <CardContent className="p-3">
+                                <div className="flex items-center justify-between">
+                                  <div>
+                                    <p className="text-sm font-medium">Overview Photo</p>
+                                    <p className="text-xs text-gray-500">
+                                      {photo.timestamp.toLocaleString()}
+                                    </p>
+                                  </div>
+                                  <Button variant="ghost" size="sm">
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </CardContent>
+                            </Card>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </TabsContent>
+
+                  {/* Notes Sub-tab */}
+                  <TabsContent value="notes" className={`${isTablet ? 'p-6' : 'p-3 md:p-6'}`}>
+                    <div className="space-y-4">
+                      <div className="flex items-center justify-between">
+                        <h3 className="text-lg font-semibold">Inspection Notes</h3>
+                        {isVoiceRecording && (
+                          <Badge variant="destructive" className="animate-pulse">
+                            <Mic className="h-3 w-3 mr-1" />
+                            Recording...
+                          </Badge>
+                        )}
+                      </div>
+                      
+                      <Card>
+                        <CardContent className="p-4">
+                          <div className="space-y-3">
+                            <Textarea
+                              placeholder="Add your inspection notes here..."
+                              value={inspectionNotes}
+                              onChange={(e) => setInspectionNotes(e.target.value)}
+                              className={`min-h-[200px] ${isTablet ? 'text-base' : 'text-sm'}`}
+                            />
+                            <div className="flex gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={startVoiceRecording}
+                                disabled={isVoiceRecording}
+                              >
+                                <Mic className="h-4 w-4 mr-2" />
+                                {isVoiceRecording ? 'Recording...' : 'Voice Input'}
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => setInspectionNotes('')}
+                              >
+                                Clear Notes
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+
+                      <Card>
+                        <CardHeader>
+                          <CardTitle className="text-base">Square Footage Confirmation</CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="flex gap-3">
+                            <Button
+                              variant={roofSquareFootageConfirmed === true ? "default" : "outline"}
+                              onClick={() => setRoofSquareFootageConfirmed(true)}
+                              size="sm"
+                            >
+                              <CheckCircle className="h-4 w-4 mr-2" />
+                              Confirmed
+                            </Button>
+                            <Button
+                              variant={roofSquareFootageConfirmed === false ? "destructive" : "outline"}
+                              onClick={() => setRoofSquareFootageConfirmed(false)}
+                              size="sm"
+                            >
+                              <X className="h-4 w-4 mr-2" />
+                              Not Confirmed
                             </Button>
                           </div>
-                        </Card>
-                      ))}
+                        </CardContent>
+                      </Card>
                     </div>
-                  )}
-                </div>
-              </TabsContent>
+                  </TabsContent>
 
-              {/* Roof Composition Tab */}
-              <TabsContent value="composition" className={`${isTablet ? 'p-6' : 'p-3 md:p-6'}`}>
-                <RoofCompositionCapture
-                  initialData={roofCompositionData}
-                  onDataChange={setRoofCompositionData}
-                  isTablet={isTablet}
-                />
-              </TabsContent>
+                  {/* Files Sub-tab */}
+                  <TabsContent value="files" className={`${isTablet ? 'p-6' : 'p-3 md:p-6'}`}>
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-semibold">Files & Documents</h3>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="text-base">Upload Documents</CardTitle>
+                          </CardHeader>
+                          <CardContent className="space-y-3">
+                            <Button 
+                              variant="outline" 
+                              className="w-full"
+                              onClick={() => warrantyFileInputRef.current?.click()}
+                              disabled={isUploading}
+                            >
+                              <FolderOpen className="h-4 w-4 mr-2" />
+                              Upload Warranty Documents
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              className="w-full"
+                              onClick={() => cadFileInputRef.current?.click()}
+                              disabled={isUploading}
+                            >
+                              <FolderOpen className="h-4 w-4 mr-2" />
+                              Upload CAD Files
+                            </Button>
+                            <Button 
+                              variant="outline" 
+                              className="w-full"
+                              onClick={() => otherFileInputRef.current?.click()}
+                              disabled={isUploading}
+                            >
+                              <FolderOpen className="h-4 w-4 mr-2" />
+                              Upload Other Documents
+                            </Button>
+                            {isUploading && (
+                              <div className="text-center text-sm text-muted-foreground">
+                                Uploading files...
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
 
-              {/* Inspection Checklist Tab */}
-              <TabsContent value="checklist" className={`${isTablet ? 'p-6' : 'p-3 md:p-6'}`}>
-                <InspectionChecklist
-                  initialData={checklistData}
-                  onDataChange={setChecklistData}
-                  isTablet={isTablet}
-                />
-              </TabsContent>
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="text-base">Workflow Export</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <WorkflowDataExporter
+                              inspectionData={{
+                                propertyId,
+                                propertyName,
+                                deficiencies,
+                                overviewPhotos,
+                                inspectionNotes,
+                                roofSquareFootageConfirmed,
+                                capitalExpenses,
+                                roofCompositionData,
+                                checklistData,
+                                executiveSummaryData,
+                                inspectionStarted,
+                                startTime
+                              }}
+                              isTablet={isTablet}
+                            />
+                          </CardContent>
+                        </Card>
+                      </div>
 
-              {/* Executive Summary Tab */}
-              <TabsContent value="summary" className={`${isTablet ? 'p-6' : 'p-3 md:p-6'}`}>
-                <ExecutiveSummary
-                  inspectionData={{
-                    ...roofCompositionData,
-                    ...checklistData,
-                    deficiencies,
-                    inspectionNotes,
-                    roofSquareFootageConfirmed,
-                    overviewPhotos
-                  }}
-                  onSummaryGenerated={setExecutiveSummaryData}
-                  isTablet={isTablet}
-                />
-              </TabsContent>
-
-              {/* Workflow Export Tab */}
-              <TabsContent value="workflow" className={`${isTablet ? 'p-6' : 'p-3 md:p-6'}`}>
-                <WorkflowDataExporter
-                  inspectionData={{
-                    propertyId,
-                    propertyName,
-                    deficiencies,
-                    overviewPhotos,
-                    inspectionNotes,
-                    roofSquareFootageConfirmed,
-                    capitalExpenses,
-                    roofCompositionData,
-                    checklistData,
-                    executiveSummaryData,
-                    inspectionStarted,
-                    startTime
-                  }}
-                  isTablet={isTablet}
-                />
+                      {/* Uploaded Files List */}
+                      {uploadedFiles.length > 0 && (
+                        <Card>
+                          <CardHeader>
+                            <CardTitle className="text-base">Uploaded Files ({uploadedFiles.length})</CardTitle>
+                          </CardHeader>
+                          <CardContent>
+                            <div className="space-y-2">
+                              {uploadedFiles.map((file) => (
+                                <div key={file.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                                  <div className="flex items-center gap-3">
+                                    <FileText className="h-5 w-5 text-gray-500" />
+                                    <div>
+                                      <p className="font-medium text-sm">{file.name}</p>
+                                      <p className="text-xs text-muted-foreground">
+                                        {file.type.toUpperCase()} • {(file.size / 1024).toFixed(1)} KB • {file.uploadedAt.toLocaleDateString()}
+                                      </p>
+                                    </div>
+                                  </div>
+                                  <div className="flex gap-2">
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleDownloadFile(file.url, file.name)}
+                                    >
+                                      <Download className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => handleDeleteFile(file.id)}
+                                    >
+                                      <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      )}
+                    </div>
+                  </TabsContent>
+                </Tabs>
               </TabsContent>
             </Tabs>
           </CardContent>
@@ -888,6 +1266,159 @@ export function ActiveInspectionInterface({
         className="hidden"
         onChange={(e) => handlePhotoCapture(e, 'overview')}
       />
+      
+      {/* Hidden document file inputs */}
+      <input
+        ref={warrantyFileInputRef}
+        type="file"
+        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+        multiple
+        className="hidden"
+        onChange={(e) => handleFileUpload(e.target.files, 'warranty')}
+      />
+      <input
+        ref={cadFileInputRef}
+        type="file"
+        accept=".dwg,.dxf,.pdf,.zip"
+        multiple
+        className="hidden"
+        onChange={(e) => handleFileUpload(e.target.files, 'cad')}
+      />
+      <input
+        ref={otherFileInputRef}
+        type="file"
+        accept="*/*"
+        multiple
+        className="hidden"
+        onChange={(e) => handleFileUpload(e.target.files, 'other')}
+      />
+
+      {/* Start Inspection Modal */}
+      <Dialog open={showStartInspectionModal} onOpenChange={setShowStartInspectionModal}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <Camera className="h-6 w-6" />
+              Start New Inspection
+            </DialogTitle>
+          </DialogHeader>
+          <div className="py-6 text-center">
+            <p className="text-muted-foreground mb-6">
+              Begin a comprehensive roof inspection for {propertyName}
+            </p>
+            <div className="flex gap-3 justify-center">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowStartInspectionModal(false);
+                  setCurrentTab('roof-summary');
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={handleStartInspection}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                <Camera className="h-4 w-4 mr-2" />
+                Start Inspection
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Pre-Inspection Briefing Modal */}
+      <Dialog open={showPreInspectionBriefing} onOpenChange={setShowPreInspectionBriefing}>
+        <DialogContent className="max-w-2xl max-h-[95vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <AlertTriangle className="h-6 w-6 text-destructive" />
+              Critical Focus Areas - {propertyName}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+              <h3 className="font-semibold text-red-800 mb-2">⚠️ Pre-Inspection Briefing</h3>
+              <p className="text-red-700 text-sm">
+                Review these critical areas identified from previous annual inspections before beginning your inspection.
+              </p>
+            </div>
+
+            {criticalAreas.length > 0 ? (
+              <div className="space-y-3">
+                {criticalAreas.map((area, index) => (
+                  <Card key={index} className={`border-l-4 ${
+                    area.severity === 'high' ? 'border-l-red-500 bg-red-50' : 
+                    area.severity === 'medium' ? 'border-l-yellow-500 bg-yellow-50' : 
+                    'border-l-blue-500 bg-blue-50'
+                  }`}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2">
+                            <Badge variant={area.severity === 'high' ? 'destructive' : 'secondary'}>
+                              {area.severity?.toUpperCase() || 'HIGH'}
+                            </Badge>
+                            <Badge variant="outline">
+                              <MapPin className="h-3 w-3 mr-1" />
+                              {area.location}
+                            </Badge>
+                            {area.estimatedCost && (
+                              <Badge variant="outline">
+                                <DollarSign className="h-3 w-3 mr-1" />
+                                ${area.estimatedCost.toLocaleString()}
+                              </Badge>
+                            )}
+                          </div>
+                          <h4 className="font-semibold text-lg">{area.issueType}</h4>
+                          <p className="text-muted-foreground mt-1">{area.description}</p>
+                          {area.lastReported && (
+                            <p className="text-xs text-muted-foreground mt-2">
+                              Last reported: {new Date(area.lastReported).toLocaleDateString()}
+                            </p>
+                          )}
+                        </div>
+                        <AlertTriangle className="h-6 w-6 text-red-500" />
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="p-6 text-center">
+                  <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-3" />
+                  <h3 className="font-semibold mb-2">No Critical Issues Found</h3>
+                  <p className="text-muted-foreground">
+                    This property has no high-priority issues identified from previous inspections.
+                    Proceed with a standard comprehensive inspection.
+                  </p>
+                </CardContent>
+              </Card>
+            )}
+          </div>
+
+          <DialogFooter className="mt-6">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setShowPreInspectionBriefing(false);
+                setShowStartInspectionModal(true);
+              }}
+            >
+              Review Later
+            </Button>
+            <Button
+              className="bg-green-600 hover:bg-green-700 text-white"
+              onClick={handleBeginInspection}
+            >
+              <Camera className="h-4 w-4 mr-2" />
+              Begin Inspection
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Deficiency Modal */}
       <Dialog open={showDeficiencyModal} onOpenChange={setShowDeficiencyModal}>
