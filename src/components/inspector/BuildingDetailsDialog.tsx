@@ -197,7 +197,7 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
           </DialogHeader>
 
           <Tabs defaultValue="roof-summary" className="mt-6">
-            <TabsList className="grid w-full grid-cols-1 sm:grid-cols-2">
+            <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="roof-summary">Roof Summary</TabsTrigger>
               <TabsTrigger value="my-inspection">My Inspection</TabsTrigger>
             </TabsList>
