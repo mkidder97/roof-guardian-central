@@ -18,11 +18,13 @@ const AppRoutes = () => {
   const { user, loading } = useAuth();
 
   if (loading) {
+    console.log('App: Auth loading state is true, user:', user);
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
           <div className="text-2xl font-bold text-primary">RoofMind</div>
-          <div className="text-muted-foreground">Loading...</div>
+          <div className="text-muted-foreground">Loading... (Auth check in progress)</div>
+          <div className="text-xs text-muted-foreground">Check browser console for details</div>
         </div>
       </div>
     );
