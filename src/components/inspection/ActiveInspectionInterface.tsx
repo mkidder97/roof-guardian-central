@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,10 +21,21 @@ import {
   X,
   CheckCircle,
   Clock,
-  DollarSign
+  DollarSign,
+  Mic,
+  ChevronLeft,
+  ChevronRight,
+  Layers,
+  ClipboardList,
+  FileBarChart,
+  Workflow
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { RoofCompositionCapture } from "./RoofCompositionCapture";
+import { InspectionChecklist } from "./InspectionChecklist";
+import { ExecutiveSummary } from "./ExecutiveSummary";
+import { WorkflowDataExporter } from "./WorkflowDataExporter";
 
 interface Photo {
   id: string;
@@ -87,6 +98,27 @@ export function ActiveInspectionInterface({
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const overviewFileInputRef = useRef<HTMLInputElement>(null);
+  
+  // iPad-specific state
+  const [isTablet, setIsTablet] = useState(false);
+  const [isVoiceRecording, setIsVoiceRecording] = useState(false);
+  const [touchStartX, setTouchStartX] = useState(0);
+  const [touchEndX, setTouchEndX] = useState(0);
+
+  // Detect tablet/iPad
+  useEffect(() => {
+    const checkDevice = () => {
+      const userAgent = navigator.userAgent;
+      const isIOS = /iPad|iPhone|iPod/.test(userAgent);
+      const isAndroidTablet = /Android/.test(userAgent) && !/Mobile/.test(userAgent);
+      const isLargeScreen = window.innerWidth >= 768;
+      setIsTablet(isIOS || isAndroidTablet || isLargeScreen);
+    };
+    
+    checkDevice();
+    window.addEventListener('resize', checkDevice);
+    return () => window.removeEventListener('resize', checkDevice);
+  }, []);
 
   // Inspection state
   const [currentTab, setCurrentTab] = useState('deficiencies');
@@ -109,6 +141,11 @@ export function ActiveInspectionInterface({
   const [capitalExpenses, setCapitalExpenses] = useState<CapitalExpense[]>([]);
   const [showCapitalExpenseModal, setShowCapitalExpenseModal] = useState(false);
   const [editingCapitalExpense, setEditingCapitalExpense] = useState<CapitalExpense | null>(null);
+
+  // New inspection components state
+  const [roofCompositionData, setRoofCompositionData] = useState<any>({});
+  const [checklistData, setChecklistData] = useState<any>({});
+  const [executiveSummaryData, setExecutiveSummaryData] = useState<any>(null);
 
   // New deficiency form
   const [newDeficiency, setNewDeficiency] = useState({
@@ -138,6 +175,9 @@ export function ActiveInspectionInterface({
         inspectionNotes,
         roofSquareFootageConfirmed,
         capitalExpenses,
+        roofCompositionData,
+        checklistData,
+        executiveSummaryData,
         inspectionStarted,
         startTime,
         lastUpdated: new Date().toISOString()
@@ -151,7 +191,10 @@ export function ActiveInspectionInterface({
     overviewPhotos, 
     inspectionNotes, 
     roofSquareFootageConfirmed, 
-    capitalExpenses, 
+    capitalExpenses,
+    roofCompositionData,
+    checklistData,
+    executiveSummaryData,
     inspectionStarted, 
     startTime, 
     onDataChange
@@ -326,6 +369,106 @@ export function ActiveInspectionInterface({
     }
   };
 
+  // iPad-specific touch and swipe handlers
+  const handleTouchStart = useCallback((e: React.TouchEvent) => {
+    setTouchStartX(e.targetTouches[0].clientX);
+  }, []);
+
+  const handleTouchMove = useCallback((e: React.TouchEvent) => {
+    setTouchEndX(e.targetTouches[0].clientX);
+  }, []);
+
+  const handleTouchEnd = useCallback(() => {
+    if (!touchStartX || !touchEndX) return;
+    
+    const distance = touchStartX - touchEndX;
+    const isLeftSwipe = distance > 50;
+    const isRightSwipe = distance < -50;
+    
+    const tabs = ['deficiencies', 'overview', 'notes', 'files'];
+    const currentIndex = tabs.indexOf(currentTab);
+    
+    if (isLeftSwipe && currentIndex < tabs.length - 1) {
+      setCurrentTab(tabs[currentIndex + 1]);
+    } else if (isRightSwipe && currentIndex > 0) {
+      setCurrentTab(tabs[currentIndex - 1]);
+    }
+  }, [touchStartX, touchEndX, currentTab]);
+
+  // Voice-to-text functionality for iPad
+  const startVoiceRecording = useCallback(() => {
+    if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
+      toast({
+        title: "Voice Recognition Unavailable",
+        description: "Voice input is not supported on this device",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsVoiceRecording(true);
+    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognition = new SpeechRecognition();
+    
+    recognition.continuous = false;
+    recognition.interimResults = false;
+    recognition.lang = 'en-US';
+
+    recognition.onresult = (event) => {
+      const transcript = event.results[0][0].transcript;
+      setInspectionNotes(prev => prev + (prev ? ' ' : '') + transcript);
+      setIsVoiceRecording(false);
+    };
+
+    recognition.onerror = () => {
+      setIsVoiceRecording(false);
+      toast({
+        title: "Voice Recognition Error",
+        description: "Could not capture voice input",
+        variant: "destructive"
+      });
+    };
+
+    recognition.onend = () => {
+      setIsVoiceRecording(false);
+    };
+
+    recognition.start();
+  }, [toast]);
+
+  // Enhanced camera capture for iPad
+  const handleEnhancedCameraCapture = useCallback(async (type: 'overview' | 'deficiency') => {
+    try {
+      // For iPad, try to access the camera directly
+      if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+        const stream = await navigator.mediaDevices.getUserMedia({ 
+          video: { 
+            facingMode: 'environment', // Use back camera
+            width: { ideal: 1920 },
+            height: { ideal: 1080 }
+          } 
+        });
+        
+        // Create video element for preview (would need full implementation)
+        toast({
+          title: "Camera Ready",
+          description: "Enhanced camera capture for iPad field use"
+        });
+        
+        // Stop the stream for now (full implementation would show camera preview)
+        stream.getTracks().forEach(track => track.stop());
+        
+        // Fall back to file input for now
+        handleCameraCapture(type);
+      } else {
+        handleCameraCapture(type);
+      }
+    } catch (error) {
+      console.error('Camera access error:', error);
+      handleCameraCapture(type);
+    }
+  }, []);
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
@@ -371,48 +514,78 @@ export function ActiveInspectionInterface({
         <Card className="shadow-lg">
           <CardContent className="p-0">
             <Tabs value={currentTab} onValueChange={setCurrentTab}>
-              <TabsList className="w-full h-12 md:h-14 bg-gray-100 rounded-none border-b overflow-x-auto flex-nowrap">
-                <TabsTrigger value="deficiencies" className="flex items-center gap-1 md:gap-2 px-2 md:px-4 text-xs md:text-sm whitespace-nowrap">
-                  <AlertTriangle className="h-3 w-3 md:h-4 md:w-4" />
+              <TabsList className={`w-full ${isTablet ? 'h-16' : 'h-12 md:h-14'} bg-gray-100 rounded-none border-b overflow-x-auto flex-nowrap`}>
+                <TabsTrigger value="deficiencies" className={`flex items-center gap-1 md:gap-2 ${isTablet ? 'px-6 py-4 text-base' : 'px-2 md:px-4 text-xs md:text-sm'} whitespace-nowrap min-h-[44px]`}>
+                  <AlertTriangle className={isTablet ? 'h-5 w-5' : 'h-3 w-3 md:h-4 md:w-4'} />
                   <span className="hidden sm:inline">Deficiencies</span>
                   <span className="sm:hidden">Def</span>
                   {getTabCount('deficiencies') > 0 && (
                     <Badge variant="secondary" className="ml-1 text-xs">{getTabCount('deficiencies')}</Badge>
                   )}
                 </TabsTrigger>
-                <TabsTrigger value="overview" className="flex items-center gap-1 md:gap-2 px-2 md:px-4 text-xs md:text-sm whitespace-nowrap">
-                  <ImageIcon className="h-3 w-3 md:h-4 md:w-4" />
+                <TabsTrigger value="overview" className={`flex items-center gap-1 md:gap-2 ${isTablet ? 'px-6 py-4 text-base' : 'px-2 md:px-4 text-xs md:text-sm'} whitespace-nowrap min-h-[44px]`}>
+                  <ImageIcon className={isTablet ? 'h-5 w-5' : 'h-3 w-3 md:h-4 md:w-4'} />
                   <span className="hidden sm:inline">Overview Photos</span>
                   <span className="sm:hidden">Photos</span>
                   {getTabCount('overview') > 0 && (
                     <Badge variant="secondary" className="ml-1 text-xs">{getTabCount('overview')}</Badge>
                   )}
                 </TabsTrigger>
-                <TabsTrigger value="notes" className="flex items-center gap-1 md:gap-2 px-2 md:px-4 text-xs md:text-sm whitespace-nowrap">
-                  <FileText className="h-3 w-3 md:h-4 md:w-4" />
+                <TabsTrigger value="notes" className={`flex items-center gap-1 md:gap-2 ${isTablet ? 'px-6 py-4 text-base' : 'px-2 md:px-4 text-xs md:text-sm'} whitespace-nowrap min-h-[44px]`}>
+                  <FileText className={isTablet ? 'h-5 w-5' : 'h-3 w-3 md:h-4 md:w-4'} />
                   <span>Notes</span>
                 </TabsTrigger>
-                <TabsTrigger value="files" className="flex items-center gap-1 md:gap-2 px-2 md:px-4 text-xs md:text-sm whitespace-nowrap">
-                  <DollarSign className="h-3 w-3 md:h-4 md:w-4" />
+                <TabsTrigger value="files" className={`flex items-center gap-1 md:gap-2 ${isTablet ? 'px-6 py-4 text-base' : 'px-2 md:px-4 text-xs md:text-sm'} whitespace-nowrap min-h-[44px]`}>
+                  <DollarSign className={isTablet ? 'h-5 w-5' : 'h-3 w-3 md:h-4 md:w-4'} />
                   <span className="hidden sm:inline">Capital Expenses</span>
                   <span className="sm:hidden">Capital</span>
                   {getTabCount('files') > 0 && (
                     <Badge variant="secondary" className="ml-1 text-xs">{getTabCount('files')}</Badge>
                   )}
                 </TabsTrigger>
+                <TabsTrigger value="composition" className={`flex items-center gap-1 md:gap-2 ${isTablet ? 'px-6 py-4 text-base' : 'px-2 md:px-4 text-xs md:text-sm'} whitespace-nowrap min-h-[44px]`}>
+                  <Layers className={isTablet ? 'h-5 w-5' : 'h-3 w-3 md:h-4 md:w-4'} />
+                  <span className="hidden sm:inline">Roof Composition</span>
+                  <span className="sm:hidden">Roof</span>
+                </TabsTrigger>
+                <TabsTrigger value="checklist" className={`flex items-center gap-1 md:gap-2 ${isTablet ? 'px-6 py-4 text-base' : 'px-2 md:px-4 text-xs md:text-sm'} whitespace-nowrap min-h-[44px]`}>
+                  <ClipboardList className={isTablet ? 'h-5 w-5' : 'h-3 w-3 md:h-4 md:w-4'} />
+                  <span className="hidden sm:inline">Checklist</span>
+                  <span className="sm:hidden">Check</span>
+                  {checklistData.completionPercentage && (
+                    <Badge variant="secondary" className="ml-1 text-xs">{checklistData.completionPercentage}%</Badge>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger value="summary" className={`flex items-center gap-1 md:gap-2 ${isTablet ? 'px-6 py-4 text-base' : 'px-2 md:px-4 text-xs md:text-sm'} whitespace-nowrap min-h-[44px]`}>
+                  <FileBarChart className={isTablet ? 'h-5 w-5' : 'h-3 w-3 md:h-4 md:w-4'} />
+                  <span className="hidden sm:inline">Executive Summary</span>
+                  <span className="sm:hidden">Summary</span>
+                </TabsTrigger>
+                <TabsTrigger value="workflow" className={`flex items-center gap-1 md:gap-2 ${isTablet ? 'px-6 py-4 text-base' : 'px-2 md:px-4 text-xs md:text-sm'} whitespace-nowrap min-h-[44px]`}>
+                  <Workflow className={isTablet ? 'h-5 w-5' : 'h-3 w-3 md:h-4 md:w-4'} />
+                  <span className="hidden sm:inline">Workflow Export</span>
+                  <span className="sm:hidden">Export</span>
+                </TabsTrigger>
               </TabsList>
 
               {/* Deficiencies Tab */}
-              <TabsContent value="deficiencies" className="p-3 md:p-6">
+              <TabsContent 
+                value="deficiencies" 
+                className={`${isTablet ? 'p-6' : 'p-3 md:p-6'}`}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+              >
                 <div className="space-y-4">
                   <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
                     <h2 className="text-lg md:text-xl font-semibold">Roof Deficiencies</h2>
                     <Button 
                       onClick={() => setShowDeficiencyModal(true)}
                       className="w-full sm:w-auto"
-                      size="lg"
+                      size={isTablet ? "lg" : "lg"}
+                      style={{ minHeight: isTablet ? '56px' : 'auto' }}
                     >
-                      <Plus className="h-4 w-4 mr-2" />
+                      <Plus className={`${isTablet ? 'h-6 w-6' : 'h-4 w-4'} mr-2`} />
                       Add New Deficiency
                     </Button>
                   </div>
@@ -466,21 +639,28 @@ export function ActiveInspectionInterface({
               </TabsContent>
 
               {/* Overview Photos Tab */}
-              <TabsContent value="overview" className="p-3 md:p-6">
+              <TabsContent 
+                value="overview" 
+                className={`${isTablet ? 'p-6' : 'p-3 md:p-6'}`}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+              >
                 <div className="space-y-4">
                   <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-                    <h2 className="text-lg md:text-xl font-semibold">Overview Photos</h2>
+                    <h2 className={`${isTablet ? 'text-2xl' : 'text-lg md:text-xl'} font-semibold`}>Overview Photos</h2>
                     <Button 
-                      onClick={() => handleCameraCapture('overview')}
+                      onClick={() => isTablet ? handleEnhancedCameraCapture('overview') : handleCameraCapture('overview')}
                       className="w-full sm:w-auto"
                       size="lg"
+                      style={{ minHeight: isTablet ? '56px' : 'auto' }}
                     >
-                      <Camera className="h-4 w-4 mr-2" />
-                      Take Photo
+                      <Camera className={`${isTablet ? 'h-6 w-6' : 'h-4 w-4'} mr-2`} />
+                      {isTablet ? 'Capture Photo' : 'Take Photo'}
                     </Button>
                   </div>
 
-                  <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4">
+                  <div className={`grid ${isTablet ? 'grid-cols-3 gap-6' : 'grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 md:gap-4'}`}>
                     {/* Upload placeholder */}
                     <Card 
                       className="aspect-square flex items-center justify-center cursor-pointer hover:bg-gray-50 border-dashed"
@@ -517,25 +697,31 @@ export function ActiveInspectionInterface({
               </TabsContent>
 
               {/* Notes Tab */}
-              <TabsContent value="notes" className="p-6">
+              <TabsContent 
+                value="notes" 
+                className={`${isTablet ? 'p-6' : 'p-6'}`}
+                onTouchStart={handleTouchStart}
+                onTouchMove={handleTouchMove}
+                onTouchEnd={handleTouchEnd}
+              >
                 <div className="space-y-6">
                   <div>
-                    <h2 className="text-xl font-semibold mb-4">Inspection Findings</h2>
+                    <h2 className={`${isTablet ? 'text-2xl' : 'text-xl'} font-semibold mb-4`}>Inspection Findings</h2>
                     
-                    <div className="mb-4">
-                      <label className="block text-sm font-medium mb-2">
+                    <div className="mb-6">
+                      <label className={`block ${isTablet ? 'text-base' : 'text-sm'} font-medium mb-3`}>
                         Did you confirm roof square footage? *
                       </label>
-                      <div className="flex gap-4">
+                      <div className="flex gap-6">
                         <label className="flex items-center">
                           <input
                             type="radio"
                             name="roofFootage"
                             checked={roofSquareFootageConfirmed === true}
                             onChange={() => setRoofSquareFootageConfirmed(true)}
-                            className="mr-2"
+                            className={`mr-3 ${isTablet ? 'w-5 h-5' : 'w-4 h-4'}`}
                           />
-                          Yes
+                          <span className={isTablet ? 'text-lg' : 'text-base'}>Yes</span>
                         </label>
                         <label className="flex items-center">
                           <input
@@ -543,23 +729,38 @@ export function ActiveInspectionInterface({
                             name="roofFootage"
                             checked={roofSquareFootageConfirmed === false}
                             onChange={() => setRoofSquareFootageConfirmed(false)}
-                            className="mr-2"
+                            className={`mr-3 ${isTablet ? 'w-5 h-5' : 'w-4 h-4'}`}
                           />
-                          No
+                          <span className={isTablet ? 'text-lg' : 'text-base'}>No</span>
                         </label>
                       </div>
                     </div>
 
                     <div>
-                      <label className="block text-sm font-medium mb-2">
-                        Inspection Findings *
-                      </label>
+                      <div className="flex items-center justify-between mb-3">
+                        <label className={`block ${isTablet ? 'text-base' : 'text-sm'} font-medium`}>
+                          Inspection Findings *
+                        </label>
+                        {isTablet && (
+                          <Button
+                            onClick={startVoiceRecording}
+                            disabled={isVoiceRecording}
+                            variant="outline"
+                            size="sm"
+                            className="ml-2"
+                          >
+                            <Mic className={`h-4 w-4 mr-2 ${isVoiceRecording ? 'text-red-500 animate-pulse' : ''}`} />
+                            {isVoiceRecording ? 'Recording...' : 'Voice Input'}
+                          </Button>
+                        )}
+                      </div>
                       <Textarea
                         value={inspectionNotes}
                         onChange={(e) => setInspectionNotes(e.target.value)}
                         placeholder="Enter detailed inspection findings, observations, and recommendations..."
-                        rows={12}
-                        className="resize-none"
+                        rows={isTablet ? 16 : 12}
+                        className={`resize-none ${isTablet ? 'text-base p-4' : 'text-sm'}`}
+                        style={{ minHeight: isTablet ? '400px' : 'auto' }}
                       />
                     </div>
                   </div>
@@ -607,6 +808,61 @@ export function ActiveInspectionInterface({
                     </div>
                   )}
                 </div>
+              </TabsContent>
+
+              {/* Roof Composition Tab */}
+              <TabsContent value="composition" className={`${isTablet ? 'p-6' : 'p-3 md:p-6'}`}>
+                <RoofCompositionCapture
+                  initialData={roofCompositionData}
+                  onDataChange={setRoofCompositionData}
+                  isTablet={isTablet}
+                />
+              </TabsContent>
+
+              {/* Inspection Checklist Tab */}
+              <TabsContent value="checklist" className={`${isTablet ? 'p-6' : 'p-3 md:p-6'}`}>
+                <InspectionChecklist
+                  initialData={checklistData}
+                  onDataChange={setChecklistData}
+                  isTablet={isTablet}
+                />
+              </TabsContent>
+
+              {/* Executive Summary Tab */}
+              <TabsContent value="summary" className={`${isTablet ? 'p-6' : 'p-3 md:p-6'}`}>
+                <ExecutiveSummary
+                  inspectionData={{
+                    ...roofCompositionData,
+                    ...checklistData,
+                    deficiencies,
+                    inspectionNotes,
+                    roofSquareFootageConfirmed,
+                    overviewPhotos
+                  }}
+                  onSummaryGenerated={setExecutiveSummaryData}
+                  isTablet={isTablet}
+                />
+              </TabsContent>
+
+              {/* Workflow Export Tab */}
+              <TabsContent value="workflow" className={`${isTablet ? 'p-6' : 'p-3 md:p-6'}`}>
+                <WorkflowDataExporter
+                  inspectionData={{
+                    propertyId,
+                    propertyName,
+                    deficiencies,
+                    overviewPhotos,
+                    inspectionNotes,
+                    roofSquareFootageConfirmed,
+                    capitalExpenses,
+                    roofCompositionData,
+                    checklistData,
+                    executiveSummaryData,
+                    inspectionStarted,
+                    startTime
+                  }}
+                  isTablet={isTablet}
+                />
               </TabsContent>
             </Tabs>
           </CardContent>
