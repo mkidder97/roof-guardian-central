@@ -478,18 +478,14 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
     <CriticalInfoDialog open={showCriticalInfo} onOpenChange={setShowCriticalInfo}>
       <DialogPortal>
         <DialogOverlay className="bg-black/50 backdrop-blur-sm" />
-        <CriticalDialogContent className="fixed inset-2 sm:inset-4 z-50 w-full max-w-sm sm:max-w-lg md:max-w-2xl lg:max-w-4xl max-h-[98vh] sm:max-h-[95vh] mx-auto my-auto p-0 border bg-white rounded-none sm:rounded-lg shadow-2xl overflow-hidden data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95"
+        <CriticalDialogContent className="fixed left-[50%] top-[50%] z-50 grid w-full max-w-2xl max-h-[95vh] translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 overflow-y-auto data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 data-[state=closed]:slide-out-to-left-1/2 data-[state=closed]:slide-out-to-top-[48%] data-[state=open]:slide-in-from-left-1/2 data-[state=open]:slide-in-from-top-[48%] sm:rounded-lg"
         >
-        <div className="sticky top-0 z-10 bg-white border-b p-4 sm:p-6">
           <CriticalDialogHeader>
             <CriticalDialogTitle className="text-xl font-bold flex items-center gap-2">
               <AlertTriangle className="h-6 w-6 text-destructive" />
               Critical Focus Areas - {roofData?.property_name}
             </CriticalDialogTitle>
           </CriticalDialogHeader>
-        </div>
-        
-        <div className="flex-1 overflow-y-auto p-4 sm:p-6">
           <div className="space-y-4">
           <div className="bg-red-50 border border-red-200 rounded-lg p-4">
             <h3 className="font-semibold text-red-800 mb-2">⚠️ Pre-Inspection Briefing</h3>
@@ -552,10 +548,8 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
           )}
 
           </div>
-        </div>
-        
-        <div className="sticky bottom-0 bg-white border-t p-4 sm:p-6">
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-3">
+
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-3 mt-6 pt-4 border-t">
             <Button 
               variant="outline" 
               onClick={() => setShowCriticalInfo(false)}
@@ -577,7 +571,6 @@ export const BuildingDetailsDialog: React.FC<BuildingDetailsDialogProps> = ({
               Begin Inspection
             </Button>
           </div>
-        </div>
         </CriticalDialogContent>
       </DialogPortal>
     </CriticalInfoDialog>
