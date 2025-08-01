@@ -12,9 +12,10 @@ import type { InspectionSyncData, InspectionStatus } from '@/types/inspection';
 
 interface InspectionsTabProps {
   onOpenSchedulingModal?: () => void;
+  onViewInspection?: (inspectionId: string, roofId: string, propertyName: string) => void;
 }
 
-export function InspectionsTab({ onOpenSchedulingModal }: InspectionsTabProps) {
+export function InspectionsTab({ onOpenSchedulingModal, onViewInspection }: InspectionsTabProps) {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
@@ -141,6 +142,15 @@ export function InspectionsTab({ onOpenSchedulingModal }: InspectionsTabProps) {
           size="sm"
           variant="ghost"
           className="flex items-center space-x-1"
+          onClick={() => {
+            if (onViewInspection && inspection.roof_id) {
+              onViewInspection(
+                inspection.id, 
+                inspection.roof_id, 
+                inspection.roofs?.property_name || 'Unknown Property'
+              );
+            }
+          }}
         >
           <Eye className="h-3 w-3" />
           <span>View</span>

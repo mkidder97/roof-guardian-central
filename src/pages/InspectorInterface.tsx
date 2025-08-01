@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -81,6 +81,7 @@ const InspectorInterface = () => {
     announceError
   } = useInspectorAccessibility();
   const navigate = useNavigate();
+  const location = useLocation();
   const { toast } = useToast();
   const [selectedProperty, setSelectedProperty] = useState<string | null>(null);
   const [briefing, setBriefing] = useState<InspectionBriefing | null>(null);
@@ -313,6 +314,19 @@ const InspectorInterface = () => {
   useEffect(() => {
     loadProperties();
   }, [loadProperties]);
+
+  // Handle navigation from dashboard with inspection state
+  useEffect(() => {
+    if (location.state?.startInspection && location.state?.roofId && location.state?.propertyName) {
+      const { roofId, propertyName } = location.state;
+      setActiveInspection({ propertyId: roofId, propertyName });
+      
+      // Clear the navigation state to prevent re-triggering
+      navigate('/inspector', { replace: true });
+      
+      console.log('Inspector Interface: Starting inspection from navigation state', roofId);
+    }
+  }, [location.state, navigate]);
 
   // Optimized briefing loading with useCallback
   const loadBriefing = useCallback(async (propertyId: string) => {

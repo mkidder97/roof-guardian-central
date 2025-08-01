@@ -129,6 +129,18 @@ export function UnifiedDashboard() {
     navigate('/inspector');
   };
 
+  const handleViewInspection = (inspectionId: string, roofId: string, propertyName: string) => {
+    // Navigate to inspector interface with the specific property/inspection
+    navigate('/inspector', { 
+      state: { 
+        inspectionId, 
+        roofId, 
+        propertyName,
+        startInspection: true 
+      } 
+    });
+  };
+
   const handleTabChange = (tab: string) => {
     if (tab === 'inspector-tools') {
       navigateToInspectorTools();
@@ -144,7 +156,10 @@ export function UnifiedDashboard() {
       case 'properties':
         return <RoofsTab />;
       case 'inspections':
-        return <InspectionsTab onOpenSchedulingModal={() => setInspectionModalOpen(true)} />;
+        return <InspectionsTab 
+          onOpenSchedulingModal={() => setInspectionModalOpen(true)}
+          onViewInspection={handleViewInspection}
+        />;
       case 'campaigns':
         return <CampaignTracker />;
       case 'work-orders':
