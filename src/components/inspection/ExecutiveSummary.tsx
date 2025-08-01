@@ -100,12 +100,12 @@ export function ExecutiveSummary({
   const [isEditing, setIsEditing] = useState(false);
   const [editedSummary, setEditedSummary] = useState('');
 
-  // Auto-generate summary when inspection data changes
-  useEffect(() => {
-    if (inspectionData && Object.keys(inspectionData).length > 0) {
-      generateExecutiveSummary();
-    }
-  }, [inspectionData]);
+  // Remove auto-generation - only generate manually
+  // useEffect(() => {
+  //   if (inspectionData && Object.keys(inspectionData).length > 0) {
+  //     generateExecutiveSummary();
+  //   }
+  // }, [inspectionData]);
 
   const generateExecutiveSummary = async () => {
     setIsGenerating(true);
@@ -346,14 +346,29 @@ export function ExecutiveSummary({
     return (
       <Card>
         <CardContent className="flex items-center justify-center p-12">
-          <div className="text-center space-y-4">
-            <FileText className="w-12 h-12 text-muted-foreground mx-auto" />
-            <p className={`text-muted-foreground ${isTablet ? 'text-base' : 'text-sm'}`}>
-              Complete inspection data to generate executive summary
-            </p>
-            <Button onClick={generateExecutiveSummary} disabled={!inspectionData}>
-              Generate Summary
+          <div className="text-center space-y-6 max-w-md">
+            <FileText className="w-16 h-16 text-primary mx-auto" />
+            <div>
+              <h3 className={`font-semibold mb-2 ${isTablet ? 'text-xl' : 'text-lg'}`}>
+                Ready to Generate Executive Summary
+              </h3>
+              <p className={`text-muted-foreground ${isTablet ? 'text-base' : 'text-sm'}`}>
+                Click the button below to generate an AI-powered executive summary of your completed inspection.
+              </p>
+            </div>
+            <Button 
+              onClick={generateExecutiveSummary} 
+              disabled={!inspectionData}
+              className={`${isTablet ? 'h-12 px-8 text-lg' : 'h-10 px-6'}`}
+            >
+              <FileText className="mr-2 h-4 w-4" />
+              Generate Executive Summary
             </Button>
+            {!inspectionData && (
+              <p className={`text-muted-foreground ${isTablet ? 'text-sm' : 'text-xs'}`}>
+                Complete inspection data first to enable summary generation
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -371,6 +386,16 @@ export function ExecutiveSummary({
               Executive Summary
             </CardTitle>
             <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size={isTablet ? "default" : "sm"}
+                onClick={generateExecutiveSummary}
+                disabled={isGenerating}
+                className={isTablet ? 'h-10' : 'h-8'}
+              >
+                <FileText className="h-4 w-4 mr-1" />
+                {isGenerating ? 'Generating...' : 'Regenerate'}
+              </Button>
               <Button
                 variant="outline"
                 size={isTablet ? "default" : "sm"}
