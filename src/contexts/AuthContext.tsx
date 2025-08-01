@@ -109,23 +109,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUserRole(null);
         }
         
-        console.log('AuthContext: Setting loading to false after auth state change');
         setLoading(false);
       }
     );
 
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
-      console.log('AuthContext: Got session on init:', session ? 'exists' : 'null');
       setSession(session);
       setUser(session?.user ?? null);
       
       if (session?.user) {
-        console.log('AuthContext: Fetching profile for user:', session.user.id);
         fetchProfile(session.user.id);
       }
       
-      console.log('AuthContext: Setting loading to false after session check');
       setLoading(false);
     }).catch(error => {
       console.error('AuthContext: Error getting session:', error);
