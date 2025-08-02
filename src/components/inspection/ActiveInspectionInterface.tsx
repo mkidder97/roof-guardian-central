@@ -216,7 +216,7 @@ export function ActiveInspectionInterface({
   };
 
   // Use autosave hook
-  const { sessionId } = useInspectionAutosave({
+  const { sessionId, forceSave } = useInspectionAutosave({
     propertyId,
     inspectionData: currentInspectionData,
     enabled: inspectionStarted
@@ -638,6 +638,23 @@ export function ActiveInspectionInterface({
     }
 
     try {
+      // Ensure we have a session before completion
+      let currentSessionId = sessionId;
+      
+      if (!currentSessionId) {
+        console.log('No session found, creating one before completion...');
+        const session = await forceSave();
+        if (!session) {
+          throw new Error('Failed to create inspection session');
+        }
+        currentSessionId = session.id;
+        console.log('Session created with ID:', currentSessionId);
+      }
+
+      if (!currentSessionId) {
+        throw new Error('Unable to create or retrieve session ID for completion');
+      }
+
       // Prepare photos for processing
       const photos = overviewPhotos.map(photo => ({
         url: photo.url,
@@ -646,10 +663,12 @@ export function ActiveInspectionInterface({
         timestamp: photo.timestamp.toISOString()
       }));
 
+      console.log('Processing completion with session ID:', currentSessionId);
+
       // Call the edge function to process completion
       const { data, error } = await supabase.functions.invoke('process-inspection-completion', {
         body: {
-          sessionId: sessionId,
+          sessionId: currentSessionId,
           finalNotes: inspectionNotes,
           photos
         }
@@ -688,9 +707,26 @@ export function ActiveInspectionInterface({
 
     } catch (error) {
       console.error('Error completing inspection:', error);
+      
+      let errorMessage = "Failed to complete inspection. Please try again.";
+      
+      if (error instanceof Error) {
+        if (error.message.includes('Session not found')) {
+          errorMessage = "Session expired or not found. Please restart the inspection.";
+        } else if (error.message.includes('Failed to create inspection session')) {
+          errorMessage = "Unable to save inspection data. Check your connection and try again.";
+        } else if (error.message.includes('session ID')) {
+          errorMessage = "Could not create session for completion. Please try again.";
+        } else if (error.message.includes('authentication')) {
+          errorMessage = "Authentication error. Please log in again.";
+        } else {
+          errorMessage = `Error: ${error.message}`;
+        }
+      }
+      
       toast({
         title: "Completion Failed",
-        description: "Failed to complete inspection. Please try again.",
+        description: errorMessage,
         variant: "destructive"
       });
     }

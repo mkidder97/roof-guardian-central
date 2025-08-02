@@ -155,11 +155,21 @@ export function useInspectionAutosave({
     }
   }, [inspectionData, saveSession]);
 
+  // Force save current data immediately
+  const forceSave = useCallback(async () => {
+    if (inspectionData) {
+      const session = await saveSession(inspectionData);
+      return session;
+    }
+    return null;
+  }, [inspectionData, saveSession]);
+
   return {
     saveSession,
     loadSession,
     completeSession,
     abandonSession,
+    forceSave,
     sessionId: sessionIdRef.current
   };
 }
