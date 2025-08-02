@@ -263,7 +263,14 @@ export function ActiveInspectionInterface({
           
           // Initialize all state with session data
           if (sessionData.deficiencies) setDeficiencies(sessionData.deficiencies);
-          if (sessionData.overviewPhotos) setOverviewPhotos(sessionData.overviewPhotos);
+          if (sessionData.overviewPhotos) {
+            // Ensure timestamps are Date objects
+            const photosWithDateTimestamps = sessionData.overviewPhotos.map(photo => ({
+              ...photo,
+              timestamp: typeof photo.timestamp === 'string' ? new Date(photo.timestamp) : photo.timestamp
+            }));
+            setOverviewPhotos(photosWithDateTimestamps);
+          }
           if (sessionData.inspectionNotes) setInspectionNotes(sessionData.inspectionNotes);
           if (sessionData.roofSquareFootageConfirmed !== undefined) {
             setRoofSquareFootageConfirmed(sessionData.roofSquareFootageConfirmed);
@@ -660,7 +667,11 @@ export function ActiveInspectionInterface({
         url: photo.url,
         type: photo.type,
         caption: photo.location || '',
-        timestamp: photo.timestamp.toISOString()
+        timestamp: photo.timestamp instanceof Date 
+          ? photo.timestamp.toISOString() 
+          : typeof photo.timestamp === 'string' 
+            ? photo.timestamp 
+            : new Date().toISOString()
       }));
 
       console.log('Processing completion with session ID:', currentSessionId);
