@@ -216,7 +216,7 @@ export function ActiveInspectionInterface({
   };
 
   // Use autosave hook
-  const { sessionId: sessionIdRef } = useInspectionAutosave({
+  const { sessionId } = useInspectionAutosave({
     propertyId,
     inspectionData: currentInspectionData,
     enabled: inspectionStarted
@@ -649,7 +649,7 @@ export function ActiveInspectionInterface({
       // Call the edge function to process completion
       const { data, error } = await supabase.functions.invoke('process-inspection-completion', {
         body: {
-          sessionId: sessionIdRef,
+          sessionId: sessionId,
           finalNotes: inspectionNotes,
           photos
         }
