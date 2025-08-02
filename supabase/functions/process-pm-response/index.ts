@@ -138,7 +138,7 @@ serve(async (req) => {
     }
 
     // Analyze response content for scheduling automation
-    let analysis = {
+    const analysis = {
       hasSchedulingInfo: false,
       dates: [] as string[],
       contacts: [] as any[],

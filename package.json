@@ -84,6 +84,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.9.0",
+    "@playwright/test": "^1.54.2",
     "@tailwindcss/typography": "^0.5.15",
     "@testing-library/dom": "^10.4.0",
     "@testing-library/jest-dom": "^6.6.4",
@@ -103,6 +104,7 @@
     "jsdom": "^26.1.0",
     "lovable-tagger": "^1.1.7",
     "msw": "^2.10.4",
+    "playwright": "^1.54.2",
     "postcss": "^8.4.47",
     "tailwindcss": "^3.4.11",
     "typescript": "^5.5.3",

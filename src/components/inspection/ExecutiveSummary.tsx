@@ -17,6 +17,7 @@ import {
   Edit3
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { aiAnalysisService, type AnalysisContext, type Deficiency } from "@/lib/aiAnalysisService";
 
 interface RoofLayer {
   id: string;
@@ -83,6 +84,11 @@ interface ExecutiveSummaryProps {
   onSummaryGenerated?: (summary: ExecutiveSummaryData) => void;
   historicalSummaries?: HistoricalSummary[];
   isTablet?: boolean;
+  // Additional context for AI analysis
+  deficiencies?: Deficiency[];
+  photoCount?: number;
+  weatherConditions?: string;
+  inspectorName?: string;
 }
 
 export function ExecutiveSummary({ 
@@ -90,7 +96,11 @@ export function ExecutiveSummary({
   roofData,
   onSummaryGenerated,
   historicalSummaries = [],
-  isTablet = false 
+  isTablet = false,
+  deficiencies = [],
+  photoCount = 0,
+  weatherConditions,
+  inspectorName
 }: ExecutiveSummaryProps) {
   const { toast } = useToast();
   
@@ -111,10 +121,23 @@ export function ExecutiveSummary({
     setIsGenerating(true);
     
     try {
-      // Simulate AI processing delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
+      // Prepare analysis context
+      const analysisContext: AnalysisContext = {
+        propertyId: roofData?.id,
+        inspectionId: inspectionData.checklist?.[0]?.id, // Use first checklist item ID as inspection reference
+        inspectorName,
+        weatherConditions,
+        deficiencies,
+        photoCount
+      };
+
+      // Call AI analysis service
+      const generatedSummary = await aiAnalysisService.generateExecutiveSummary(
+        inspectionData, 
+        roofData, 
+        analysisContext
+      );
       
-      const generatedSummary = analyzeInspectionData(inspectionData, roofData);
       setSummary(generatedSummary);
       setEditedSummary(generatedSummary.summaryText);
       
@@ -124,9 +147,10 @@ export function ExecutiveSummary({
       
       toast({
         title: "Executive Summary Generated",
-        description: "AI analysis complete. Review and edit as needed."
+        description: "AI-powered analysis complete. Review and edit as needed."
       });
     } catch (error) {
+      console.error('Executive summary generation failed:', error);
       toast({
         title: "Generation Failed",
         description: "Unable to generate executive summary. Please try again.",
@@ -137,163 +161,7 @@ export function ExecutiveSummary({
     }
   };
 
-  const analyzeInspectionData = (data: InspectionData, roof?: any): ExecutiveSummaryData => {
-    const currentYear = new Date().getFullYear();
-    const roofAge = data.installationYear ? currentYear - data.installationYear : 0;
-    
-    // Analyze critical issues
-    const criticalIssues: string[] = [];
-    const keyFindings: string[] = [];
-    const recommendedActions: string[] = [];
-    
-    // Check for standing water
-    if (data.standingWater === 'YES') {
-      criticalIssues.push('Standing water observed on roof surface');
-      recommendedActions.push('Immediate drainage system evaluation and repair');
-    }
-    
-    // Check for roof assembly failure
-    if (data.roofAssemblyFailure === 'YES') {
-      criticalIssues.push('Roof assembly failure detected');
-      recommendedActions.push('Comprehensive structural assessment required');
-    }
-    
-    // Analyze checklist responses
-    const noResponses = data.checklist?.filter(item => item.response === 'NO') || [];
-    noResponses.forEach(item => {
-      if (item.category === 'Safety' && item.response === 'NO') {
-        criticalIssues.push(`Safety concern: ${item.question.toLowerCase()}`);
-        recommendedActions.push('Address safety issues immediately');
-      } else if (item.response === 'NO') {
-        keyFindings.push(`${item.category}: ${item.question.toLowerCase()}`);
-        if (item.notes) {
-          keyFindings.push(`  Note: ${item.notes}`);
-        }
-      }
-    });
-    
-    // Age-based recommendations
-    if (roofAge > 15) {
-      keyFindings.push(`Roof system age: ${roofAge} years - approaching replacement consideration`);
-      recommendedActions.push('Plan for replacement within next 5 years');
-    } else if (roofAge > 10) {
-      keyFindings.push(`Roof system age: ${roofAge} years - increased maintenance required`);
-      recommendedActions.push('Enhanced preventative maintenance program');
-    }
-    
-    // System-specific findings
-    if (data.roofSystem) {
-      keyFindings.push(`Roof system type: ${data.roofSystem}`);
-    }
-    
-    // Solar/daylighting considerations
-    if (data.hasSolar === 'YES') {
-      keyFindings.push('Solar installation present - requires specialized maintenance');
-      recommendedActions.push('Coordinate with solar maintenance provider');
-    }
-    
-    if (data.hasDaylighting === 'YES') {
-      keyFindings.push(`Daylighting system present (${data.daylightFactor}% daylight factor)`);
-    }
-    
-    // Preventative maintenance status
-    if (data.preventativeRepairsCompleted === 'NO') {
-      keyFindings.push('Previous year preventative repairs incomplete');
-      recommendedActions.push('Complete outstanding preventative maintenance items');
-    }
-    
-    // Determine overall condition and rating
-    let overallCondition: ExecutiveSummaryData['overallCondition'] = 'Good';
-    let overallRating = 4;
-    let budgetRecommendation: ExecutiveSummaryData['budgetRecommendation'] = 'Maintenance Only';
-    
-    if (criticalIssues.length > 0) {
-      overallCondition = 'Poor';
-      overallRating = 2;
-      budgetRecommendation = 'Major Repairs';
-    } else if (noResponses.length > 3) {
-      overallCondition = 'Fair';
-      overallRating = 3;
-      budgetRecommendation = 'Minor Repairs';
-    } else if (roofAge > 18) {
-      overallCondition = 'Fair';
-      overallRating = 2;
-      budgetRecommendation = 'Replacement Required';
-    } else if (roofAge > 15) {
-      overallCondition = 'Good';
-      overallRating = 3;
-      budgetRecommendation = 'Minor Repairs';
-    }
-    
-    // Generate summary text
-    const summaryText = generateSummaryText({
-      roofAge,
-      roofSystem: data.roofSystem,
-      completionPercentage: data.completionPercentage || 0,
-      criticalIssues: criticalIssues.length,
-      keyFindings: keyFindings.length,
-      overallCondition
-    });
-    
-    // Calculate next inspection date
-    const nextInspectionMonths = overallCondition === 'Poor' ? 6 : 12;
-    const nextInspection = new Date();
-    nextInspection.setMonth(nextInspection.getMonth() + nextInspectionMonths);
-    
-    return {
-      overallCondition,
-      overallRating,
-      summaryText,
-      keyFindings,
-      criticalIssues,
-      recommendedActions,
-      budgetRecommendation,
-      nextInspectionDate: nextInspection.toLocaleDateString(),
-      inspectorNotes: '',
-      generatedAt: new Date().toISOString()
-    };
-  };
 
-  const generateSummaryText = (analysis: {
-    roofAge: number;
-    roofSystem?: string;
-    completionPercentage: number;
-    criticalIssues: number;
-    keyFindings: number;
-    overallCondition: string;
-  }) => {
-    const { roofAge, roofSystem, completionPercentage, criticalIssues, keyFindings, overallCondition } = analysis;
-    
-    let summary = `Comprehensive roof inspection completed with ${completionPercentage}% checklist completion. `;
-    
-    if (roofSystem) {
-      summary += `The ${roofSystem} roof system, installed approximately ${roofAge} years ago, `;
-    } else {
-      summary += `The roof system, installed approximately ${roofAge} years ago, `;
-    }
-    
-    summary += `presents an overall condition of "${overallCondition}". `;
-    
-    if (criticalIssues > 0) {
-      summary += `${criticalIssues} critical issue${criticalIssues > 1 ? 's' : ''} requiring immediate attention were identified. `;
-    }
-    
-    if (keyFindings > 0) {
-      summary += `${keyFindings} additional finding${keyFindings > 1 ? 's' : ''} noted for maintenance planning. `;
-    }
-    
-    if (roofAge > 15) {
-      summary += `Given the system age, replacement planning should be considered within the next 3-5 years. `;
-    } else if (roofAge > 10) {
-      summary += `The roof system is in its mature phase, requiring enhanced preventative maintenance. `;
-    } else {
-      summary += `The roof system remains in good operational condition with standard maintenance requirements. `;
-    }
-    
-    summary += `Regular inspection and proactive maintenance will help maximize the roof system's service life and performance.`;
-    
-    return summary;
-  };
 
   const getConditionColor = (condition: string) => {
     switch (condition) {
@@ -334,7 +202,7 @@ export function ExecutiveSummary({
           <div className="text-center space-y-4">
             <div className="animate-spin w-8 h-8 border-2 border-primary border-t-transparent rounded-full mx-auto" />
             <p className={`text-muted-foreground ${isTablet ? 'text-base' : 'text-sm'}`}>
-              Generating AI-powered executive summary...
+              Analyzing inspection data with AI intelligence...
             </p>
           </div>
         </CardContent>
@@ -353,7 +221,7 @@ export function ExecutiveSummary({
                 Ready to Generate Executive Summary
               </h3>
               <p className={`text-muted-foreground ${isTablet ? 'text-base' : 'text-sm'}`}>
-                Click the button below to generate an AI-powered executive summary of your completed inspection.
+                Generate an intelligent AI analysis of your inspection data including deficiencies, photos, and checklist responses.
               </p>
             </div>
             <Button 

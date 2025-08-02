@@ -71,16 +71,16 @@ export const KeyboardShortcutsHelp: React.FC<KeyboardShortcutsHelpProps> = ({
                   {contextShortcuts
                     .filter(shortcut => shortcut.enabled !== false)
                     .map((shortcut, index) => (
-                    <div key={index} className="flex items-center justify-between py-2 border-b last:border-b-0">
+                    <div key={`${context}-${shortcut.key}-${index}`} className="flex items-center justify-between py-2 border-b last:border-b-0">
                       <span className="text-sm">{shortcut.description}</span>
                       <div className="flex items-center gap-1">
                         {formatKeyCombo(shortcut).map((key, keyIndex) => (
-                          <React.Fragment key={keyIndex}>
-                            {keyIndex > 0 && <span className="text-muted-foreground">+</span>}
+                          <span key={`${shortcut.key}-${keyIndex}`} className="flex items-center">
+                            {keyIndex > 0 && <span className="text-muted-foreground mr-1">+</span>}
                             <Badge variant="outline" className="font-mono text-xs">
                               {key}
                             </Badge>
-                          </React.Fragment>
+                          </span>
                         ))}
                       </div>
                     </div>

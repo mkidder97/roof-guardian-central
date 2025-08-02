@@ -61,12 +61,16 @@ export const AccessibleField: React.FC<AccessibleFieldProps> = ({
         </p>
       )}
       
-      {React.cloneElement(children, {
-        id: fieldId,
-        'aria-describedby': describedBy || undefined,
-        'aria-invalid': error ? 'true' : undefined,
-        'aria-required': required
-      })}
+      {React.isValidElement(children) && 
+       children.type !== React.Fragment && 
+       typeof children.type !== 'symbol'
+        ? React.cloneElement(children, {
+            id: fieldId,
+            'aria-describedby': describedBy || undefined,
+            'aria-invalid': error ? 'true' : undefined,
+            'aria-required': required
+          })
+        : children}
       
       {error && (
         <div 

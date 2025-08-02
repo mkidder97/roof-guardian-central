@@ -68,7 +68,7 @@ serve(async (req) => {
     }
 
     // Update individual properties if provided
-    let updatedProperties = [];
+    const updatedProperties = [];
     if (propertyUpdates && propertyUpdates.length > 0) {
       for (const propUpdate of propertyUpdates) {
         const propertyData: any = {
@@ -107,7 +107,7 @@ serve(async (req) => {
       .select('status')
       .eq('campaign_id', campaignId);
 
-    let progressStats = {
+    const progressStats = {
       total: 0,
       pending: 0,
       scheduled: 0,

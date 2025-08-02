@@ -31,6 +31,7 @@ import { KeyboardShortcutsHelp } from "@/components/ui/keyboard-shortcuts-help";
 import { offlineManager } from "@/lib/offlineManager";
 import { VirtualizedPropertyList } from "@/components/ui/virtualized-property-list";
 import { QuickActions } from "@/components/ui/quick-actions";
+import { createTestInspection, storeTestInspection, selectFirstProperty } from "@/lib/testDataGenerator";
 
 import { useInspectorAccessibility } from "@/hooks/useAccessibility";
 import { AccessibleStatus } from "@/components/ui/accessible-components";
@@ -310,10 +311,73 @@ const InspectorInterface = () => {
     }
   }, [toast]);
 
-  // Load available properties on component mount
-  useEffect(() => {
-    loadProperties();
+  // Auto-populate first property with test data
+  const populateFirstPropertyWithTestData = useCallback(async () => {
+    try {
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        console.log('No authenticated user, skipping test data population');
+        return;
+      }
+
+      // Get the user's record to get inspector_id
+      const { data: userRecord, error: userError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', user.email)
+        .single();
+
+      let inspectorId;
+      if (userError) {
+        console.warn('User not found in users table, using auth user ID');
+        inspectorId = user.id;
+      } else {
+        inspectorId = userRecord.id;
+      }
+
+      // Check if test data already exists for first property
+      const { data: existingSession } = await supabase
+        .from('inspection_sessions')
+        .select('id')
+        .eq('inspector_id', inspectorId)
+        .eq('status', 'active')
+        .limit(1)
+        .single();
+
+      if (existingSession) {
+        console.log('✅ Test inspection data already exists');
+        return;
+      }
+
+      console.log('🎯 Populating first property with test inspection data...');
+
+      // Generate test inspection data
+      const testData = await createTestInspection();
+      
+      // Store in database
+      const result = await storeTestInspection(testData, inspectorId);
+      
+      console.log(`✅ Test inspection populated for "${result.propertyName}"`);
+
+      // Refresh properties to show the new inspection
+      await loadProperties();
+
+    } catch (error) {
+      console.error('Error populating test data:', error);
+    }
   }, [loadProperties]);
+
+  // Load available properties on component mount and populate test data
+  useEffect(() => {
+    const initializeInspectorInterface = async () => {
+      await loadProperties();
+      // Auto-populate first property with test data if authenticated
+      await populateFirstPropertyWithTestData();
+    };
+    
+    initializeInspectorInterface();
+  }, [loadProperties, populateFirstPropertyWithTestData]);
 
   // Handle navigation from dashboard with inspection state
   useEffect(() => {
@@ -465,6 +529,7 @@ const InspectorInterface = () => {
     setSelectedBuildingId(null);
   }, []);
 
+
   // If there's an active inspection, show the inspection interface
   if (activeInspection) {
     return (
@@ -506,7 +571,7 @@ const InspectorInterface = () => {
           <Card>
             <CardHeader>
               <CardTitle className="text-lg sm:text-xl">Select Property for Inspection</CardTitle>
-              <CardDescription className="text-sm">Choose a property to view pre-inspection intelligence</CardDescription>
+              <CardDescription className="text-sm">Choose a property to view pre-inspection intelligence (first property auto-populated with test data)</CardDescription>
             </CardHeader>
             <CardContent>
               {loading ? (

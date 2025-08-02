@@ -24,13 +24,13 @@ import { useN8nWorkflow, type CampaignWorkflowData, type ProcessingResult } from
 import { useInspectors, type Inspector } from '@/hooks/useInspectors';
 import { useUnifiedInspectionEvents, useInspectionEventEmitter } from '@/hooks/useUnifiedInspectionEvents';
 // Optional monitoring imports - only imported when needed to prevent React context errors
-let usePerformanceMonitor = null;
-let useOperationTimer = null;
-let ComponentHealthMonitor = null;
-let useHealthReporting = null;
-let useAutoRecovery = null;
-let ErrorBoundary = null;
-let monitoringService = null;
+const usePerformanceMonitor = null;
+const useOperationTimer = null;
+const ComponentHealthMonitor = null;
+const useHealthReporting = null;
+const useAutoRecovery = null;
+const ErrorBoundary = null;
+const monitoringService = null;
 
 // Monitoring modules disabled to prevent runtime errors
 console.log('🔍 DEBUG: Monitoring modules disabled for debugging')

@@ -124,7 +124,6 @@ export const VirtualizedPropertyList: React.FC<VirtualizedPropertyListProps> = (
 
     return (
       <Card 
-        key={property.id}
         className={`
           cursor-pointer transition-all duration-200 hover:shadow-md hover:border-primary
           ${property.priority === 'critical' ? 'border-l-4 border-l-red-500 bg-red-50/30' : ''}

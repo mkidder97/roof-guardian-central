@@ -46,6 +46,7 @@ BEGIN
   LEFT JOIN public.roofs r ON i.roof_id = r.id
   LEFT JOIN public.inspection_sessions s ON s.property_id = r.id AND s.inspector_id = i.inspector_id
   WHERE i.inspector_id = p_inspector_id
+    AND i.status IN ('scheduled', 'in_progress', 'pending')  -- Only show active inspections, not completed ones
   ORDER BY i.scheduled_date DESC NULLS LAST, i.created_at DESC;
 END;
 $$;

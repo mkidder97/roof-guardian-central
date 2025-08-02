@@ -72,45 +72,80 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchProfile = async (userId: string) => {
     try {
-      // Fetch profile data with timeout protection
-      const { data: profileData } = await withTimeout(
-        Promise.resolve(
-          supabase
-            .from('profiles')
-            .select('*')
-            .eq('auth_user_id', userId)
-            .single()
-        ),
-        8000,
+      console.log('🔍 AuthContext: Starting profile fetch for user:', userId);
+      
+      // Fetch profile data with reduced timeout
+      console.log('📋 AuthContext: Fetching profile data...');
+      const profileQuery = supabase
+        .from('profiles')
+        .select('*')
+        .eq('auth_user_id', userId)
+        .single();
+        
+      const { data: profileData, error: profileError } = await withTimeout(
+        profileQuery,
+        3000, // Reduced from 8000ms to 3000ms
         'Profile fetch'
       );
 
-      // Fetch role data with timeout protection
-      const { data: roleData } = await withTimeout(
-        Promise.resolve(
-          supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', userId)
-            .order('created_at', { ascending: false })
-            .limit(1)
-            .single()
-        ),
-        8000,
+      if (profileError) {
+        console.warn('⚠️ AuthContext: Profile fetch returned error:', profileError);
+        // For 406 errors, likely schema issues - continue without profile
+        if (profileError.code === 'PGRST106' || profileError.message?.includes('406')) {
+          console.warn('🔧 AuthContext: Database schema issue detected - continuing without profile');
+          setProfile(null);
+          setUserRole(null);
+          return;
+        }
+      } else {
+        console.log('✅ AuthContext: Profile data fetched successfully:', profileData);
+      }
+
+      // Fetch role data with reduced timeout
+      console.log('👤 AuthContext: Fetching user role...');
+      const roleQuery = supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .single();
+        
+      const { data: roleData, error: roleError } = await withTimeout(
+        roleQuery,
+        3000, // Reduced from 8000ms to 3000ms
         'Role fetch'
       );
 
-      setProfile(profileData);
-      setUserRole(roleData?.role || null);
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-      console.error('Profile fetch error details:', getAuthErrorMessage(error));
-      
-      // Don't fail completely if profile fetch fails
-      // User can still be authenticated without profile details
-      if (isCorsError(error)) {
-        console.warn('CORS/timeout detected during profile fetch - continuing without profile data');
+      if (roleError) {
+        console.warn('⚠️ AuthContext: Role fetch returned error:', roleError);
+        // For 406 errors, likely schema issues - continue without role
+        if (roleError.code === 'PGRST106' || roleError.message?.includes('406')) {
+          console.warn('🔧 AuthContext: Database schema issue detected - continuing without role');
+        }
+      } else {
+        console.log('✅ AuthContext: Role data fetched successfully:', roleData);
       }
+
+      setProfile(profileData || null);
+      setUserRole(roleData?.role || null);
+      console.log('🎯 AuthContext: Profile and role set successfully');
+    } catch (error) {
+      console.error('❌ AuthContext: Error fetching profile:', error);
+      console.error('🔍 AuthContext: Profile fetch error details:', getAuthErrorMessage(error));
+      
+      // Don't fail completely if profile fetch fails - continue without profile data
+      console.warn('⚠️ AuthContext: Continuing without profile data due to fetch error');
+      setProfile(null);
+      setUserRole(null);
+      
+      if (isCorsError(error)) {
+        console.warn('🌐 AuthContext: CORS/timeout detected during profile fetch - user can still proceed');
+      }
+    } finally {
+      // CRITICAL: Always ensure loading is set to false after profile fetch attempt
+      console.log('🔓 AuthContext: Profile fetch complete - ensuring loading is false');
+      setLoading(false);
     }
   };
 
@@ -126,50 +161,64 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
+    console.log('🚀 AuthContext: Setting up auth state listener...');
+    
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        console.log('🔄 AuthContext: Auth state changed. Event:', event, 'Session:', !!session);
+        
         setSession(session);
         setUser(session?.user ?? null);
         
         if (session?.user) {
+          console.log('👤 AuthContext: User logged in, fetching profile...');
+          // Don't set loading to false here - let fetchProfile handle it
           fetchProfile(session.user.id);
         } else {
+          console.log('👤 AuthContext: No user session, clearing profile data');
           setProfile(null);
           setUserRole(null);
+          console.log('✅ AuthContext: No session - setting loading to false');
+          setLoading(false);
         }
-        
-        setLoading(false);
       }
     );
 
-    // Check for existing session with timeout protection
+    // Check for existing session with reduced timeout
+    console.log('🔍 AuthContext: Checking for existing session...');
     withTimeout(
       supabase.auth.getSession(),
-      10000,
+      5000, // Reduced from 10000ms to 5000ms
       'Session check'
     ).then(({ data: { session } }) => {
+      console.log('📋 AuthContext: Session check complete. Session exists:', !!session);
       setSession(session);
       setUser(session?.user ?? null);
       
       if (session?.user) {
+        console.log('👤 AuthContext: Found existing session, fetching profile...');
+        // Don't set loading to false here - let fetchProfile handle it
         fetchProfile(session.user.id);
+      } else {
+        console.log('👤 AuthContext: No existing session found');
+        console.log('✅ AuthContext: Initial session check - no session - setting loading to false');
+        setLoading(false);
       }
-      
-      setLoading(false);
     }).catch(error => {
-      console.error('AuthContext: Error getting session:', error);
-      console.error('Error details:', getAuthErrorMessage(error));
+      console.error('❌ AuthContext: Error getting session:', error);
+      console.error('🔍 AuthContext: Session error details:', getAuthErrorMessage(error));
       
       // Set error state for user feedback
       setError(getAuthErrorMessage(error));
       
       // Always set loading to false, even on timeout/error
+      console.log('⚠️ AuthContext: Session check failed - setting loading to false anyway');
       setLoading(false);
       
       // If it's a CORS/timeout issue, we might want to retry later
       if (isCorsError(error)) {
-        console.warn('CORS/timeout detected - authentication may be unavailable');
+        console.warn('🌐 AuthContext: CORS/timeout detected - authentication may be unavailable');
       }
     });
 

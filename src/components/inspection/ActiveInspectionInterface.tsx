@@ -107,6 +107,12 @@ export function ActiveInspectionInterface({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const overviewFileInputRef = useRef<HTMLInputElement>(null);
   
+  // Property data
+  const selectedProperty = {
+    id: propertyId,
+    name: propertyName
+  };
+  
   // Inspection state
   const [currentTab, setCurrentTab] = useState('roof-summary');
   const [currentSubTab, setCurrentSubTab] = useState('overview');
@@ -186,7 +192,8 @@ export function ActiveInspectionInterface({
     location: '',
     description: '',
     budgetAmount: 0,
-    severity: 'medium' as 'low' | 'medium' | 'high'
+    severity: 'medium' as 'low' | 'medium' | 'high',
+    photos: [] as { id: string; url: string; file: File }[]
   });
 
   // Get current inspection data for auto-save
@@ -221,39 +228,69 @@ export function ActiveInspectionInterface({
     scopeOfWork: ''
   });
 
-  // Auto-save inspection data whenever it changes
-  useEffect(() => {
-    if (onDataChange) {
-      const inspectionData = {
-        propertyId,
-        propertyName,
-        deficiencies,
-        overviewPhotos,
-        inspectionNotes,
-        roofSquareFootageConfirmed,
-        capitalExpenses,
-        roofCompositionData,
-        checklistData,
-        executiveSummaryData,
-        inspectionStarted,
-        startTime,
-        lastUpdated: new Date().toISOString()
-      };
-      onDataChange(inspectionData);
-    }
-  }, [
-    propertyId, 
-    propertyName, 
-    deficiencies, 
-    overviewPhotos, 
-    inspectionNotes, 
-    roofSquareFootageConfirmed, 
+  // Initialize autosave hook for session management
+  const inspectionData = {
+    propertyId,
+    propertyName,
+    deficiencies,
+    overviewPhotos,
+    inspectionNotes,
+    roofSquareFootageConfirmed,
     capitalExpenses,
     roofCompositionData,
     checklistData,
     executiveSummaryData,
-    inspectionStarted, 
-    startTime, 
+    inspectionStarted,
+    startTime,
+    lastUpdated: new Date().toISOString()
+  };
+  
+  const { loadSession } = useInspectionAutosave({
+    propertyId,
+    inspectionData,
+    enabled: true
+  });
+
+  // Load existing session data on component mount
+  useEffect(() => {
+    const loadExistingSession = async () => {
+      try {
+        const sessionData = await loadSession();
+        if (sessionData) {
+          console.log('🔄 Loading existing inspection session data:', sessionData);
+          
+          // Initialize all state with session data
+          if (sessionData.deficiencies) setDeficiencies(sessionData.deficiencies);
+          if (sessionData.overviewPhotos) setOverviewPhotos(sessionData.overviewPhotos);
+          if (sessionData.inspectionNotes) setInspectionNotes(sessionData.inspectionNotes);
+          if (sessionData.roofSquareFootageConfirmed !== undefined) {
+            setRoofSquareFootageConfirmed(sessionData.roofSquareFootageConfirmed);
+          }
+          if (sessionData.capitalExpenses) setCapitalExpenses(sessionData.capitalExpenses);
+          if (sessionData.roofCompositionData) setRoofCompositionData(sessionData.roofCompositionData);
+          if (sessionData.checklistData) setChecklistData(sessionData.checklistData);
+          if (sessionData.executiveSummaryData) setExecutiveSummaryData(sessionData.executiveSummaryData);
+          if (sessionData.inspectionStarted !== undefined) setInspectionStarted(sessionData.inspectionStarted);
+          if (sessionData.startTime) setStartTime(new Date(sessionData.startTime));
+          
+          console.log('✅ Session data loaded successfully');
+        }
+      } catch (error) {
+        console.error('❌ Error loading session data:', error);
+      }
+    };
+    
+    // Load session data when property changes
+    loadExistingSession();
+  }, [propertyId, loadSession]); // Load when property changes
+
+  // Auto-save inspection data whenever it changes
+  useEffect(() => {
+    if (onDataChange) {
+      onDataChange(inspectionData);
+    }
+  }, [
+    inspectionData,
     onDataChange
   ]);
 
@@ -297,6 +334,44 @@ export function ActiveInspectionInterface({
     event.target.value = '';
   };
 
+  // Helper function to upload photos to Supabase
+  const uploadPhotosToStorage = async (photos: { id: string; url: string; file: File }[], folder: string) => {
+    return Promise.all(
+      photos.map(async (photo) => {
+        try {
+          const fileName = `${selectedProperty?.id}/${folder}/${Date.now()}-${photo.file.name}`;
+          const { data, error } = await supabase.storage
+            .from('inspection-photos')
+            .upload(fileName, photo.file);
+
+          if (error) throw error;
+
+          const { data: { publicUrl } } = supabase.storage
+            .from('inspection-photos')
+            .getPublicUrl(fileName);
+
+          return {
+            id: photo.id,
+            url: publicUrl,
+            fileName: photo.file.name,
+            size: photo.file.size,
+            uploadedAt: new Date().toISOString()
+          };
+        } catch (error) {
+          console.error('Error uploading photo:', error);
+          return {
+            id: photo.id,
+            url: photo.url, // Keep local URL as fallback
+            fileName: photo.file.name,
+            size: photo.file.size,
+            uploadedAt: new Date().toISOString(),
+            error: 'Upload failed'
+          };
+        }
+      })
+    );
+  };
+
   // Enhanced photo capture handler for FloatingCameraButton
   const handleFloatingCameraCapture = async (files: File[], type: 'overview' | 'deficiency') => {
     const photos: Photo[] = files.map(file => ({
@@ -308,24 +383,52 @@ export function ActiveInspectionInterface({
     }));
 
     if (type === 'overview') {
-      setOverviewPhotos(prev => [...prev, ...photos]);
-    } else {
-      // For deficiency photos, add them to a temporary state or handle differently
-      // For now, we'll add them as overview photos, but in a real implementation
-      // you might want to open a deficiency creation modal
-      setOverviewPhotos(prev => [...prev, ...photos]);
-      
-      // Optional: Auto-open deficiency modal if deficiency photos are captured
-      if (photos.length > 0) {
+      setIsUploading(true);
+      try {
+        // Upload overview photos immediately to storage
+        const uploadedPhotos = await uploadPhotosToStorage(
+          photos.map(p => ({ id: p.id, url: p.url, file: p.file })), 
+          'overview'
+        );
+        
+        const enhancedPhotos = photos.map((photo, index) => ({
+          ...photo,
+          url: uploadedPhotos[index].url,
+          uploaded: !uploadedPhotos[index].error
+        }));
+
+        setOverviewPhotos(prev => [...prev, ...enhancedPhotos]);
         toast({
-          title: "Deficiency Photos Captured",
-          description: "Consider adding these to a specific deficiency record",
+          title: "Overview Photos Added",
+          description: `${photos.length} photo${photos.length > 1 ? 's' : ''} uploaded successfully`,
         });
+      } catch (error) {
+        console.error('Overview photo upload error:', error);
+        setOverviewPhotos(prev => [...prev, ...photos]);
+        toast({
+          title: "Photos Added Locally",
+          description: "Photos saved locally. Upload will be retried later.",
+          variant: "destructive"
+        });
+      } finally {
+        setIsUploading(false);
       }
+    } else {
+      // For deficiency photos, open deficiency creation modal with photos pre-loaded
+      setNewDeficiency(prev => ({ 
+        ...prev, 
+        photos: photos.map(p => ({ id: p.id, url: p.url, file: p.file }))
+      }));
+      setShowDeficiencyModal(true);
+      
+      toast({
+        title: "Deficiency Photos Captured",
+        description: "Photos ready for deficiency creation",
+      });
     }
   };
 
-  const handleCreateDeficiency = () => {
+  const handleCreateDeficiency = async () => {
     if (!newDeficiency.category || !newDeficiency.location) {
       toast({
         title: "Missing Information",
@@ -335,31 +438,50 @@ export function ActiveInspectionInterface({
       return;
     }
 
-    const deficiency: Deficiency = {
-      id: `def-${Date.now()}`,
-      category: newDeficiency.category,
-      location: newDeficiency.location,
-      description: newDeficiency.description,
-      budgetAmount: newDeficiency.budgetAmount,
-      photos: [],
-      severity: newDeficiency.severity,
-      status: 'identified'
-    };
+    setIsUploading(true);
 
-    setDeficiencies(prev => [...prev, deficiency]);
-    setNewDeficiency({
-      category: '',
-      location: '',
-      description: '',
-      budgetAmount: 0,
-      severity: 'medium'
-    });
-    setShowDeficiencyModal(false);
+    try {
+      // Upload photos to Supabase storage if any
+      const uploadedPhotos = newDeficiency.photos.length > 0 
+        ? await uploadPhotosToStorage(newDeficiency.photos, 'deficiencies')
+        : [];
 
-    toast({
-      title: "Deficiency Added",
-      description: `${deficiency.category} deficiency documented`,
-    });
+      const deficiency: Deficiency = {
+        id: `def-${Date.now()}`,
+        category: newDeficiency.category,
+        location: newDeficiency.location,
+        description: newDeficiency.description,
+        budgetAmount: newDeficiency.budgetAmount,
+        photos: uploadedPhotos,
+        severity: newDeficiency.severity,
+        status: 'identified'
+      };
+
+      setDeficiencies(prev => [...prev, deficiency]);
+      setNewDeficiency({
+        category: '',
+        location: '',
+        description: '',
+        budgetAmount: 0,
+        severity: 'medium',
+        photos: []
+      });
+      setShowDeficiencyModal(false);
+
+      toast({
+        title: "Deficiency Created",
+        description: `${uploadedPhotos.length > 0 ? `Created with ${uploadedPhotos.length} photo${uploadedPhotos.length > 1 ? 's' : ''}` : 'Created successfully'}`,
+      });
+    } catch (error) {
+      console.error('Error creating deficiency:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create deficiency. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const handleAddCapitalExpense = () => {
@@ -1074,8 +1196,19 @@ export function ActiveInspectionInterface({
                               roofSquareFootageConfirmed,
                               overviewPhotos
                             }}
+                            roofData={selectedProperty}
                             onSummaryGenerated={setExecutiveSummaryData}
                             isTablet={isTablet}
+                            deficiencies={deficiencies.map(d => ({
+                              type: d.type,
+                              severity: d.severity,
+                              description: d.description,
+                              location: d.location,
+                              estimatedCost: d.estimatedBudget
+                            }))}
+                            photoCount={(overviewPhotos?.length || 0) + deficiencies.reduce((total, d) => total + (d.photos?.length || 0), 0)}
+                            weatherConditions="Clear" // Could be enhanced to get real weather data
+                            inspectorName="Current Inspector" // Could be enhanced to get actual inspector name
                           />
                         </CardContent>
                       </Card>
@@ -1578,17 +1711,65 @@ export function ActiveInspectionInterface({
               </Select>
             </div>
 
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-              <Camera className="h-8 w-8 text-gray-400 mx-auto mb-2" />
-              <p className="text-sm text-gray-600">Upload Photo (max 20 MB)</p>
-              <Button 
-                variant="outline" 
-                className="mt-2"
-                onClick={() => handleCameraCapture('deficiency')}
-              >
-                Take Photo
-              </Button>
-            </div>
+            {/* Photo Preview Section */}
+            {newDeficiency.photos.length > 0 ? (
+              <div className="space-y-2">
+                <label className="block text-sm font-medium">Captured Photos ({newDeficiency.photos.length})</label>
+                <div className="grid grid-cols-2 gap-2 max-h-32 overflow-y-auto">
+                  {newDeficiency.photos.map((photo) => (
+                    <div key={photo.id} className="relative">
+                      <img 
+                        src={photo.url} 
+                        alt="Deficiency" 
+                        className="w-full h-20 object-cover rounded border"
+                      />
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        className="absolute -top-1 -right-1 h-6 w-6 rounded-full p-0"
+                        onClick={() => setNewDeficiency(prev => ({
+                          ...prev,
+                          photos: prev.photos.filter(p => p.id !== photo.id)
+                        }))}
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => {
+                    // Trigger floating camera button for deficiency photos
+                    toast({
+                      title: "Use Camera Button",
+                      description: "Use the floating camera button and select 'Deficiency' to add more photos",
+                    });
+                  }}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add More Photos
+                </Button>
+              </div>
+            ) : (
+              <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
+                <Camera className="h-8 w-8 text-gray-400 mx-auto mb-2" />
+                <p className="text-sm text-gray-600">Upload Photo (max 20 MB)</p>
+                <Button 
+                  variant="outline" 
+                  className="mt-2"
+                  onClick={() => {
+                    toast({
+                      title: "Use Camera Button",
+                      description: "Use the floating camera button and select 'Deficiency' to capture photos",
+                    });
+                  }}
+                >
+                  Take Photo
+                </Button>
+              </div>
+            )}
           </div>
 
           <DialogFooter>

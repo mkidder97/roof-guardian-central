@@ -321,9 +321,9 @@ export function FloatingCameraButton({
         onChange={(e) => handleFileChange(e, 'camera')}
         disabled={isUploading}
         // iOS specific attributes
-        {...(navigator.userAgent.match(/iPhone|iPad|iPod/) && {
+        {...(navigator.userAgent.match(/iPhone|iPad|iPod/) ? {
           capture: "environment"
-        })}
+        } : {})}
       />
 
       {/* Photo Library - No capture attribute for gallery access */}
