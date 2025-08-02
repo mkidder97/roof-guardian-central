@@ -43,11 +43,23 @@ serve(async (req) => {
 
     // Create inspection if it doesn't exist
     if (!inspectionId) {
+      // Look up the public.users.id from auth.users.id
+      const { data: userRecord, error: userError } = await supabaseClient
+        .from('users')
+        .select('id')
+        .eq('auth_user_id', session.inspector_id)
+        .single()
+
+      if (userError || !userRecord) {
+        console.error('Error finding user record:', userError)
+        throw new Error('Inspector user record not found. Please ensure user is properly set up.')
+      }
+
       const { data: newInspection, error: inspectionError } = await supabaseClient
         .from('inspections')
         .insert({
           roof_id: session.property_id,
-          inspector_id: session.inspector_id,
+          inspector_id: userRecord.id, // Use public.users.id instead of auth.users.id
           scheduled_date: new Date().toISOString().split('T')[0],
           completed_date: new Date().toISOString().split('T')[0],
           status: 'completed',
