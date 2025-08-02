@@ -27,16 +27,113 @@ serve(async (req) => {
 
     console.log('Processing inspection completion for session:', sessionId)
 
-    // Complete the inspection and get the inspection ID
-    const { data: inspectionId, error: completionError } = await supabaseClient
-      .rpc('complete_inspection_from_session', {
-        p_session_id: sessionId,
-        p_final_notes: finalNotes
-      })
+    // Get session data directly
+    const { data: session, error: sessionError } = await supabaseClient
+      .from('inspection_sessions')
+      .select('*')
+      .eq('id', sessionId)
+      .single()
 
-    if (completionError) {
-      console.error('Error completing inspection:', completionError)
-      throw completionError
+    if (sessionError || !session) {
+      console.error('Error getting session:', sessionError)
+      throw new Error('Session not found or access denied')
+    }
+
+    let inspectionId = session.inspection_id
+
+    // Create inspection if it doesn't exist
+    if (!inspectionId) {
+      const { data: newInspection, error: inspectionError } = await supabaseClient
+        .from('inspections')
+        .insert({
+          roof_id: session.property_id,
+          inspector_id: session.inspector_id,
+          scheduled_date: new Date().toISOString().split('T')[0],
+          completed_date: new Date().toISOString().split('T')[0],
+          status: 'completed',
+          inspection_type: session.session_data?.inspectionType || 'routine',
+          notes: finalNotes || session.session_data?.inspectionNotes || '',
+          weather_conditions: session.session_data?.weatherConditions
+        })
+        .select()
+        .single()
+
+      if (inspectionError) {
+        console.error('Error creating inspection:', inspectionError)
+        throw inspectionError
+      }
+
+      inspectionId = newInspection.id
+
+      // Update session with inspection ID
+      await supabaseClient
+        .from('inspection_sessions')
+        .update({ inspection_id: inspectionId })
+        .eq('id', sessionId)
+    } else {
+      // Update existing inspection
+      await supabaseClient
+        .from('inspections')
+        .update({
+          status: 'completed',
+          completed_date: new Date().toISOString().split('T')[0],
+          notes: finalNotes || session.session_data?.inspectionNotes || '',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', inspectionId)
+    }
+
+    // Mark session as completed
+    await supabaseClient
+      .from('inspection_sessions')
+      .update({ 
+        status: 'completed',
+        last_updated: new Date().toISOString()
+      })
+      .eq('id', sessionId)
+
+    // Process deficiencies from session data
+    if (session.session_data?.deficiencies && session.session_data.deficiencies.length > 0) {
+      console.log('Processing', session.session_data.deficiencies.length, 'deficiencies')
+      
+      for (const deficiency of session.session_data.deficiencies) {
+        try {
+          await supabaseClient
+            .from('inspection_deficiencies')
+            .insert({
+              inspection_id: inspectionId,
+              deficiency_type: deficiency.category || deficiency.type || 'general',
+              severity: deficiency.severity || 'medium',
+              description: deficiency.description || '',
+              location_description: deficiency.location || '',
+              estimated_cost: deficiency.budgetAmount || deficiency.estimatedCost || 0
+            })
+        } catch (deficiencyError) {
+          console.error('Error saving deficiency:', deficiencyError)
+        }
+      }
+    }
+
+    // Process capital expenses from session data
+    if (session.session_data?.capitalExpenses && session.session_data.capitalExpenses.length > 0) {
+      console.log('Processing', session.session_data.capitalExpenses.length, 'capital expenses')
+      
+      for (const expense of session.session_data.capitalExpenses) {
+        try {
+          await supabaseClient
+            .from('inspection_capital_expenses')
+            .insert({
+              inspection_id: inspectionId,
+              expense_type: expense.type || 'capital_expense',
+              description: expense.description || '',
+              estimated_cost: expense.estimatedCost || 0,
+              priority: expense.priority || 'medium',
+              recommended_timeline: expense.timeline || (expense.year ? expense.year.toString() : null)
+            })
+        } catch (expenseError) {
+          console.error('Error saving capital expense:', expenseError)
+        }
+      }
     }
 
     console.log('Inspection completed with ID:', inspectionId)
