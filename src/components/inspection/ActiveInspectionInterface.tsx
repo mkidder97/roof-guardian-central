@@ -41,6 +41,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useInspectionAutosave } from "@/hooks/useInspectionAutosave";
 import { RoofCompositionCapture } from "./RoofCompositionCapture";
 import { InspectionChecklist } from "./InspectionChecklist";
+import { StreamlinedInspectionChecklist } from "./StreamlinedInspectionChecklist";
 import { ExecutiveSummary } from "./ExecutiveSummary";
 import { WorkflowDataExporter } from "./WorkflowDataExporter";
 import { FloatingCameraButton } from "./FloatingCameraButton";
@@ -1173,7 +1174,7 @@ export function ActiveInspectionInterface({
                       <h3 className="text-lg font-semibold mb-4">Inspection Checklist</h3>
                       <Card>
                         <CardContent className="p-6">
-                          <InspectionChecklist
+                          <StreamlinedInspectionChecklist
                             initialData={checklistData}
                             onDataChange={setChecklistData}
                             isTablet={isTablet}
