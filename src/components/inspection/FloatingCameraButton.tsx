@@ -322,7 +322,7 @@ export function FloatingCameraButton({
         disabled={isUploading}
         // iOS specific attributes
         {...(navigator.userAgent.match(/iPhone|iPad|iPod/) && {
-          capture: "camera"
+          capture: "environment"
         })}
       />
 

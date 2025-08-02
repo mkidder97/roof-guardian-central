@@ -416,6 +416,117 @@ export type Database = {
           },
         ]
       }
+      inspection_capital_expenses: {
+        Row: {
+          created_at: string
+          description: string
+          estimated_cost: number
+          expense_type: string
+          id: string
+          inspection_id: string
+          priority: string | null
+          recommended_timeline: string | null
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          estimated_cost: number
+          expense_type: string
+          id?: string
+          inspection_id: string
+          priority?: string | null
+          recommended_timeline?: string | null
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          estimated_cost?: number
+          expense_type?: string
+          id?: string
+          inspection_id?: string
+          priority?: string | null
+          recommended_timeline?: string | null
+        }
+        Relationships: []
+      }
+      inspection_deficiencies: {
+        Row: {
+          created_at: string
+          deficiency_type: string
+          description: string
+          estimated_cost: number | null
+          id: string
+          inspection_id: string
+          location_description: string | null
+          photo_urls: string[] | null
+          priority_level: string | null
+          severity: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          deficiency_type: string
+          description: string
+          estimated_cost?: number | null
+          id?: string
+          inspection_id: string
+          location_description?: string | null
+          photo_urls?: string[] | null
+          priority_level?: string | null
+          severity?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          deficiency_type?: string
+          description?: string
+          estimated_cost?: number | null
+          id?: string
+          inspection_id?: string
+          location_description?: string | null
+          photo_urls?: string[] | null
+          priority_level?: string | null
+          severity?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      inspection_photos: {
+        Row: {
+          caption: string | null
+          created_at: string
+          deficiency_id: string | null
+          file_url: string
+          id: string
+          inspection_id: string
+          metadata: Json | null
+          photo_type: string
+          storage_path: string
+        }
+        Insert: {
+          caption?: string | null
+          created_at?: string
+          deficiency_id?: string | null
+          file_url: string
+          id?: string
+          inspection_id: string
+          metadata?: Json | null
+          photo_type?: string
+          storage_path: string
+        }
+        Update: {
+          caption?: string | null
+          created_at?: string
+          deficiency_id?: string | null
+          file_url?: string
+          id?: string
+          inspection_id?: string
+          metadata?: Json | null
+          photo_type?: string
+          storage_path?: string
+        }
+        Relationships: []
+      }
       inspection_reports: {
         Row: {
           created_at: string
@@ -484,6 +595,7 @@ export type Database = {
           created_at: string
           expires_at: string
           id: string
+          inspection_id: string | null
           inspector_id: string
           last_updated: string
           property_id: string
@@ -494,6 +606,7 @@ export type Database = {
           created_at?: string
           expires_at?: string
           id?: string
+          inspection_id?: string | null
           inspector_id: string
           last_updated?: string
           property_id: string
@@ -504,6 +617,7 @@ export type Database = {
           created_at?: string
           expires_at?: string
           id?: string
+          inspection_id?: string | null
           inspector_id?: string
           last_updated?: string
           property_id?: string
@@ -1350,6 +1464,20 @@ export type Database = {
       cleanup_expired_sessions: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      complete_inspection_from_session: {
+        Args: { p_session_id: string; p_final_notes?: string }
+        Returns: string
+      }
+      create_direct_inspection: {
+        Args: {
+          p_roof_id: string
+          p_inspector_id: string
+          p_scheduled_date: string
+          p_inspection_type?: string
+          p_notes?: string
+        }
+        Returns: string
       }
       generate_campaign_name: {
         Args: {

@@ -8,6 +8,7 @@ import { Calendar, MapPin, User, Clock, AlertTriangle, Eye, Play, Pause, CheckCi
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { useInspectionSync } from '@/hooks/useInspectionSync';
+import { InspectionDetailModal } from './InspectionDetailModal';
 import type { InspectionSyncData, InspectionStatus } from '@/types/inspection';
 
 interface InspectionsTabProps {
@@ -21,6 +22,8 @@ export function InspectionsTab({ onOpenSchedulingModal, onViewInspection }: Insp
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [inspections, setInspections] = useState<InspectionSyncData[]>([]);
   const [filteredInspections, setFilteredInspections] = useState<InspectionSyncData[]>([]);
+  const [selectedInspection, setSelectedInspection] = useState<InspectionSyncData | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
 
   // Use the inspection sync hook for real-time data
   const {
@@ -143,13 +146,8 @@ export function InspectionsTab({ onOpenSchedulingModal, onViewInspection }: Insp
           variant="ghost"
           className="flex items-center space-x-1"
           onClick={() => {
-            if (onViewInspection && inspection.roof_id) {
-              onViewInspection(
-                inspection.id, 
-                inspection.roof_id, 
-                inspection.roofs?.property_name || 'Unknown Property'
-              );
-            }
+            setSelectedInspection(inspection);
+            setShowDetailModal(true);
           }}
         >
           <Eye className="h-3 w-3" />
@@ -363,6 +361,12 @@ export function InspectionsTab({ onOpenSchedulingModal, onViewInspection }: Insp
           )}
         </CardContent>
       </Card>
+
+      <InspectionDetailModal
+        inspection={selectedInspection}
+        open={showDetailModal}
+        onOpenChange={setShowDetailModal}
+      />
     </div>
   );
 }

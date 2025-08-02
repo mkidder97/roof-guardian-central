@@ -38,6 +38,7 @@ import {
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { useInspectionAutosave } from "@/hooks/useInspectionAutosave";
 import { RoofCompositionCapture } from "./RoofCompositionCapture";
 import { InspectionChecklist } from "./InspectionChecklist";
 import { ExecutiveSummary } from "./ExecutiveSummary";
@@ -186,6 +187,30 @@ export function ActiveInspectionInterface({
     description: '',
     budgetAmount: 0,
     severity: 'medium' as 'low' | 'medium' | 'high'
+  });
+
+  // Get current inspection data for auto-save
+  const currentInspectionData = {
+    propertyId,
+    propertyName,
+    deficiencies,
+    overviewPhotos,
+    inspectionNotes,
+    roofSquareFootageConfirmed,
+    capitalExpenses,
+    roofCompositionData,
+    checklistData,
+    executiveSummaryData,
+    inspectionStarted,
+    startTime,
+    lastUpdated: new Date().toISOString()
+  };
+
+  // Use autosave hook
+  const { sessionId: sessionIdRef } = useInspectionAutosave({
+    propertyId,
+    inspectionData: currentInspectionData,
+    enabled: inspectionStarted
   });
 
   // New capital expense form
@@ -488,33 +513,63 @@ export function ActiveInspectionInterface({
       return;
     }
 
-    const inspectionData = {
-      propertyId,
-      propertyName,
-      startTime,
-      endTime: new Date(),
-      deficiencies,
-      overviewPhotos,
-      capitalExpenses,
-      inspectionNotes,
-      roofSquareFootageConfirmed,
-      summary: {
-        totalDeficiencies: deficiencies.length,
-        highSeverityCount: deficiencies.filter(d => d.severity === 'high').length,
-        totalCapitalExpenses: capitalExpenses.reduce((sum, exp) => sum + exp.estimatedCost, 0),
-        overviewPhotoCount: overviewPhotos.length
-      }
-    };
+    try {
+      // Prepare photos for processing
+      const photos = overviewPhotos.map(photo => ({
+        url: photo.url,
+        type: photo.type,
+        caption: photo.location || '',
+        timestamp: photo.timestamp.toISOString()
+      }));
 
-    // Here you would save to database
-    console.log('Completing inspection:', inspectionData);
-    
-    toast({
-      title: "Inspection Complete",
-      description: `${deficiencies.length} deficiencies and ${overviewPhotos.length} overview photos documented`,
-    });
+      // Call the edge function to process completion
+      const { data, error } = await supabase.functions.invoke('process-inspection-completion', {
+        body: {
+          sessionId: sessionIdRef,
+          finalNotes: inspectionNotes,
+          photos
+        }
+      });
 
-    onComplete(inspectionData);
+      if (error) throw error;
+
+      toast({
+        title: "Inspection Completed",
+        description: "Your inspection has been processed and saved successfully",
+      });
+
+      // Call the original completion handler
+      const inspectionData = {
+        propertyId,
+        propertyName,
+        startTime,
+        endTime: new Date(),
+        deficiencies,
+        overviewPhotos,
+        capitalExpenses,
+        inspectionNotes,
+        roofSquareFootageConfirmed,
+        roofCompositionData,
+        checklistData,
+        executiveSummaryData,
+        summary: {
+          totalDeficiencies: deficiencies.length,
+          highSeverityCount: deficiencies.filter(d => d.severity === 'high').length,
+          totalCapitalExpenses: capitalExpenses.reduce((sum, exp) => sum + exp.estimatedCost, 0),
+          overviewPhotoCount: overviewPhotos.length
+        }
+      };
+
+      onComplete(inspectionData);
+
+    } catch (error) {
+      console.error('Error completing inspection:', error);
+      toast({
+        title: "Completion Failed",
+        description: "Failed to complete inspection. Please try again.",
+        variant: "destructive"
+      });
+    }
   };
 
   const getSeverityColor = (severity: string) => {
