@@ -1,0 +1,190 @@
+{
+  "project": "roof-guardian-central",
+  "description": "RoofGuardian construction industry roof inspection and property management platform",
+  "version": "3.0.0",
+  "system_type": "claude_code_optimized",
+  
+  "agents": {
+    "code_orchestrator": {
+      "mission": "rapid_development_engine",
+      "consolidated_capabilities": [
+        "database_operations",
+        "api_development", 
+        "security_implementation",
+        "testing_automation",
+        "deployment_orchestration"
+      ],
+      "response_time": "30_seconds",
+      "specializations": [
+        "supabase_optimization",
+        "construction_industry_patterns",
+        "mobile_workflows",
+        "offline_sync_strategies"
+      ],
+      "mcp_servers": [
+        "@anthropic/mcp-github",
+        "@anthropic/mcp-filesystem", 
+        "@anthropic/mcp-commands",
+        "@anthropic/mcp-supabase"
+      ]
+    },
+    
+    "visual_development": {
+      "mission": "immediate_visual_feedback",
+      "consolidated_capabilities": [
+        "mobile_ui_development",
+        "field_operations_optimization",
+        "visual_testing_automation", 
+        "accessibility_validation",
+        "performance_monitoring"
+      ],
+      "response_time": "30_seconds",
+      "specializations": [
+        "inspector_workflows",
+        "touch_optimization",
+        "field_conditions_simulation",
+        "cross_device_validation"
+      ],
+      "mcp_servers": [
+        "@anthropic/mcp-playwright",
+        "@anthropic/mcp-commands",
+        "@anthropic/mcp-filesystem"
+      ]
+    },
+    
+    "context_intelligence": {
+      "mission": "perfect_memory_and_optimization",
+      "consolidated_capabilities": [
+        "meta_coordination",
+        "ai_intelligence",
+        "pattern_learning",
+        "predictive_analytics",
+        "task_delegation"
+      ],
+      "response_time": "5_seconds",
+      "specializations": [
+        "construction_domain_expertise",
+        "business_intelligence",
+        "strategic_planning",
+        "workflow_optimization"
+      ],
+      "mcp_servers": [
+        "@anthropic/mcp-memory",
+        "@anthropic/mcp-github",
+        "@anthropic/mcp-web-search"
+      ]
+    }
+  },
+  
+  "speed_targets": {
+    "iteration_cycle": "2-3_minutes",
+    "first_response": "30_seconds",
+    "visual_feedback": "30_seconds",
+    "context_retrieval": "5_seconds",
+    "error_recovery": "1_minute"
+  },
+  
+  "quality_standards": {
+    "code_quality": "100%_typescript_compliance",
+    "accessibility": "WCAG_2.1_AA_plus",
+    "performance": "core_web_vitals_excellence",
+    "security": "zero_vulnerabilities",
+    "construction_compliance": "industry_safety_standards"
+  },
+  
+  "roofguardian_optimizations": {
+    "construction_intelligence": {
+      "inspection_workflows": "Pre-inspection, field operations, post-inspection excellence",
+      "safety_protocols": "Fall protection, PPE, site hazard assessment",
+      "equipment_integration": "Cameras, measurement tools, drones, IoT sensors",
+      "regulatory_compliance": "Building codes, OSHA, insurance requirements"
+    },
+    
+    "mobile_specialization": {
+      "field_conditions": "Outdoor visibility, weather resistance, glove compatibility",
+      "offline_capability": "Progressive sync, local storage, connectivity resilience", 
+      "performance_optimization": "Battery management, data compression, touch responsiveness",
+      "accessibility_focus": "Voice commands, screen readers, motor impairment support"
+    },
+    
+    "technical_architecture": {
+      "supabase_optimization": "Query performance, real-time sync, geospatial operations",
+      "pwa_excellence": "Service workers, background sync, offline functionality",
+      "scalability": "10K+ property portfolios, virtualized lists, performance monitoring",
+      "collaboration": "Real-time updates, expert consultation, quality assurance workflows"
+    }
+  },
+  
+  "development_patterns": {
+    "rapid_iteration": {
+      "multi_file_coordination": "Simultaneous editing across related files",
+      "dependency_resolution": "Automatic import management and type checking",
+      "testing_integration": "Automated test generation and execution",
+      "deployment_automation": "CI/CD with monitoring and rollback capabilities"
+    },
+    
+    "construction_industry_templates": {
+      "inspector_interfaces": "Touch-optimized field inspection workflows",
+      "campaign_management": "Weather-aware scheduling and automation",
+      "emergency_response": "Storm damage assessment and rapid deployment",
+      "portfolio_analytics": "Risk assessment and ROI optimization"
+    }
+  },
+  
+  "coordination_protocols": {
+    "agent_routing": {
+      "intelligent_assignment": "Context-based optimal agent selection",
+      "parallel_execution": "Synchronized multi-agent collaboration",
+      "conflict_resolution": "Priority-based resource allocation",
+      "quality_assurance": "Cross-agent consistency validation"
+    },
+    
+    "communication_patterns": {
+      "task_coordination": "Real-time status updates and progress synchronization",
+      "error_handling": "Immediate error detection and recovery strategies",
+      "optimization_suggestions": "AI-driven improvement recommendations",
+      "pattern_learning": "Continuous learning from successful implementations"
+    }
+  },
+  
+  "performance_monitoring": {
+    "development_metrics": {
+      "velocity": "Development speed and iteration cycle times",
+      "quality": "Code quality scores and testing coverage",
+      "efficiency": "Resource utilization and agent coordination",
+      "satisfaction": "Developer experience and success rates"
+    },
+    
+    "business_metrics": {
+      "time_to_market": "Feature delivery speed and competitive advantage",
+      "roi": "Development investment returns and business impact",
+      "client_satisfaction": "User experience quality and retention",
+      "compliance": "Industry standard adherence and regulatory alignment"
+    }
+  },
+  
+  "natural_language_interface": {
+    "supported_patterns": [
+      "Feature development: 'Add real-time photo sharing to inspector interface'",
+      "Performance optimization: 'Speed up property dashboard for large portfolios'",
+      "Bug fixes: 'Fix TypeScript errors in inspection components'",
+      "Mobile enhancement: 'Improve touch targets for work gloves'",
+      "Emergency features: 'Create storm response workflow with alerts'"
+    ],
+    
+    "automatic_routing": {
+      "code_changes": "Route to Code Orchestrator for implementation",
+      "visual_validation": "Route to Visual Development for testing",
+      "coordination": "Route to Context Intelligence for orchestration",
+      "optimization": "Apply learned patterns and best practices"
+    }
+  },
+  
+  "success_criteria": {
+    "speed": "95% faster than previous 8-agent system",
+    "quality": "100% preservation of construction industry intelligence", 
+    "compatibility": "Perfect Claude Code and MCP server integration",
+    "usability": "Natural language interface with predictable results",
+    "scalability": "Support for complex construction industry workflows"
+  }
+}

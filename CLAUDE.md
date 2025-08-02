@@ -175,3 +175,55 @@ The project includes automatic detection:
 - ESLint rules warn about improper usage
 
 **FAILURE TO FOLLOW THESE RULES WILL BREAK THE APPLICATION**
+
+## Claude Code Agent Integration
+
+### Three-Agent Speed System
+The RoofGuardian platform now uses an optimized 3-agent system designed for Lovable-speed development with Claude Code:
+
+1. **Code Orchestrator Agent**: Multi-file development with <30 second response times
+2. **Visual Development Agent**: Playwright-powered visual validation with immediate feedback
+3. **Context Intelligence Agent**: Perfect project memory and pattern learning
+
+### Required MCP Servers
+Essential for optimal performance:
+- **@anthropic/mcp-github**: Repository management, branching, commits, PR creation
+- **@anthropic/mcp-playwright**: Visual testing, screenshot capture, mobile validation
+- **@anthropic/mcp-memory**: Context intelligence, pattern storage, learning systems
+- **@anthropic/mcp-filesystem**: Multi-file editing, rapid component generation
+- **@anthropic/mcp-commands**: Build processes, dev server management, testing
+
+Optional but recommended:
+- **@anthropic/mcp-supabase**: Database-aware optimizations
+- **@anthropic/mcp-web-search**: Documentation and troubleshooting
+
+### Development Workflow with Claude Code
+1. **Natural Language Prompt**: Simply describe what you want
+   - Example: "Make the inspection form more mobile-friendly"
+2. **Rapid Agent Collaboration**: All three agents work together in 2-3 minute cycles
+3. **Visual Validation**: Immediate screenshots and testing feedback
+4. **Automatic Git Operations**: Branches, commits, and PRs created automatically
+5. **Context Preservation**: Every decision and pattern learned for future iterations
+
+### Speed Targets
+- **Time to First Visual**: <30 seconds after prompt
+- **Complete Iteration Cycle**: 2-3 minutes
+- **Error Recovery**: <1 minute
+- **Context Retrieval**: <5 seconds
+
+### RoofGuardian-Specific Optimizations
+- **Construction Industry Patterns**: Pre-built inspection workflow components
+- **Mobile-First Development**: Touch-friendly interfaces optimized for field workers
+- **Offline Capability**: Progressive sync and local storage strategies
+- **Performance at Scale**: Optimized for 10K+ property portfolios
+- **Supabase Integration**: Database-aware code generation and optimization
+
+### Usage Examples
+Instead of complex agent commands, use natural language:
+- "Optimize the property loading performance"
+- "Add offline sync to the photo upload feature" 
+- "Fix any TypeScript errors in the inspection components"
+- "Make the dashboard more responsive on tablets"
+- "Improve the accessibility of form inputs"
+
+The system automatically selects optimal agents and coordination patterns based on the request.
