@@ -55,27 +55,55 @@ serve(async (req) => {
         throw new Error('Inspector user record not found. Please ensure user is properly set up.')
       }
 
-      const { data: newInspection, error: inspectionError } = await supabaseClient
+      // Check for existing inspection for same property and date to prevent duplicates
+      const today = new Date().toISOString().split('T')[0]
+      const { data: existingInspection } = await supabaseClient
         .from('inspections')
-        .insert({
-          roof_id: session.property_id,
-          inspector_id: userRecord.id, // Use public.users.id instead of auth.users.id
-          scheduled_date: new Date().toISOString().split('T')[0],
-          completed_date: new Date().toISOString().split('T')[0],
-          status: 'completed',
-          inspection_type: session.session_data?.inspectionType || 'routine',
-          notes: finalNotes || session.session_data?.inspectionNotes || '',
-          weather_conditions: session.session_data?.weatherConditions
-        })
-        .select()
-        .single()
+        .select('id')
+        .eq('roof_id', session.property_id)
+        .eq('inspector_id', userRecord.id)
+        .eq('completed_date', today)
+        .eq('status', 'completed')
+        .maybeSingle()
 
-      if (inspectionError) {
-        console.error('Error creating inspection:', inspectionError)
-        throw inspectionError
+      if (existingInspection) {
+        console.log('Found existing inspection for today:', existingInspection.id)
+        inspectionId = existingInspection.id
+        
+        // Update the existing inspection with latest data
+        await supabaseClient
+          .from('inspections')
+          .update({
+            notes: finalNotes || session.session_data?.inspectionNotes || '',
+            weather_conditions: session.session_data?.weatherConditions,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', inspectionId)
+      } else {
+        // Create new inspection
+        const { data: newInspection, error: inspectionError } = await supabaseClient
+          .from('inspections')
+          .insert({
+            roof_id: session.property_id,
+            inspector_id: userRecord.id, // Use public.users.id instead of auth.users.id
+            scheduled_date: new Date().toISOString().split('T')[0],
+            completed_date: new Date().toISOString().split('T')[0],
+            status: 'completed',
+            inspection_type: session.session_data?.inspectionType || 'routine',
+            notes: finalNotes || session.session_data?.inspectionNotes || '',
+            weather_conditions: session.session_data?.weatherConditions
+          })
+          .select()
+          .single()
+
+        if (inspectionError) {
+          console.error('Error creating inspection:', inspectionError)
+          throw inspectionError
+        }
+
+        inspectionId = newInspection.id
+        console.log('Created new inspection:', inspectionId)
       }
-
-      inspectionId = newInspection.id
 
       // Update session with inspection ID
       await supabaseClient

@@ -55,16 +55,55 @@ export function useInspectionAutosave({
         if (error) throw error;
         return updatedSession;
       } else {
-        // Create new session
-        const { data: newSession, error } = await supabase
+        // Check for existing active session for this property before creating new one
+        const { data: existingSession } = await supabase
           .from('inspection_sessions')
-          .insert(sessionData)
-          .select()
-          .single();
+          .select('id')
+          .eq('property_id', propertyId)
+          .eq('inspector_id', user.user.id)
+          .eq('status', 'active')
+          .order('last_updated', { ascending: false })
+          .limit(1)
+          .maybeSingle();
 
-        if (error) throw error;
-        sessionIdRef.current = newSession.id;
-        return newSession;
+        if (existingSession) {
+          // Update existing session instead of creating new one
+          sessionIdRef.current = existingSession.id;
+          const { data: updatedSession, error } = await supabase
+            .from('inspection_sessions')
+            .update({
+              session_data: data,
+              status,
+              last_updated: new Date().toISOString()
+            })
+            .eq('id', existingSession.id)
+            .select()
+            .single();
+
+          if (error) throw error;
+          console.log('🔄 Updated existing session:', existingSession.id);
+          return updatedSession;
+        } else {
+          // Mark any old sessions for this property as abandoned
+          await supabase
+            .from('inspection_sessions')
+            .update({ status: 'abandoned' })
+            .eq('property_id', propertyId)
+            .eq('inspector_id', user.user.id)
+            .eq('status', 'active');
+
+          // Create new session
+          const { data: newSession, error } = await supabase
+            .from('inspection_sessions')
+            .insert(sessionData)
+            .select()
+            .single();
+
+          if (error) throw error;
+          sessionIdRef.current = newSession.id;
+          console.log('✨ Created new session:', newSession.id);
+          return newSession;
+        }
       }
     } catch (error) {
       console.error('Failed to save inspection session:', error);

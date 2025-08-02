@@ -468,7 +468,15 @@ const InspectorInterface = () => {
       
       toast({
         title: "Inspection Completed",
-        description: `Inspection for ${inspectionData.propertyName} has been completed and synced`,
+        description: `Inspection for ${inspectionData.propertyName} has been completed and saved to database`,
+      });
+
+      // Log completion for debugging
+      console.log('✅ Inspection completed successfully:', {
+        propertyId: inspectionData.propertyId,
+        propertyName: inspectionData.propertyName,
+        deficiencies: inspectionData.deficiencies?.length || 0,
+        photos: inspectionData.overviewPhotos?.length || 0
       });
     } catch (error) {
       console.error('Error completing inspection:', error);
