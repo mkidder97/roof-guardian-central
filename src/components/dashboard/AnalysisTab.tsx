@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TrendingUp, TrendingDown, AlertTriangle, DollarSign, Calendar, BarChart3, FileDown, Loader2, MapPin, Users } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Area, AreaChart } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line, Area, AreaChart } from "recharts";
 import { differenceInYears, differenceInDays, parseISO, format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 
 interface AnalyticsData {
@@ -530,7 +530,7 @@ export function AnalysisTab() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="name" />
                 <YAxis />
-                <Tooltip />
+                <RechartsTooltip />
                 <Bar dataKey="count" fill="#0088FE" />
               </BarChart>
             </ResponsiveContainer>
@@ -559,7 +559,7 @@ export function AnalysisTab() {
                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                   ))}
                 </Pie>
-                <Tooltip />
+                <RechartsTooltip />
               </PieChart>
             </ResponsiveContainer>
           </CardContent>
@@ -576,7 +576,7 @@ export function AnalysisTab() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="month" />
                 <YAxis />
-                <Tooltip />
+                <RechartsTooltip />
                 <Area type="monotone" dataKey="manufacturer" stackId="1" stroke="#8884d8" fill="#8884d8" />
                 <Area type="monotone" dataKey="installer" stackId="1" stroke="#82ca9d" fill="#82ca9d" />
               </AreaChart>
@@ -595,7 +595,7 @@ export function AnalysisTab() {
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis dataKey="year" />
                 <YAxis />
-                <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, '']} />
+                <RechartsTooltip formatter={(value) => [`$${value.toLocaleString()}`, '']} />
                 <Bar dataKey="estimated" fill="#8884d8" name="Estimated" />
                 <Bar dataKey="actual" fill="#82ca9d" name="Actual" />
               </BarChart>
@@ -687,7 +687,7 @@ export function AnalysisTab() {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="region" />
                     <YAxis />
-                    <Tooltip />
+                    <RechartsTooltip />
                     <Bar dataKey="propertyCount" fill="#8884d8" name="Properties" />
                   </BarChart>
                 </ResponsiveContainer>
@@ -704,7 +704,7 @@ export function AnalysisTab() {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="region" />
                     <YAxis />
-                    <Tooltip formatter={(value: any) => [`$${value.toLocaleString()}`, '']} />
+                    <RechartsTooltip formatter={(value: any) => [`$${value.toLocaleString()}`, '']} />
                     <Bar dataKey="totalCapitalBudget" stackId="a" fill="#8884d8" name="Capital Budget" />
                     <Bar dataKey="totalPreventativeBudget" stackId="a" fill="#82ca9d" name="Preventative Budget" />
                   </BarChart>
