@@ -461,7 +461,12 @@ export function ActiveInspectionInterface({
         location: newDeficiency.location,
         description: newDeficiency.description,
         budgetAmount: newDeficiency.budgetAmount,
-        photos: uploadedPhotos,
+        photos: uploadedPhotos.map(photo => ({
+          ...photo,
+          file: new File([], photo.fileName),
+          type: 'deficiency' as const,
+          timestamp: new Date(photo.uploadedAt)
+        })),
         severity: newDeficiency.severity,
         status: 'identified'
       };
@@ -688,8 +693,8 @@ export function ActiveInspectionInterface({
       if (error) throw error;
 
       toast({
-        title: "Inspection Completed",
-        description: "Your inspection has been processed and saved successfully",
+        title: "Inspection Submitted",
+        description: "Your inspection has been submitted for review and will be processed by the review team",
       });
 
       // Call the original completion handler
@@ -1249,11 +1254,11 @@ export function ActiveInspectionInterface({
                             onSummaryGenerated={setExecutiveSummaryData}
                             isTablet={isTablet}
                             deficiencies={deficiencies.map(d => ({
-                              type: d.type,
+                              type: d.category,
                               severity: d.severity,
                               description: d.description,
                               location: d.location,
-                              estimatedCost: d.estimatedBudget
+                              estimatedCost: d.budgetAmount
                             }))}
                             photoCount={(overviewPhotos?.length || 0) + deficiencies.reduce((total, d) => total + (d.photos?.length || 0), 0)}
                             weatherConditions="Clear" // Could be enhanced to get real weather data

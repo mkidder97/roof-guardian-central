@@ -83,7 +83,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .single();
         
       const { data: profileData, error: profileError } = await withTimeout(
-        profileQuery,
+        Promise.resolve(profileQuery).then(res => ({ data: res.data, error: res.error })),
         3000, // Reduced from 8000ms to 3000ms
         'Profile fetch'
       );
@@ -112,7 +112,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .single();
         
       const { data: roleData, error: roleError } = await withTimeout(
-        roleQuery,
+        Promise.resolve(roleQuery).then(res => ({ data: res.data, error: res.error })),
         3000, // Reduced from 8000ms to 3000ms
         'Role fetch'
       );

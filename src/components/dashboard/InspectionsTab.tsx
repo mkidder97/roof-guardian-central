@@ -9,7 +9,7 @@ import { Calendar, MapPin, User, Clock, AlertTriangle, Eye, Play, Pause, CheckCi
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { useInspectionSync } from '@/hooks/useInspectionSync';
-import { InspectionDetailModal } from './InspectionDetailModal';
+import { InspectionReviewInterface } from './InspectionReviewInterface';
 import { supabase } from '@/integrations/supabase/client';
 import type { InspectionSyncData, InspectionStatus } from '@/types/inspection';
 
@@ -621,10 +621,16 @@ export function InspectionsTab({ onOpenSchedulingModal, onViewInspection }: Insp
         </CardContent>
       </Card>
 
-      <InspectionDetailModal
+      <InspectionReviewInterface
         inspection={selectedInspection}
         open={showDetailModal}
         onOpenChange={setShowDetailModal}
+        onSave={(updatedInspection) => {
+          setInspections(prev => prev.map(inspection => 
+            inspection.id === updatedInspection.id ? updatedInspection : inspection
+          ));
+          setShowDetailModal(false);
+        }}
       />
     </div>
   );

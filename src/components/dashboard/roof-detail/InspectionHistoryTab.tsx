@@ -7,7 +7,7 @@ import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { inspectorEventBus, INSPECTOR_EVENTS } from '@/lib/eventBus';
-import { EditableInspectionDetailModal } from '../EditableInspectionDetailModal';
+import { InspectionReviewInterface } from '../InspectionReviewInterface';
 import type { UnifiedInspection, InspectionStatus, InspectionType, InspectionPriority, InspectionSyncData } from '@/types/inspection';
 
 interface InspectionHistoryTabProps {
@@ -170,7 +170,13 @@ export function InspectionHistoryTab({ roof }: InspectionHistoryTabProps) {
     setInspections(prevInspections => 
       prevInspections.map(inspection => 
         inspection.id === updatedInspection.id 
-          ? { ...inspection, ...updatedInspection }
+          ? { 
+              ...inspection, 
+              status: updatedInspection.status as InspectionStatus,
+              notes: updatedInspection.notes,
+              weather_conditions: updatedInspection.weather_conditions,
+              updated_at: updatedInspection.updated_at
+            }
           : inspection
       )
     );
@@ -324,7 +330,7 @@ export function InspectionHistoryTab({ roof }: InspectionHistoryTabProps) {
         </div>
       )}
 
-      <EditableInspectionDetailModal
+      <InspectionReviewInterface
         inspection={selectedInspection}
         open={showDetailModal}
         onOpenChange={setShowDetailModal}

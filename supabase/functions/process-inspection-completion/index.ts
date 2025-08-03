@@ -63,7 +63,7 @@ serve(async (req) => {
         .eq('roof_id', session.property_id)
         .eq('inspector_id', userRecord.id)
         .eq('completed_date', today)
-        .eq('status', 'completed')
+        .eq('status', 'ready_for_review')
         .maybeSingle()
 
       if (existingInspection) {
@@ -88,7 +88,7 @@ serve(async (req) => {
             inspector_id: userRecord.id, // Use public.users.id instead of auth.users.id
             scheduled_date: new Date().toISOString().split('T')[0],
             completed_date: new Date().toISOString().split('T')[0],
-            status: 'completed',
+            status: 'ready_for_review',
             inspection_type: session.session_data?.inspectionType || 'routine',
             notes: finalNotes || session.session_data?.inspectionNotes || '',
             weather_conditions: session.session_data?.weatherConditions
@@ -115,7 +115,7 @@ serve(async (req) => {
       await supabaseClient
         .from('inspections')
         .update({
-          status: 'completed',
+          status: 'ready_for_review',
           completed_date: new Date().toISOString().split('T')[0],
           notes: finalNotes || session.session_data?.inspectionNotes || '',
           updated_at: new Date().toISOString()
