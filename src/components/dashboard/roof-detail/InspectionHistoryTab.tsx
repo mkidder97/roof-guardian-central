@@ -2,12 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Calendar, User, FileText, Download, Eye } from 'lucide-react';
+import { Calendar, User, FileText, Download, Eye, Edit } from 'lucide-react';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { inspectorEventBus, INSPECTOR_EVENTS } from '@/lib/eventBus';
-import type { UnifiedInspection, InspectionStatus, InspectionType, InspectionPriority } from '@/types/inspection';
+import { EditableInspectionDetailModal } from '../EditableInspectionDetailModal';
+import type { UnifiedInspection, InspectionStatus, InspectionType, InspectionPriority, InspectionSyncData } from '@/types/inspection';
 
 interface InspectionHistoryTabProps {
   roof: {
@@ -19,6 +20,8 @@ interface InspectionHistoryTabProps {
 export function InspectionHistoryTab({ roof }: InspectionHistoryTabProps) {
   const [inspections, setInspections] = useState<UnifiedInspection[]>([]);
   const [loading, setLoading] = useState(true);
+  const [selectedInspection, setSelectedInspection] = useState<InspectionSyncData | null>(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
   const { toast } = useToast();
 
   const fetchInspections = async () => {
@@ -50,6 +53,7 @@ export function InspectionHistoryTab({ roof }: InspectionHistoryTabProps) {
           )
         `)
         .eq('roof_id', roof.id)
+        .is('archived_at', null)
         .order('scheduled_date', { ascending: false });
 
       if (error) throw error;
@@ -139,6 +143,40 @@ export function InspectionHistoryTab({ roof }: InspectionHistoryTabProps) {
     fetchInspections();
   }, [roof.id]);
 
+  const handleViewInspection = (inspection: UnifiedInspection) => {
+    // Convert UnifiedInspection to InspectionSyncData format
+    const inspectionData: InspectionSyncData = {
+      id: inspection.id,
+      roof_id: inspection.roof_id,
+      inspector_id: inspection.inspector_id,
+      scheduled_date: inspection.scheduled_date,
+      completed_date: inspection.completed_date,
+      status: inspection.status,
+      inspection_type: inspection.inspection_type,
+      notes: inspection.notes,
+      weather_conditions: inspection.weather_conditions,
+      created_at: inspection.created_at,
+      updated_at: inspection.updated_at,
+      session_data: inspection.session_data,
+      roofs: inspection.roofs,
+      users: inspection.users
+    };
+    setSelectedInspection(inspectionData);
+    setShowDetailModal(true);
+  };
+
+  const handleInspectionUpdate = (updatedInspection: InspectionSyncData) => {
+    // Update the inspection in the local state
+    setInspections(prevInspections => 
+      prevInspections.map(inspection => 
+        inspection.id === updatedInspection.id 
+          ? { ...inspection, ...updatedInspection }
+          : inspection
+      )
+    );
+    setShowDetailModal(false);
+  };
+
   const getStatusBadgeVariant = (status: InspectionStatus) => {
     switch (status) {
       case 'scheduled': return 'secondary';
@@ -216,9 +254,13 @@ export function InspectionHistoryTab({ roof }: InspectionHistoryTabProps) {
                     </span>
                   </div>
                   <div className="flex items-center space-x-2">
-                    <Button variant="ghost" size="sm">
-                      <Eye className="h-4 w-4 mr-2" />
-                      View Details
+                    <Button 
+                      variant="ghost" 
+                      size="sm"
+                      onClick={() => handleViewInspection(inspection)}
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit Details
                     </Button>
                     {inspection.status === 'completed' && (
                       <Button variant="ghost" size="sm">
@@ -281,6 +323,13 @@ export function InspectionHistoryTab({ roof }: InspectionHistoryTabProps) {
           ))}
         </div>
       )}
+
+      <EditableInspectionDetailModal
+        inspection={selectedInspection}
+        open={showDetailModal}
+        onOpenChange={setShowDetailModal}
+        onSave={handleInspectionUpdate}
+      />
     </div>
   );
 }

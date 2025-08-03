@@ -84,7 +84,8 @@ export function useInspectionSync(options: UseInspectionSyncOptions = {}) {
             email
           )
         `)
-        .order('scheduled_date', { ascending: false });
+        .order('scheduled_date', { ascending: false })
+        .is('archived_at', null); // Exclude archived inspections
 
       if (stableFilters.roofId) {
         query = query.eq('roof_id', stableFilters.roofId);
