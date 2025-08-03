@@ -29,14 +29,14 @@ export function InspectionHistoryTab({ roof }: InspectionHistoryTabProps) {
         .from('inspections')
         .select(`
           *,
-          roofs!roof_id(
+          roofs(
             id,
             property_name,
             address,
             city,
             state
           ),
-          users!inspector_id(
+          users(
             id,
             first_name,
             last_name,
@@ -143,6 +143,7 @@ export function InspectionHistoryTab({ roof }: InspectionHistoryTabProps) {
     switch (status) {
       case 'scheduled': return 'secondary';
       case 'in_progress': return 'default';
+      case 'ready_for_review': return 'default';
       case 'completed': return 'default';
       case 'cancelled': return 'destructive';
       default: return 'secondary';

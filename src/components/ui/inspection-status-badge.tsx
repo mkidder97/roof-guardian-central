@@ -6,10 +6,11 @@ import {
   Clock, 
   Eye, 
   CheckCircle,
-  AlertCircle 
+  AlertCircle,
+  X 
 } from 'lucide-react';
 
-export type InspectionStatus = 'scheduled' | 'in_progress' | 'ready_for_review' | 'completed';
+export type InspectionStatus = 'scheduled' | 'in_progress' | 'ready_for_review' | 'completed' | 'cancelled';
 
 interface InspectionStatusBadgeProps {
   status: InspectionStatus;
@@ -42,6 +43,12 @@ const statusConfig = {
     color: 'bg-green-100 text-green-800 border-green-200',
     icon: CheckCircle,
     description: 'Inspection completed and approved'
+  },
+  cancelled: {
+    label: 'Cancelled',
+    color: 'bg-gray-100 text-gray-800 border-gray-200',
+    icon: X,
+    description: 'Inspection has been cancelled'
   }
 };
 
@@ -93,7 +100,8 @@ export function getNextStatus(currentStatus: InspectionStatus): InspectionStatus
     scheduled: 'in_progress',
     in_progress: 'ready_for_review', 
     ready_for_review: 'completed',
-    completed: null
+    completed: null,
+    cancelled: null
   };
   
   return workflow[currentStatus];
@@ -101,10 +109,11 @@ export function getNextStatus(currentStatus: InspectionStatus): InspectionStatus
 
 export function canTransitionTo(from: InspectionStatus, to: InspectionStatus): boolean {
   const allowedTransitions: Record<InspectionStatus, InspectionStatus[]> = {
-    scheduled: ['in_progress'],
-    in_progress: ['ready_for_review', 'scheduled'], // Can go back to scheduled
-    ready_for_review: ['completed', 'in_progress'], // Can go back for more work
-    completed: [] // Final state
+    scheduled: ['in_progress', 'cancelled'],
+    in_progress: ['ready_for_review', 'scheduled', 'cancelled'], // Can go back to scheduled or cancel
+    ready_for_review: ['completed', 'in_progress', 'cancelled'], // Can go back for more work or cancel
+    completed: [], // Final state
+    cancelled: [] // Final state
   };
   
   return allowedTransitions[from].includes(to);

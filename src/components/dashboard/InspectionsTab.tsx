@@ -79,6 +79,7 @@ export function InspectionsTab({ onOpenSchedulingModal, onViewInspection }: Insp
     switch (status) {
       case 'scheduled': return 'secondary';
       case 'in_progress': return 'default';
+      case 'ready_for_review': return 'default';
       case 'completed': return 'default';
       case 'cancelled': return 'destructive';
       default: return 'secondary';
@@ -271,6 +272,7 @@ export function InspectionsTab({ onOpenSchedulingModal, onViewInspection }: Insp
                   <SelectItem value="all">All Statuses</SelectItem>
                   <SelectItem value="scheduled">Scheduled</SelectItem>
                   <SelectItem value="in_progress">In Progress</SelectItem>
+                  <SelectItem value="ready_for_review">Ready for Review</SelectItem>
                   <SelectItem value="completed">Completed</SelectItem>
                   <SelectItem value="cancelled">Cancelled</SelectItem>
                 </SelectContent>
