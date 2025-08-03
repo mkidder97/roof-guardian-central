@@ -2,10 +2,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { uploadRoofFile } from '@/lib/fileStorage';
 import { RealPDFParser, ExtractedPDFData } from './realPdfParser';
 import { PropertyMatcher, PropertyMatch } from './propertyMatcher';
-import type { Database } from '@/integrations/supabase/types';
-
-type InspectionInsert = Database['public']['Tables']['inspections']['Insert'];
-type InspectionReportInsert = Database['public']['Tables']['inspection_reports']['Insert'];
 
 export interface StoredInspectionResult {
   inspectionId: string;
@@ -229,7 +225,7 @@ export class HistoricalInspectionService {
       const inspectionDate = this.parseInspectionDate(extractedData.reportDate);
       
       // 3. Create inspection record
-      const inspectionData: InspectionInsert = {
+      const inspectionData = {
         roof_id: roofId,
         inspection_type: this.normalizeInspectionType(extractedData.reportType, extractedData.inspectionTypeClassification),
         completed_date: inspectionDate,
@@ -252,7 +248,7 @@ export class HistoricalInspectionService {
       const findings = this.generateFindings(extractedData);
       const recommendations = this.generateRecommendations(extractedData);
       
-      const reportData: InspectionReportInsert = {
+      const reportData = {
         inspection_id: inspection.id,
         findings,
         recommendations,

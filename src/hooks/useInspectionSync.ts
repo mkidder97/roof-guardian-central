@@ -84,8 +84,7 @@ export function useInspectionSync(options: UseInspectionSyncOptions = {}) {
             email
           )
         `)
-        .order('scheduled_date', { ascending: false })
-        .is('archived_at', null); // Exclude archived inspections
+        .order('scheduled_date', { ascending: false });
 
       if (stableFilters.roofId) {
         query = query.eq('roof_id', stableFilters.roofId);
@@ -103,7 +102,10 @@ export function useInspectionSync(options: UseInspectionSyncOptions = {}) {
 
       const transformedData = (data || []).map(inspection => ({
         ...inspection,
-        inspection_status: (inspection.status || 'scheduled') as InspectionStatus
+        inspection_status: (inspection.status || 'scheduled') as InspectionStatus,
+        status: inspection.status as InspectionStatus,
+        session_data: {},
+        archived_at: null
       })) as InspectionSyncData[];
 
       // Deep comparison to prevent unnecessary updates

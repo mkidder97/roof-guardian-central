@@ -27,6 +27,8 @@ export interface UnifiedInspection {
   weather_conditions: string | null;
   created_at: string;
   updated_at?: string;
+  session_data?: Record<string, any>;
+  archived_at?: string | null;
 
   // Joined data from related tables
   roofs?: {
@@ -89,7 +91,7 @@ export interface InspectionSyncData {
   scheduled_date: string | null;
   completed_date: string | null;
   inspection_type: string | null;
-  status: string | null;
+  status: InspectionStatus | string | null;
   inspection_status?: InspectionStatus;
   notes: string | null;
   weather_conditions: string | null;
@@ -98,15 +100,20 @@ export interface InspectionSyncData {
   created_at: string;
   updated_at?: string;
   priority?: InspectionPriority;
+  session_data?: Record<string, any>;
+  archived_at?: string | null;
   
   // Joined data
   roofs?: {
     property_name: string;
     address?: string;
+    city?: string;
+    state?: string;
   } | null;
   users?: {
     first_name: string | null;
     last_name: string | null;
+    email?: string;
   } | null;
 }
 
@@ -225,6 +232,8 @@ export function toUnifiedInspection(inspection: InspectionSyncData): UnifiedInsp
     scheduled_date: inspection.scheduled_date,
     completed_date: inspection.completed_date,
     status: (inspection.inspection_status || inspection.status || 'scheduled') as InspectionStatus,
+    session_data: inspection.session_data,
+    archived_at: inspection.archived_at,
     inspection_type: (inspection.inspection_type || 'routine') as InspectionType,
     priority: (inspection.priority || 'medium') as InspectionPriority,
     notes: inspection.notes,
