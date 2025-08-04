@@ -311,7 +311,7 @@ const InspectorInterface = () => {
     }
   }, [toast]);
 
-  // Auto-populate first property with test data
+  // Auto-populate first property with test data (stable ref to prevent infinite loops)
   const populateFirstPropertyWithTestData = useCallback(async () => {
     try {
       // Check if test data has already been populated for this user session
@@ -322,10 +322,19 @@ const InspectorInterface = () => {
         return;
       }
 
+      // Add session-based check to prevent concurrent runs
+      const sessionKey = `${testDataKey}_session_${Date.now()}`;
+      if ((window as any)[sessionKey]) {
+        console.log('✅ Test data population already in progress, skipping');
+        return;
+      }
+      (window as any)[sessionKey] = true;
+
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
         console.log('No authenticated user, skipping test data population');
+        (window as any)[sessionKey] = false;
         return;
       }
 
@@ -354,6 +363,7 @@ const InspectorInterface = () => {
 
       if (propertyError) {
         console.log('No test property found, skipping test data population');
+        (window as any)[sessionKey] = false;
         return;
       }
 
@@ -367,6 +377,7 @@ const InspectorInterface = () => {
 
       if (inspectionError) {
         console.error('Error checking existing inspections:', inspectionError);
+        (window as any)[sessionKey] = false;
         return;
       }
 
@@ -374,6 +385,7 @@ const InspectorInterface = () => {
         console.log('✅ Test inspection already exists for this property and inspector', existingInspections);
         // Mark as populated to prevent future attempts
         localStorage.setItem(testDataKey, 'true');
+        (window as any)[sessionKey] = false;
         return;
       }
 
@@ -389,25 +401,50 @@ const InspectorInterface = () => {
 
       // Mark as populated to prevent future attempts
       localStorage.setItem(testDataKey, 'true');
+      (window as any)[sessionKey] = false;
 
-      // Refresh properties to show the new inspection
-      await loadProperties();
+      // Don't call loadProperties here to prevent infinite loop
+      // The component will re-render and load properties naturally
 
     } catch (error) {
       console.error('Error populating test data:', error);
+      // Clean up session lock on error - testDataKey is defined in this scope
+      // No need to clean up session key here as it's function-scoped
     }
-  }, [loadProperties]);
+  }, []); // Empty deps array to prevent infinite loop
 
   // Load available properties on component mount and populate test data
   useEffect(() => {
+    let mounted = true;
+    
     const initializeInspectorInterface = async () => {
+      if (!mounted) return;
+      
       await loadProperties();
+      
+      if (!mounted) return;
+      
       // Auto-populate first property with test data if authenticated
       await populateFirstPropertyWithTestData();
     };
     
     initializeInspectorInterface();
-  }, [loadProperties, populateFirstPropertyWithTestData]);
+    
+    return () => {
+      mounted = false;
+    };
+  }, []); // Only run once on mount
+
+  // Separate effect to refresh properties after test data population
+  useEffect(() => {
+    const testDataKey = 'inspector_test_data_populated';
+    const hasPopulated = localStorage.getItem(testDataKey);
+    
+    if (hasPopulated && availableProperties.length === 0) {
+      // If test data was populated but no properties are loaded, refresh
+      loadProperties();
+    }
+  }, [availableProperties.length, loadProperties]);
 
   // Handle navigation from dashboard with inspection state
   useEffect(() => {
