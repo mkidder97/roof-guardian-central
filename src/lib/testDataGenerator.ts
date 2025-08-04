@@ -491,22 +491,54 @@ export async function storeTestInspection(testData: TestInspectionData, inspecto
   try {
     console.log('💾 Storing test inspection in database...');
     
-    // Create inspection record
-    const { data: inspection, error: inspectionError } = await supabase
+    // First, check if an inspection already exists for this property and inspector
+    const { data: existingInspections, error: checkError } = await supabase
       .from('inspections')
-      .insert({
-        roof_id: testData.property.id,
-        inspector_id: inspectorId,
-        status: 'in_progress',
-        inspection_type: 'annual',
-        scheduled_date: new Date().toISOString(),
-        weather_conditions: 'Clear',
-        notes: testData.inspectionNotes
-      })
-      .select()
-      .single();
+      .select('id, status')
+      .eq('roof_id', testData.property.id)
+      .eq('inspector_id', inspectorId)
+      .limit(1);
+
+    if (checkError) {
+      console.error('Error checking for existing inspections:', checkError);
+      throw checkError;
+    }
+
+    if (existingInspections && existingInspections.length > 0) {
+      console.log(`✅ Inspection already exists for property ${testData.property.property_name} and inspector ${inspectorId}`);
+      console.log('Existing inspection:', existingInspections[0]);
+      
+      // Return the existing inspection info instead of creating a duplicate
+      return {
+        inspectionId: existingInspections[0].id,
+        propertyId: testData.property.id,
+        propertyName: testData.property.property_name,
+        existing: true
+      };
+    }
+    
+    // Create inspection record only if none exists using the safe creation function
+    const { data: inspectionResult, error: inspectionError } = await supabase
+      .rpc('create_inspection_safely', {
+        p_roof_id: testData.property.id,
+        p_inspector_id: inspectorId,
+        p_status: 'in_progress',
+        p_inspection_type: 'annual',
+        p_scheduled_date: new Date().toISOString(),
+        p_weather_conditions: 'Clear',
+        p_notes: testData.inspectionNotes
+      });
     
     if (inspectionError) throw inspectionError;
+
+    // Get the full inspection record
+    const { data: inspection, error: fetchError } = await supabase
+      .from('inspections')
+      .select('*')
+      .eq('id', inspectionResult)
+      .single();
+    
+    if (fetchError) throw fetchError;
     
     // Create inspection session with complete data
     const sessionData = {

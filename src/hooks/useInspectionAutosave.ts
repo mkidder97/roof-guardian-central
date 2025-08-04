@@ -92,17 +92,66 @@ export function useInspectionAutosave({
             .eq('inspector_id', user.user.id)
             .eq('status', 'active');
 
-          // Create new session
-          const { data: newSession, error } = await supabase
-            .from('inspection_sessions')
-            .insert(sessionData)
-            .select()
-            .single();
+          // Create new session with retry logic for race conditions
+          let retryCount = 0;
+          const maxRetries = 3;
+          
+          while (retryCount < maxRetries) {
+            try {
+              const { data: newSession, error } = await supabase
+                .from('inspection_sessions')
+                .insert(sessionData)
+                .select()
+                .single();
 
-          if (error) throw error;
-          sessionIdRef.current = newSession.id;
-          console.log('✨ Created new session:', newSession.id);
-          return newSession;
+              if (error) throw error;
+              sessionIdRef.current = newSession.id;
+              console.log('✨ Created new session:', newSession.id);
+              return newSession;
+              
+            } catch (insertError: any) {
+              // If unique constraint violation, try to find the existing session
+              if (insertError?.code === '23505') { // unique_violation
+                console.log('Unique violation detected, checking for existing session...');
+                
+                const { data: existingSession } = await supabase
+                  .from('inspection_sessions')
+                  .select('id')
+                  .eq('property_id', propertyId)
+                  .eq('inspector_id', user.user.id)
+                  .eq('status', 'active')
+                  .order('last_updated', { ascending: false })
+                  .limit(1)
+                  .maybeSingle();
+
+                if (existingSession) {
+                  sessionIdRef.current = existingSession.id;
+                  const { data: updatedSession, error: updateError } = await supabase
+                    .from('inspection_sessions')
+                    .update({
+                      session_data: data,
+                      status,
+                      last_updated: new Date().toISOString()
+                    })
+                    .eq('id', existingSession.id)
+                    .select()
+                    .single();
+
+                  if (updateError) throw updateError;
+                  console.log('🔄 Found and updated existing session after race condition:', existingSession.id);
+                  return updatedSession;
+                }
+              }
+              
+              retryCount++;
+              if (retryCount >= maxRetries) {
+                throw insertError;
+              }
+              
+              // Wait a bit before retrying (exponential backoff)
+              await new Promise(resolve => setTimeout(resolve, Math.pow(2, retryCount) * 100));
+            }
+          }
         }
       }
     } catch (error) {

@@ -314,6 +314,14 @@ const InspectorInterface = () => {
   // Auto-populate first property with test data
   const populateFirstPropertyWithTestData = useCallback(async () => {
     try {
+      // Check if test data has already been populated for this user session
+      const testDataKey = 'inspector_test_data_populated';
+      const hasPopulated = localStorage.getItem(testDataKey);
+      if (hasPopulated) {
+        console.log('✅ Test data already populated in this session, skipping');
+        return;
+      }
+
       // Get current user
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) {
@@ -336,17 +344,36 @@ const InspectorInterface = () => {
         inspectorId = userRecord.id;
       }
 
-      // Check if test data already exists for first property
-      const { data: existingSession } = await supabase
-        .from('inspection_sessions')
-        .select('id')
-        .eq('inspector_id', inspectorId)
-        .eq('status', 'active')
+      // Get the first property (3535 Commerce Ctr.) to check for existing inspections
+      const { data: firstProperty, error: propertyError } = await supabase
+        .from('roofs')
+        .select('id, property_name')
+        .eq('property_name', '3535 Commerce Ctr.')
         .limit(1)
         .single();
 
-      if (existingSession) {
-        console.log('✅ Test inspection data already exists');
+      if (propertyError) {
+        console.log('No test property found, skipping test data population');
+        return;
+      }
+
+      // Check for ANY existing inspections for this property and inspector (not just active sessions)
+      const { data: existingInspections, error: inspectionError } = await supabase
+        .from('inspections')
+        .select('id, status')
+        .eq('roof_id', firstProperty.id)
+        .eq('inspector_id', inspectorId)
+        .limit(1);
+
+      if (inspectionError) {
+        console.error('Error checking existing inspections:', inspectionError);
+        return;
+      }
+
+      if (existingInspections && existingInspections.length > 0) {
+        console.log('✅ Test inspection already exists for this property and inspector', existingInspections);
+        // Mark as populated to prevent future attempts
+        localStorage.setItem(testDataKey, 'true');
         return;
       }
 
@@ -359,6 +386,9 @@ const InspectorInterface = () => {
       const result = await storeTestInspection(testData, inspectorId);
       
       console.log(`✅ Test inspection populated for "${result.propertyName}"`);
+
+      // Mark as populated to prevent future attempts
+      localStorage.setItem(testDataKey, 'true');
 
       // Refresh properties to show the new inspection
       await loadProperties();
