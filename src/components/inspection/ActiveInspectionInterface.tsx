@@ -40,8 +40,6 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useInspectionAutosave } from "@/hooks/useInspectionAutosave";
 import { RoofCompositionCapture } from "./RoofCompositionCapture";
-import { InspectionChecklist } from "./InspectionChecklist";
-import { StreamlinedInspectionChecklist } from "./StreamlinedInspectionChecklist";
 import { MinimalInspectionChecklist } from "./MinimalInspectionChecklist";
 import { ExecutiveSummary } from "./ExecutiveSummary";
 import { WorkflowDataExporter } from "./WorkflowDataExporter";
