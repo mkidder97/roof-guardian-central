@@ -55,16 +55,48 @@ export function InspectionReviewInterface({
   useEffect(() => {
     if (inspection) {
       setEditedInspection({ ...inspection });
+      
+      // Load complete inspection data from both session_data and direct database relationships
       const sessionData = inspection.session_data || {};
       
-      // Load deficiencies
-      setDeficiencies(sessionData.deficiencies || []);
+      // Load deficiencies from database relationships or session data
+      const dbDeficiencies = (inspection as any).inspection_deficiencies || [];
+      const sessionDeficiencies = sessionData.deficiencies || [];
+      setDeficiencies(dbDeficiencies.length > 0 ? dbDeficiencies.map((d: any) => ({
+        id: d.id,
+        type: d.deficiency_type,
+        category: d.deficiency_type,
+        location: d.location_description || '',
+        description: d.description || '',
+        severity: d.severity || 'medium',
+        estimatedBudget: d.estimated_cost || 0,
+        budgetAmount: d.estimated_cost || 0,
+        status: 'identified',
+        photos: []
+      })) : sessionDeficiencies);
       
-      // Load capital expenses  
-      setCapitalExpenses(sessionData.capitalExpenses || []);
+      // Load capital expenses from database relationships or session data
+      const dbCapitalExpenses = (inspection as any).inspection_capital_expenses || [];
+      const sessionCapitalExpenses = sessionData.capitalExpenses || [];
+      setCapitalExpenses(dbCapitalExpenses.length > 0 ? dbCapitalExpenses.map((e: any) => ({
+        id: e.id,
+        type: e.expense_type,
+        description: e.description || '',
+        estimatedBudget: e.estimated_cost || 0,
+        timeline: e.recommended_timeline || '',
+        priority: e.priority || 'medium'
+      })) : sessionCapitalExpenses);
       
-      // Load photos
-      setOverviewPhotos(sessionData.overviewPhotos || []);
+      // Load photos from database relationships or session data
+      const dbPhotos = (inspection as any).inspection_photos || [];
+      const sessionPhotos = sessionData.overviewPhotos || [];
+      setOverviewPhotos(dbPhotos.length > 0 ? dbPhotos.map((p: any) => ({
+        id: p.id,
+        url: p.file_url,
+        type: p.photo_type,
+        caption: p.caption || '',
+        timestamp: p.metadata?.timestamp || new Date().toISOString()
+      })) : sessionPhotos);
       
       // Load notes and conditions
       setInspectionNotes(sessionData.inspectionNotes || inspection.notes || '');
@@ -109,18 +141,68 @@ export function InspectionReviewInterface({
         reviewedBy: 'Current User' // Would get from auth context
       };
 
-      const { error } = await supabase
+      // Update main inspection record
+      const { error: inspectionError } = await supabase
         .from('inspections')
         .update({
           status: 'completed',
           notes: inspectionNotes,
           weather_conditions: weatherConditions,
-          session_data: updatedSessionData,
           updated_at: new Date().toISOString()
         })
         .eq('id', editedInspection.id);
 
-      if (error) throw error;
+      if (inspectionError) throw inspectionError;
+
+      // Update or insert deficiencies
+      for (const deficiency of deficiencies) {
+        const deficiencyData = {
+          inspection_id: editedInspection.id,
+          deficiency_type: deficiency.category || deficiency.type,
+          severity: deficiency.severity,
+          description: deficiency.description,
+          location_description: deficiency.location,
+          estimated_cost: deficiency.budgetAmount || deficiency.estimatedBudget
+        };
+
+        if (deficiency.id && !deficiency.id.toString().startsWith('temp-')) {
+          // Update existing deficiency
+          await supabase
+            .from('inspection_deficiencies')
+            .update(deficiencyData)
+            .eq('id', deficiency.id);
+        } else {
+          // Insert new deficiency
+          await supabase
+            .from('inspection_deficiencies')
+            .insert(deficiencyData);
+        }
+      }
+
+      // Update or insert capital expenses
+      for (const expense of capitalExpenses) {
+        const expenseData = {
+          inspection_id: editedInspection.id,
+          expense_type: expense.type,
+          description: expense.description,
+          estimated_cost: expense.estimatedBudget,
+          priority: expense.priority,
+          recommended_timeline: expense.timeline
+        };
+
+        if (expense.id && !expense.id.toString().startsWith('temp-')) {
+          // Update existing expense
+          await supabase
+            .from('inspection_capital_expenses')
+            .update(expenseData)
+            .eq('id', expense.id);
+        } else {
+          // Insert new expense
+          await supabase
+            .from('inspection_capital_expenses')
+            .insert(expenseData);
+        }
+      }
 
       const updatedInspection = {
         ...editedInspection,
@@ -202,7 +284,7 @@ export function InspectionReviewInterface({
 
   const addDeficiency = () => {
     const newDeficiency: Deficiency = {
-      id: Date.now().toString(),
+      id: `temp-${Date.now()}`,
       type: '',
       category: '',
       location: '',
@@ -228,7 +310,7 @@ export function InspectionReviewInterface({
 
   const addCapitalExpense = () => {
     const newExpense: CapitalExpense = {
-      id: Date.now().toString(),
+      id: `temp-${Date.now()}`,
       type: '',
       description: '',
       estimatedBudget: 0,

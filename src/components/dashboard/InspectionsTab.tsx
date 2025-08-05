@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Calendar, MapPin, User, Clock, AlertTriangle, Eye, Play, Pause, CheckCircle, Filter, Search, RefreshCw, X, Archive, Trash2, CheckSquare } from 'lucide-react';
+import { Calendar, MapPin, User, Clock, AlertTriangle, Eye, Play, Pause, CheckCircle, Filter, Search, RefreshCw, X, Archive, Trash2, CheckSquare, DollarSign } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { format } from 'date-fns';
 import { useInspectionSync } from '@/hooks/useInspectionSync';
@@ -571,36 +571,62 @@ export function InspectionsTab({ onOpenSchedulingModal, onViewInspection }: Insp
                         className="mt-1"
                       />
                       <div className="flex-1">
-                        <div className="flex items-center space-x-3 mb-2">
-                          <h3 className="font-semibold text-lg">
-                            {inspection.roofs?.property_name || 'Unknown Property'}
-                          </h3>
-                          <Badge variant={getStatusBadgeVariant(inspection.status)}>
-                            {inspection.status || 'Unknown'}
-                          </Badge>
-                        </div>
+                         <div className="flex items-center space-x-3 mb-2">
+                           <h3 className="font-semibold text-lg">
+                             {inspection.roofs?.property_name || 'Unknown Property'}
+                           </h3>
+                           <Badge variant={getStatusBadgeVariant(inspection.status)}>
+                             {inspection.status || 'Unknown'}
+                           </Badge>
+                           {(inspection as any).deficiency_count > 0 && (
+                             <Badge variant="outline" className="text-xs bg-orange-50 text-orange-700">
+                               {(inspection as any).deficiency_count} deficiencies
+                             </Badge>
+                           )}
+                           {(inspection as any).capital_expense_count > 0 && (
+                             <Badge variant="outline" className="text-xs bg-blue-50 text-blue-700">
+                               {(inspection as any).capital_expense_count} expenses
+                             </Badge>
+                           )}
+                           {(inspection as any).photo_count > 0 && (
+                             <Badge variant="outline" className="text-xs bg-green-50 text-green-700">
+                               {(inspection as any).photo_count} photos
+                             </Badge>
+                           )}
+                         </div>
                       
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm text-gray-600">
-                        <div className="flex items-center space-x-2">
-                          <User className="h-4 w-4" />
-                          <span>Inspector: {getInspectorName(inspection)}</span>
-                        </div>
-                        
-                        <div className="flex items-center space-x-2">
-                          <Clock className="h-4 w-4" />
-                          <span>
-                            Scheduled: {inspection.scheduled_date 
-                              ? format(new Date(inspection.scheduled_date), 'MMM dd, yyyy')
-                              : 'Not scheduled'
-                            }
-                          </span>
-                        </div>
-                        
-                        <div className="flex items-center space-x-2">
-                          <MapPin className="h-4 w-4" />
-                          <span>Type: {inspection.inspection_type || 'Standard'}</span>
-                        </div>
-                      </div>
+                       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-sm text-gray-600">
+                         <div className="flex items-center space-x-2">
+                           <User className="h-4 w-4" />
+                           <span>Inspector: {getInspectorName(inspection)}</span>
+                         </div>
+                         
+                         <div className="flex items-center space-x-2">
+                           <Clock className="h-4 w-4" />
+                           <span>
+                             {inspection.completed_date 
+                               ? `Completed: ${format(new Date(inspection.completed_date), 'MMM dd, yyyy')}`
+                               : inspection.scheduled_date
+                               ? `Scheduled: ${format(new Date(inspection.scheduled_date), 'MMM dd, yyyy')}`
+                               : 'Not scheduled'
+                             }
+                           </span>
+                         </div>
+                         
+                         <div className="flex items-center space-x-2">
+                           <MapPin className="h-4 w-4" />
+                           <span>Type: {inspection.inspection_type || 'Standard'}</span>
+                         </div>
+                         
+                         {(inspection as any).total_estimated_cost > 0 && (
+                           <div className="flex items-center space-x-2">
+                             <DollarSign className="h-4 w-4" />
+                             <span className="font-medium text-green-600">
+                               ${(inspection as any).total_estimated_cost.toLocaleString()}
+                             </span>
+                           </div>
+                         )}
+                       </div>
                       
                       {inspection.notes && (
                         <div className="mt-2 text-sm text-gray-700">
