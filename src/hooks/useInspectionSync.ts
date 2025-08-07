@@ -73,15 +73,40 @@ export function useInspectionSync(options: UseInspectionSyncOptions = {}) {
         .select(`
           *,
           roofs(
+            id,
             property_name,
             address,
             city,
             state
           ),
           users(
+            id,
             first_name,
             last_name,
             email
+          ),
+          inspection_deficiencies(
+            id,
+            deficiency_type,
+            severity,
+            description,
+            location_description,
+            estimated_cost
+          ),
+          inspection_capital_expenses(
+            id,
+            expense_type,
+            description,
+            estimated_cost,
+            priority,
+            recommended_timeline
+          ),
+          inspection_photos(
+            id,
+            photo_type,
+            file_url,
+            caption,
+            metadata
           )
         `)
         .order('scheduled_date', { ascending: false });
@@ -104,8 +129,21 @@ export function useInspectionSync(options: UseInspectionSyncOptions = {}) {
         ...inspection,
         inspection_status: (inspection.status || 'scheduled') as InspectionStatus,
         status: inspection.status as InspectionStatus,
-        session_data: {},
-        archived_at: null
+        session_data: {
+          deficiencies: inspection.inspection_deficiencies || [],
+          capitalExpenses: inspection.inspection_capital_expenses || [],
+          overviewPhotos: inspection.inspection_photos || [],
+          inspectionNotes: inspection.notes || '',
+          weatherConditions: inspection.weather_conditions || ''
+        },
+        archived_at: null,
+        deficiency_count: inspection.inspection_deficiencies?.length || 0,
+        capital_expense_count: inspection.inspection_capital_expenses?.length || 0,
+        photo_count: inspection.inspection_photos?.length || 0,
+        total_estimated_cost: (
+          (inspection.inspection_deficiencies || []).reduce((sum: number, d: any) => sum + (d.estimated_cost || 0), 0) +
+          (inspection.inspection_capital_expenses || []).reduce((sum: number, e: any) => sum + (e.estimated_cost || 0), 0)
+        )
       })) as InspectionSyncData[];
 
       // Deep comparison to prevent unnecessary updates

@@ -138,18 +138,26 @@ serve(async (req) => {
       
       for (const deficiency of session.session_data.deficiencies) {
         try {
-          await supabaseClient
+          const deficiencyData = {
+            inspection_id: inspectionId,
+            deficiency_type: deficiency.category || deficiency.type || 'general',
+            severity: deficiency.severity || 'medium',
+            description: deficiency.description || '',
+            location_description: deficiency.location || '',
+            estimated_cost: parseFloat(deficiency.budgetAmount || deficiency.estimatedCost || 0)
+          };
+          
+          console.log('Inserting deficiency:', deficiencyData);
+          
+          const { error: deficiencyError } = await supabaseClient
             .from('inspection_deficiencies')
-            .insert({
-              inspection_id: inspectionId,
-              deficiency_type: deficiency.category || deficiency.type || 'general',
-              severity: deficiency.severity || 'medium',
-              description: deficiency.description || '',
-              location_description: deficiency.location || '',
-              estimated_cost: deficiency.budgetAmount || deficiency.estimatedCost || 0
-            })
+            .insert(deficiencyData);
+            
+          if (deficiencyError) {
+            console.error('Error saving deficiency:', deficiencyError);
+          }
         } catch (deficiencyError) {
-          console.error('Error saving deficiency:', deficiencyError)
+          console.error('Error processing deficiency:', deficiencyError)
         }
       }
     }
@@ -160,18 +168,26 @@ serve(async (req) => {
       
       for (const expense of session.session_data.capitalExpenses) {
         try {
-          await supabaseClient
+          const expenseData = {
+            inspection_id: inspectionId,
+            expense_type: expense.type || expense.category || 'capital_expense',
+            description: expense.description || '',
+            estimated_cost: parseFloat(expense.estimatedCost || expense.estimatedBudget || 0),
+            priority: expense.priority || 'medium',
+            recommended_timeline: expense.timeline || (expense.year ? expense.year.toString() : null)
+          };
+          
+          console.log('Inserting capital expense:', expenseData);
+          
+          const { error: expenseError } = await supabaseClient
             .from('inspection_capital_expenses')
-            .insert({
-              inspection_id: inspectionId,
-              expense_type: expense.type || 'capital_expense',
-              description: expense.description || '',
-              estimated_cost: expense.estimatedCost || 0,
-              priority: expense.priority || 'medium',
-              recommended_timeline: expense.timeline || (expense.year ? expense.year.toString() : null)
-            })
+            .insert(expenseData);
+            
+          if (expenseError) {
+            console.error('Error saving capital expense:', expenseError);
+          }
         } catch (expenseError) {
-          console.error('Error saving capital expense:', expenseError)
+          console.error('Error processing capital expense:', expenseError)
         }
       }
     }
