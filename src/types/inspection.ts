@@ -7,7 +7,7 @@
 import type { Property } from './property';
 
 // Core inspection status type
-export type InspectionStatus = 'scheduled' | 'in_progress' | 'ready_for_review' | 'completed' | 'cancelled';
+export type InspectionStatus = 'pending' | 'in_progress' | 'ready_for_review' | 'completed' | 'cancelled';
 
 // Inspection type and priority enums
 export type InspectionType = 'routine' | 'emergency' | 'follow-up';
@@ -29,6 +29,8 @@ export interface UnifiedInspection {
   updated_at?: string;
   session_data?: Record<string, any>;
   archived_at?: string | null;
+  ready_to_send?: boolean;
+  proof_check_notes?: string | null;
 
   // Joined data from related tables
   roofs?: {
@@ -61,6 +63,8 @@ export interface Inspection {
   weather_conditions: string | null;
   created_at: string;
   updated_at?: string;
+  ready_to_send?: boolean;
+  proof_check_notes?: string | null;
 
   // Joined data
   roofs?: {
@@ -102,6 +106,8 @@ export interface InspectionSyncData {
   priority?: InspectionPriority;
   session_data?: Record<string, any>;
   archived_at?: string | null;
+  ready_to_send?: boolean;
+  proof_check_notes?: string | null;
   
   // Joined data
   roofs?: {
@@ -221,6 +227,22 @@ export interface ProcessingResult {
     properties: any[];
   };
   error?: string;
+}
+
+// Inspection validation result interface
+export interface ValidationResult {
+  isValid: boolean;
+  errors: string[];
+  warnings?: string[];
+  summary?: string;
+}
+
+// Inspection validation criteria interface
+export interface ValidationCriteria {
+  minimumDeficiencies: number;
+  minimumPhotos: number;
+  requiredDeficiencyFields: string[];
+  requiredInspectionFields: string[];
 }
 
 // Utility type transformation functions

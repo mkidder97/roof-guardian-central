@@ -21,12 +21,15 @@ import {
   Save,
   X,
   Plus,
-  Trash2
+  Trash2,
+  Shield,
+  CheckCircle2
 } from "lucide-react";
 import { format } from "date-fns";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import type { InspectionSyncData } from '@/types/inspection';
+import { useInspectionValidation } from '@/hooks/useInspectionValidation';
 
 interface EditableInspectionDetailModalProps {
   inspection: InspectionSyncData | null;
@@ -47,6 +50,7 @@ export function EditableInspectionDetailModal({
   const [isEditing, setIsEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [editedInspection, setEditedInspection] = useState<InspectionSyncData | null>(null);
+  const { validateInspection, isValidating, lastValidationResult } = useInspectionValidation();
 
   useEffect(() => {
     if (inspection) {
@@ -116,6 +120,22 @@ export function EditableInspectionDetailModal({
     setIsEditing(false);
   };
 
+  const handleValidation = async () => {
+    if (!editedInspection?.id) {
+      toast({
+        title: "Validation Error",
+        description: "No inspection selected for validation",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    await validateInspection(editedInspection.id);
+    
+    // Optionally refresh the inspection data to get updated validation fields
+    // This would require a refetch mechanism from the parent component
+  };
+
   const updateDeficiency = (index: number, field: string, value: any) => {
     const sessionData = editedInspection.session_data || {};
     const deficiencies = [...(sessionData.deficiencies || [])];
@@ -181,10 +201,37 @@ export function EditableInspectionDetailModal({
                     </Button>
                   </>
                 ) : (
-                  <Button onClick={() => setIsEditing(true)}>
-                    <Edit className="h-4 w-4 mr-2" />
-                    Edit Inspection
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button onClick={() => setIsEditing(true)}>
+                      <Edit className="h-4 w-4 mr-2" />
+                      Edit Inspection
+                    </Button>
+                    {editedInspection.status === 'completed' && (
+                      <Button 
+                        onClick={handleValidation} 
+                        disabled={isValidating}
+                        variant={editedInspection.ready_to_send ? "default" : "outline"}
+                        className={editedInspection.ready_to_send ? "bg-green-600 hover:bg-green-700" : ""}
+                      >
+                        {isValidating ? (
+                          <>
+                            <Shield className="h-4 w-4 mr-2 animate-spin" />
+                            Validating...
+                          </>
+                        ) : editedInspection.ready_to_send ? (
+                          <>
+                            <CheckCircle2 className="h-4 w-4 mr-2" />
+                            Validated
+                          </>
+                        ) : (
+                          <>
+                            <Shield className="h-4 w-4 mr-2" />
+                            Validate Now
+                          </>
+                        )}
+                      </Button>
+                    )}
+                  </div>
                 )}
               </div>
             )}
@@ -217,9 +264,32 @@ export function EditableInspectionDetailModal({
                     </SelectContent>
                   </Select>
                 ) : (
-                  <Badge className={getStatusColor(editedInspection.status || 'scheduled')}>
-                    {editedInspection.status?.replace('_', ' ').toUpperCase()}
-                  </Badge>
+                  <div className="flex gap-2">
+                    <Badge className={getStatusColor(editedInspection.status || 'scheduled')}>
+                      {editedInspection.status?.replace('_', ' ').toUpperCase()}
+                    </Badge>
+                    {editedInspection.status === 'completed' && (
+                      <Badge 
+                        className={
+                          editedInspection.ready_to_send 
+                            ? "bg-green-100 text-green-800" 
+                            : "bg-orange-100 text-orange-800"
+                        }
+                      >
+                        {editedInspection.ready_to_send ? (
+                          <>
+                            <CheckCircle2 className="h-3 w-3 mr-1" />
+                            Validated
+                          </>
+                        ) : (
+                          <>
+                            <Shield className="h-3 w-3 mr-1" />
+                            Pending Validation
+                          </>
+                        )}
+                      </Badge>
+                    )}
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -297,6 +367,29 @@ export function EditableInspectionDetailModal({
                   )}
                 </CardContent>
               </Card>
+
+              {/* Validation Status Card */}
+              {editedInspection.status === 'completed' && editedInspection.proof_check_notes && (
+                <Card className="border-orange-200 bg-orange-50">
+                  <CardHeader>
+                    <CardTitle className="flex items-center gap-2 text-orange-800">
+                      <AlertTriangle className="h-4 w-4" />
+                      Validation Issues
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-orange-700">
+                      The following issues were found during validation:
+                    </p>
+                    <div className="mt-2 p-3 bg-white rounded border border-orange-200">
+                      <p className="text-sm font-mono">{editedInspection.proof_check_notes}</p>
+                    </div>
+                    <p className="text-xs text-orange-600 mt-2">
+                      Please address these issues and run validation again.
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
 
               {editedInspection.session_data && (
                 <Card>
