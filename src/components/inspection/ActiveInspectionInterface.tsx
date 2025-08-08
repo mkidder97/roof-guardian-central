@@ -494,6 +494,8 @@ export function ActiveInspectionInterface({
         location: newDeficiency.location,
         description: newDeficiency.description,
         budgetAmount: newDeficiency.budgetAmount,
+        estimatedBudget: newDeficiency.budgetAmount,
+        type: newDeficiency.category || 'general',
         photos: uploadedPhotos.map(photo => ({
           ...photo,
           file: new File([], photo.fileName),

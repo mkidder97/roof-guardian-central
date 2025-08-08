@@ -15,7 +15,7 @@ const mockSupabase = {
       data: { user: { id: 'test-user-id' } }
     })
   },
-  from: vi.fn(() => ({
+  from: vi.fn((table: string) => ({
     insert: vi.fn().mockReturnThis(),
     select: vi.fn().mockReturnThis(),
     single: vi.fn().mockResolvedValue({
@@ -113,7 +113,9 @@ describe('Inspection Scheduling Integration', () => {
       mockSupabase.from.mockImplementation((table: string) => {
         if (table === 'roofs') {
           return {
+            insert: vi.fn().mockReturnThis(),
             select: vi.fn().mockReturnThis(),
+            single: vi.fn().mockResolvedValue({ data: null, error: null }),
             eq: vi.fn().mockReturnThis(),
             neq: vi.fn().mockReturnThis(),
             order: vi.fn().mockResolvedValue({
@@ -138,13 +140,22 @@ describe('Inspection Scheduling Integration', () => {
             select: vi.fn().mockResolvedValue({
               data: [{ id: 'inspection-1', roof_id: 'property-1' }],
               error: null
-            })
+            }),
+            single: vi.fn().mockResolvedValue({
+              data: { id: 'inspection-1', roof_id: 'property-1' },
+              error: null
+            }),
+            eq: vi.fn().mockReturnThis(),
+            order: vi.fn().mockReturnThis()
           };
         }
         
         return {
+          insert: vi.fn().mockReturnThis(),
           select: vi.fn().mockReturnThis(),
-          eq: vi.fn().mockReturnThis()
+          single: vi.fn().mockResolvedValue({ data: null, error: null }),
+          eq: vi.fn().mockReturnThis(),
+          order: vi.fn().mockReturnThis()
         };
       });
 
@@ -180,10 +191,18 @@ describe('Inspection Scheduling Integration', () => {
           return {
             insert: mockInsert,
             select: mockSelect,
-            single: mockSingle
+            single: mockSingle,
+            eq: vi.fn().mockReturnThis(),
+            order: vi.fn().mockReturnThis()
           };
         }
-        return { select: vi.fn().mockReturnThis() };
+        return { 
+          insert: vi.fn().mockReturnThis(),
+          select: vi.fn().mockReturnThis(),
+          single: vi.fn().mockResolvedValue({ data: null, error: null }),
+          eq: vi.fn().mockReturnThis(),
+          order: vi.fn().mockReturnThis(),
+        };
       });
 
       renderWithProviders(
@@ -231,10 +250,22 @@ describe('Inspection Scheduling Integration', () => {
             select: vi.fn().mockResolvedValue({
               data: null,
               error: { message: 'Database error' }
-            })
+            }),
+            single: vi.fn().mockResolvedValue({
+              data: null,
+              error: { message: 'Database error' }
+            }),
+            eq: vi.fn().mockReturnThis(),
+            order: vi.fn().mockReturnThis()
           };
         }
-        return { select: vi.fn().mockReturnThis() };
+        return { 
+          insert: vi.fn().mockReturnThis(),
+          select: vi.fn().mockReturnThis(),
+          single: vi.fn().mockResolvedValue({ data: null, error: null }),
+          eq: vi.fn().mockReturnThis(),
+          order: vi.fn().mockReturnThis()
+        };
       });
 
       renderWithProviders(
