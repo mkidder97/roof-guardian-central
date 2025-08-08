@@ -7,7 +7,7 @@
 import type { Property } from './property';
 
 // Core inspection status type
-export type InspectionStatus = 'pending' | 'in_progress' | 'ready_for_review' | 'completed' | 'cancelled';
+export type InspectionStatus = 'pending' | 'scheduled' | 'in_progress' | 'ready_for_review' | 'completed' | 'cancelled';
 
 // Inspection type and priority enums
 export type InspectionType = 'routine' | 'emergency' | 'follow-up';

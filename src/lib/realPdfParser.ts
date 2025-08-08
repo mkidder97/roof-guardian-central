@@ -699,7 +699,7 @@ function classifyInspectionType(text: string, reportType: string): {
   // Final adjustments based on urgency keywords in text
   if (lowerText.includes('immediate') || lowerText.includes('emergency') || lowerText.includes('critical')) {
     if (urgency !== 'high' && urgency !== 'critical') {
-      urgency = 'high';
+      urgency = 'high' as 'low' | 'medium' | 'high' | 'critical';
     }
     if (type === 'unknown') {
       type = 'storm'; // Emergency situations are usually storm-related

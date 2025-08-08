@@ -83,7 +83,7 @@ class N8nWorkflowTriggers {
    */
   async triggerDeficiencyAlerts(payload: DeficiencyAlertPayload): Promise<{
     success: boolean;
-    data?: any;
+    data: any;
     error?: string;
   }> {
     try {
@@ -91,11 +91,12 @@ class N8nWorkflowTriggers {
         body: { workflow: 'deficiency-alerts', payload }
       });
       if (error) throw error;
-      return { success: true, data };
+      return { success: true, data: data || {} };
     } catch (error) {
       console.error('Failed to trigger deficiency alerts:', error);
       return {
         success: false,
+        data: {},
         error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
@@ -107,7 +108,7 @@ class N8nWorkflowTriggers {
    */
   async triggerInspectionReview(payload: InspectionReviewPayload): Promise<{
     success: boolean;
-    data?: any;
+    data: any;
     error?: string;
   }> {
     try {
@@ -115,11 +116,12 @@ class N8nWorkflowTriggers {
         body: { workflow: 'inspection-review', payload }
       });
       if (error) throw error;
-      return { success: true, data };
+      return { success: true, data: data || {} };
     } catch (error) {
       console.error('Failed to trigger AI inspection review:', error);
       return {
         success: false,
+        data: {},
         error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
@@ -130,12 +132,12 @@ class N8nWorkflowTriggers {
    * Handles both deficiency alerts and AI review
    */
   async triggerInspectionWorkflows(inspectionData: any): Promise<{
-    deficiencyAlerts: { success: boolean; data?: any; error?: string };
-    aiReview: { success: boolean; data?: any; error?: string };
+    deficiencyAlerts: { success: boolean; data: any; error?: string };
+    aiReview: { success: boolean; data: any; error?: string };
   }> {
     const results = {
-      deficiencyAlerts: { success: true, data: null },
-      aiReview: { success: true, data: null }
+      deficiencyAlerts: { success: true, data: {} },
+      aiReview: { success: true, data: {} }
     };
 
     // Trigger deficiency alerts if deficiencies exist
@@ -267,28 +269,28 @@ class N8nWorkflowTriggers {
 
     // Test deficiency alerts workflow
     try {
-      const response = await supabase.functions.invoke('trigger-workflow', {
+      const { data, error } = await supabase.functions.invoke('trigger-workflow', {
         body: { workflow: 'deficiency-alerts', payload: {
           inspection_id: 'connectivity-test',
           property_name: 'Test Property',
           deficiencies: []
         } }
       });
-      results.deficiencyAlerts = response.status < 500;
+      results.deficiencyAlerts = !error;
     } catch (error) {
       console.warn('Deficiency alerts workflow not accessible:', error);
     }
 
     // Test AI review workflow
     try {
-      const response = await supabase.functions.invoke('trigger-workflow', {
+      const { data, error } = await supabase.functions.invoke('trigger-workflow', {
         body: { workflow: 'inspection-review', payload: {
           inspection_id: 'connectivity-test',
           property_name: 'Test Property',
           status: 'completed'
         } }
       });
-      results.aiReview = response.status < 500;
+      results.aiReview = !error;
     } catch (error) {
       console.warn('AI review workflow not accessible:', error);
     }

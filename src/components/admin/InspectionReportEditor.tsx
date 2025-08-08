@@ -136,11 +136,15 @@ export function InspectionReportEditor({
       }
 
       // Parse the stored report data
+      const inspection = reportData.inspections as any;
+      const roof = inspection.roofs as any;
+      const user = inspection.users as any;
+      
       const parsedReport: EnhancedReport = {
         inspectionId: reportData.inspection_id,
-        propertyName: reportData.inspections.roofs.property_name,
-        propertyAddress: `${reportData.inspections.roofs.address}, ${reportData.inspections.roofs.city}, ${reportData.inspections.roofs.state}`,
-        inspectorName: `${reportData.inspections.users.first_name} ${reportData.inspections.users.last_name}`,
+        propertyName: roof.property_name,
+        propertyAddress: `${roof.address}, ${roof.city}, ${roof.state}`,
+        inspectorName: `${user.first_name} ${user.last_name}`,
         qualityScore: 0, // Will be calculated
         qualityGrade: reportData.priority_level || 'Fair',
         qualityStatus: reportData.status || 'needs_review',
@@ -198,11 +202,14 @@ export function InspectionReportEditor({
 
       if (inspectionError) throw inspectionError;
 
+      const roof = inspectionData.roofs as any;
+      const user = inspectionData.users as any;
+      
       const basicReport: EnhancedReport = {
         inspectionId: inspectionData.id,
-        propertyName: inspectionData.roofs.property_name,
-        propertyAddress: `${inspectionData.roofs.address}, ${inspectionData.roofs.city}, ${inspectionData.roofs.state}`,
-        inspectorName: `${inspectionData.users.first_name} ${inspectionData.users.last_name}`,
+        propertyName: roof.property_name,
+        propertyAddress: `${roof.address}, ${roof.city}, ${roof.state}`,
+        inspectorName: `${user.first_name} ${user.last_name}`,
         qualityScore: 0,
         qualityGrade: 'Pending Review',
         qualityStatus: 'needs_review',

@@ -1123,9 +1123,11 @@ export function InspectionSchedulingModal({ open, onOpenChange, directMode = fal
               const createdInspection = {
                 ...inspection,
                 scheduled_date: originalInsert.scheduled_date,
+                completed_date: originalInsert.completed_date,
                 status: originalInsert.status as InspectionStatus,
                 inspection_type: originalInsert.inspection_type as InspectionType,
                 notes: originalInsert.notes,
+                weather_conditions: originalInsert.weather_conditions,
                 roofs: {
                   property_name: property.property_name,
                   address: property.address,

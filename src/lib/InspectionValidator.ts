@@ -164,7 +164,14 @@ export class InspectionValidator {
       return null;
     }
 
-    return data as UnifiedInspection;
+    // Cast the joined data properly since Supabase types think they're arrays
+    const typedData = {
+      ...data,
+      roofs: (data as any).roofs as { id: string; property_name: string; address: string; city: string; state: string; },
+      users: (data as any).users as { id: string; first_name: string; last_name: string; email: string; }
+    };
+    
+    return typedData as UnifiedInspection;
   }
 
   /**

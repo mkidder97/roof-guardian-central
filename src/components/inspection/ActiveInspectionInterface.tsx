@@ -42,6 +42,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useInspectionAutosave } from "@/hooks/useInspectionAutosave";
+import { Deficiency } from "@/types/deficiency";
 import { ImmediateRepairModal } from "./ImmediateRepairModal";
 import { RoofCompositionCapture } from "./RoofCompositionCapture";
 import { MinimalInspectionChecklist } from "./MinimalInspectionChecklist";
@@ -59,21 +60,6 @@ interface Photo {
   timestamp: Date;
 }
 
-interface Deficiency {
-  id: string;
-  category: string;
-  location: string;
-  description: string;
-  budgetAmount: number;
-  photos: Photo[];
-  severity: 'low' | 'medium' | 'high';
-  status: 'identified' | 'documented' | 'resolved';
-  // Critical issue management fields
-  isImmediateRepair?: boolean;
-  needsSupervisorAlert?: boolean;
-  criticalityScore?: number;
-  detectionTimestamp?: string;
-}
 
 interface CapitalExpense {
   id: string;

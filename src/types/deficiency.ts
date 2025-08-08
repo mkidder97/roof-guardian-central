@@ -11,7 +11,7 @@ export interface Deficiency {
   severity: 'low' | 'medium' | 'high';
   estimatedBudget: number;
   budgetAmount: number;
-  status: 'identified' | 'in_progress' | 'resolved';
+  status: 'identified' | 'in_progress' | 'resolved' | 'documented';
   photos: Photo[];
   // Critical issue management fields
   isImmediateRepair?: boolean;
