@@ -525,6 +525,55 @@ const InspectorInterface = () => {
         await dataSync.syncBuildingHistory(inspectionData.propertyId);
       }
       
+      // Trigger n8n workflows for deficiency alerts and AI review
+      try {
+        const { n8nWorkflowTriggers } = await import('@/lib/n8nWorkflowTriggers');
+        
+        // Format the inspection data for n8n
+        const workflowData = {
+          id: inspectionData.inspectionId,
+          property_name: inspectionData.propertyName,
+          property_address: inspectionData.propertyAddress,
+          status: 'completed',
+          deficiencies: inspectionData.deficiencies || [],
+          executiveSummary: inspectionData.executiveSummary,
+          capitalExpenses: inspectionData.capitalExpenses,
+          overviewPhotos: inspectionData.overviewPhotos || [],
+          notes: inspectionData.notes,
+          weather_conditions: inspectionData.weatherConditions,
+          roofs: {
+            property_name: inspectionData.propertyName,
+            address: inspectionData.propertyAddress
+          },
+          users: {
+            first_name: user?.first_name || '',
+            last_name: user?.last_name || '',
+            email: user?.email || ''
+          }
+        };
+        
+        const workflowResults = await n8nWorkflowTriggers.triggerInspectionWorkflows(workflowData);
+        
+        console.log('n8n workflow results:', workflowResults);
+        
+        if (workflowResults.deficiencyAlerts.success && inspectionData.deficiencies?.length > 0) {
+          toast({
+            title: "Deficiency Alerts Sent",
+            description: "Critical deficiencies have been reported via email",
+          });
+        }
+        
+        if (workflowResults.aiReview.success) {
+          toast({
+            title: "AI Review Initiated",
+            description: "Inspection is being processed for quality review",
+          });
+        }
+      } catch (workflowError) {
+        console.error('Failed to trigger n8n workflows:', workflowError);
+        // Don't fail the inspection completion if workflows fail
+      }
+      
       // Clear local state
       setActiveInspection(null);
       setSelectedProperty(null);
