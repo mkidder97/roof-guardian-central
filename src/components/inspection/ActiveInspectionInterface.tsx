@@ -93,6 +93,7 @@ interface ActiveInspectionProps {
 }
 
 const DEFICIENCY_CATEGORIES = [
+  'Immediate Repair',
   'Perimeter Flashing',
   'Curb Flashing', 
   'Penetration',
@@ -513,6 +514,51 @@ export function ActiveInspectionInterface({
       };
 
       setDeficiencies(prev => [...prev, deficiency]);
+
+      // If "Immediate Repair" category is selected, automatically send email notification
+      if (newDeficiency.category === 'Immediate Repair') {
+        try {
+          // Call edge function to send immediate repair email
+          const { data: emailData, error: emailError } = await supabase.functions.invoke('send-immediate-repair-email', {
+            body: {
+              propertyId,
+              propertyName,
+              deficiency: {
+                location: deficiency.location,
+                description: deficiency.description,
+                budgetAmount: deficiency.budgetAmount,
+                severity: deficiency.severity,
+                photos: uploadedPhotos
+              },
+              inspectorEmail: (await supabase.auth.getUser()).data.user?.email,
+              timestamp: new Date().toISOString()
+            }
+          });
+
+          if (emailError) {
+            console.error('Error sending immediate repair email:', emailError);
+            toast({
+              title: "Email Warning",
+              description: "Immediate repair created but email notification failed",
+              variant: "destructive"
+            });
+          } else {
+            toast({
+              title: "🚨 Immediate Repair Email Sent",
+              description: "Emergency repair team has been notified automatically",
+              variant: "default"
+            });
+          }
+        } catch (emailError) {
+          console.error('Error with immediate repair email:', emailError);
+          toast({
+            title: "Email Warning", 
+            description: "Repair team notification may have failed",
+            variant: "destructive"
+          });
+        }
+      }
+
       setNewDeficiency({
         category: '',
         location: '',
@@ -524,8 +570,10 @@ export function ActiveInspectionInterface({
       setShowDeficiencyModal(false);
 
       toast({
-        title: "Deficiency Created",
-        description: `${uploadedPhotos.length > 0 ? `Created with ${uploadedPhotos.length} photo${uploadedPhotos.length > 1 ? 's' : ''}` : 'Created successfully'}`,
+        title: newDeficiency.category === 'Immediate Repair' ? "🚨 Immediate Repair Created" : "Deficiency Created",
+        description: newDeficiency.category === 'Immediate Repair' 
+          ? "Emergency repair request submitted and team notified"
+          : `${uploadedPhotos.length > 0 ? `Created with ${uploadedPhotos.length} photo${uploadedPhotos.length > 1 ? 's' : ''}` : 'Created successfully'}`,
       });
     } catch (error) {
       console.error('Error creating deficiency:', error);
@@ -1908,15 +1956,30 @@ export function ActiveInspectionInterface({
                 <Select value={newDeficiency.category} onValueChange={(value) => 
                   setNewDeficiency(prev => ({ ...prev, category: value }))
                 }>
-                  <SelectTrigger>
+                  <SelectTrigger className={newDeficiency.category === 'Immediate Repair' ? 'border-red-500 bg-red-50' : ''}>
                     <SelectValue placeholder="Select category" />
                   </SelectTrigger>
                   <SelectContent>
                     {DEFICIENCY_CATEGORIES.map(category => (
-                      <SelectItem key={category} value={category}>{category}</SelectItem>
+                      <SelectItem key={category} value={category}>
+                        {category === 'Immediate Repair' ? '🚨 Immediate Repair' : category}
+                      </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
+                {newDeficiency.category === 'Immediate Repair' && (
+                  <div className="mt-2 p-3 bg-red-50 border border-red-200 rounded-lg">
+                    <div className="flex items-start gap-2">
+                      <AlertTriangle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+                      <div className="text-sm">
+                        <p className="font-semibold text-red-800">⚡ Auto-Email Alert</p>
+                        <p className="text-red-700">
+                          Selecting this category will automatically send an emergency email to the repair team when saved.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
               
               <div>
