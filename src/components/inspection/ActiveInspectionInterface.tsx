@@ -201,6 +201,11 @@ export function ActiveInspectionInterface({
   const [showImmediateRepairModal, setShowImmediateRepairModal] = useState(false);
   const [selectedDeficiencyForRepair, setSelectedDeficiencyForRepair] = useState<Deficiency | null>(null);
   const [criticalAnalysisForRepair, setCriticalAnalysisForRepair] = useState<CriticalityAnalysis | null>(null);
+  
+  // Last year's maintenance state
+  const [showLastYearMaintenanceModal, setShowLastYearMaintenanceModal] = useState(false);
+  const [lastYearDeficiencies, setLastYearDeficiencies] = useState<any[]>([]);
+  const [isLoadingLastYear, setIsLoadingLastYear] = useState(false);
 
   // New deficiency form
   const [newDeficiency, setNewDeficiency] = useState({
@@ -772,6 +777,59 @@ export function ActiveInspectionInterface({
     setCriticalAreas(sampleCriticalAreas);
   };
 
+  // Fetch last year's maintenance deficiencies
+  const fetchLastYearDeficiencies = async () => {
+    if (!propertyId) return;
+    
+    setIsLoadingLastYear(true);
+    try {
+      const lastYear = new Date().getFullYear() - 1;
+      const startDate = `${lastYear}-01-01`;
+      const endDate = `${lastYear}-12-31`;
+      
+      // Query inspections for this property from last year
+      const { data: inspections, error: inspectionsError } = await supabase
+        .from('inspections')
+        .select('id, inspection_date, inspector_id')
+        .eq('roof_id', propertyId)
+        .gte('inspection_date', startDate)
+        .lte('inspection_date', endDate)
+        .order('inspection_date', { ascending: false });
+
+      if (inspectionsError) throw inspectionsError;
+
+      if (!inspections?.length) {
+        setLastYearDeficiencies([]);
+        return;
+      }
+
+      // Get deficiencies from last year's inspections
+      const inspectionIds = inspections.map(i => i.id);
+      const { data: deficiencies, error: deficienciesError } = await supabase
+        .from('inspection_deficiencies')
+        .select(`
+          *,
+          inspection:inspections(inspection_date, inspector_id)
+        `)
+        .in('inspection_id', inspectionIds)
+        .order('created_at', { ascending: false });
+
+      if (deficienciesError) throw deficienciesError;
+
+      setLastYearDeficiencies(deficiencies || []);
+      
+    } catch (error) {
+      console.error('Error fetching last year deficiencies:', error);
+      toast({
+        title: "Error Loading Data",
+        description: "Could not load last year's maintenance items",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoadingLastYear(false);
+    }
+  };
+
   const handleCompleteInspection = async () => {
     if (deficiencies.length === 0 && overviewPhotos.length === 0) {
       toast({
@@ -1296,14 +1354,28 @@ export function ActiveInspectionInterface({
                     <section>
                       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 mb-4">
                         <h3 className="text-lg font-semibold">Roof Deficiencies</h3>
-                        <Button 
-                          onClick={() => setShowDeficiencyModal(true)}
-                          className="w-full sm:w-auto"
-                          size={isTablet ? "lg" : "default"}
-                        >
-                          <Plus className={`${isTablet ? 'h-5 w-5' : 'h-4 w-4'} mr-2`} />
-                          Add New Deficiency
-                        </Button>
+                        <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                          <Button 
+                            onClick={() => {
+                              fetchLastYearDeficiencies();
+                              setShowLastYearMaintenanceModal(true);
+                            }}
+                            variant="outline"
+                            className="w-full sm:w-auto"
+                            size={isTablet ? "lg" : "default"}
+                          >
+                            <History className={`${isTablet ? 'h-5 w-5' : 'h-4 w-4'} mr-2`} />
+                            Last Year's Maintenance
+                          </Button>
+                          <Button 
+                            onClick={() => setShowDeficiencyModal(true)}
+                            className="w-full sm:w-auto"
+                            size={isTablet ? "lg" : "default"}
+                          >
+                            <Plus className={`${isTablet ? 'h-5 w-5' : 'h-4 w-4'} mr-2`} />
+                            Add New Deficiency
+                          </Button>
+                        </div>
                       </div>
 
                       {deficiencies.length === 0 ? (
@@ -2185,6 +2257,140 @@ export function ActiveInspectionInterface({
         criticalityAnalysis={criticalAnalysisForRepair || undefined}
         onRepairCreated={handleImmediateRepairCreated}
       />
+
+      {/* Last Year's Maintenance Modal */}
+      <Dialog open={showLastYearMaintenanceModal} onOpenChange={setShowLastYearMaintenanceModal}>
+        <DialogContent className="max-w-4xl max-h-[95vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <History className="h-6 w-6 text-blue-600" />
+              Last Year's Maintenance - {propertyName}
+            </DialogTitle>
+          </DialogHeader>
+          
+          <div className="space-y-4">
+            <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <h3 className="font-semibold text-blue-800 mb-2">📋 Previous Year Review</h3>
+              <p className="text-blue-700 text-sm">
+                Review deficiencies identified in {new Date().getFullYear() - 1} to verify completion status during this inspection.
+              </p>
+            </div>
+
+            {isLoadingLastYear ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="text-center">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-2"></div>
+                  <p className="text-sm text-muted-foreground">Loading last year's maintenance items...</p>
+                </div>
+              </div>
+            ) : lastYearDeficiencies.length === 0 ? (
+              <Card>
+                <CardContent className="p-6 text-center">
+                  <CheckCircle className="h-12 w-12 text-green-500 mx-auto mb-3" />
+                  <h3 className="font-semibold mb-2">No Previous Deficiencies Found</h3>
+                  <p className="text-muted-foreground">
+                    No maintenance items were identified in {new Date().getFullYear() - 1} inspections, 
+                    or no inspections were performed for this property last year.
+                  </p>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-3 max-h-96 overflow-y-auto">
+                <div className="text-sm text-muted-foreground mb-3">
+                  Found {lastYearDeficiencies.length} deficienc{lastYearDeficiencies.length === 1 ? 'y' : 'ies'} from {new Date().getFullYear() - 1}
+                </div>
+                {lastYearDeficiencies.map((deficiency, index) => (
+                  <Card key={deficiency.id} className="border-l-4 border-l-yellow-500 bg-yellow-50/30">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-2 flex-wrap">
+                            <Badge className={
+                              deficiency.severity === 'high' ? 'bg-red-100 text-red-800' :
+                              deficiency.severity === 'medium' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-green-100 text-green-800'
+                            }>
+                              {deficiency.severity?.toUpperCase() || 'MEDIUM'}
+                            </Badge>
+                            <Badge variant="outline">{deficiency.deficiency_type}</Badge>
+                            {deficiency.inspection?.inspection_date && (
+                              <Badge variant="secondary" className="text-xs">
+                                <Clock className="h-3 w-3 mr-1" />
+                                {new Date(deficiency.inspection.inspection_date).toLocaleDateString()}
+                              </Badge>
+                            )}
+                          </div>
+                          
+                          <h4 className="font-semibold text-gray-900">
+                            {deficiency.location_description || deficiency.deficiency_type}
+                          </h4>
+                          {deficiency.description && (
+                            <p className="text-gray-600 mt-1 text-sm">{deficiency.description}</p>
+                          )}
+                          {deficiency.estimated_cost && deficiency.estimated_cost > 0 && (
+                            <p className="text-sm text-green-600 mt-1 font-medium">
+                              Estimated Cost: ${deficiency.estimated_cost.toLocaleString()}
+                            </p>
+                          )}
+                        </div>
+                        
+                        <div className="flex flex-col gap-2 ml-4">
+                          <Badge variant="outline" className="text-xs">
+                            #{index + 1}
+                          </Badge>
+                        </div>
+                      </div>
+                      
+                      {/* Status check boxes for inspector */}
+                      <div className="mt-3 pt-3 border-t border-gray-200">
+                        <p className="text-xs font-medium text-gray-700 mb-2">Field Verification:</p>
+                        <div className="flex gap-4 text-xs">
+                          <label className="flex items-center gap-1 cursor-pointer">
+                            <input type="checkbox" className="rounded text-green-600" />
+                            <span className="text-green-700">✓ Completed</span>
+                          </label>
+                          <label className="flex items-center gap-1 cursor-pointer">
+                            <input type="checkbox" className="rounded text-red-600" />
+                            <span className="text-red-700">✗ Still Needs Work</span>
+                          </label>
+                          <label className="flex items-center gap-1 cursor-pointer">
+                            <input type="checkbox" className="rounded text-blue-600" />
+                            <span className="text-blue-700">◐ Partially Complete</span>
+                          </label>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <DialogFooter className="mt-6">
+            <Button
+              variant="outline"
+              onClick={() => setShowLastYearMaintenanceModal(false)}
+            >
+              Close
+            </Button>
+            {lastYearDeficiencies.length > 0 && (
+              <Button
+                onClick={() => {
+                  setShowLastYearMaintenanceModal(false);
+                  toast({
+                    title: "Review Complete",
+                    description: "Continue with current inspection based on your field verification",
+                  });
+                }}
+                className="bg-green-600 hover:bg-green-700 text-white"
+              >
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Continue Inspection
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* Floating Camera Button - Only show during active inspection */}
       {inspectionStarted && (

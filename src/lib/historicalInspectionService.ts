@@ -247,15 +247,19 @@ export class HistoricalInspectionService {
       // 4. Create inspection report with extracted findings
       const findings = this.generateFindings(extractedData);
       const recommendations = this.generateRecommendations(extractedData);
+      const executiveSummary = this.extractExecutiveSummary(extractedData);
+      
+      const totalEstimatedCost = extractedData.estimatedRepairCost || extractedData.issues.reduce((sum, issue) => sum + (issue.estimatedCost || 0), 0) || 0;
       
       const reportData = {
         inspection_id: inspection.id,
         findings,
         recommendations,
-        estimated_cost: 0, // Will be updated if cost estimates are found in PDF
+        estimated_cost: totalEstimatedCost,
         priority_level: this.determinePriorityLevel(extractedData),
         status: 'completed',
-        report_url: fileUploadResult.data.file_url
+        report_url: fileUploadResult.data.file_url,
+        executive_summary: executiveSummary
       };
 
       const { data: report, error: reportError } = await supabase
@@ -267,8 +271,16 @@ export class HistoricalInspectionService {
       if (reportError || !report) {
         throw new Error(`Failed to create inspection report: ${reportError?.message}`);
       }
+
+      // 5. Store extracted deficiencies as individual records
+      await this.storeExtractedDeficiencies(inspection.id, extractedData.issues);
+
+      // 6. Store executive summary and capital expenses if needed
+      if (extractedData.priorityActions && extractedData.priorityActions.length > 0) {
+        await this.storeCapitalExpenses(inspection.id, extractedData);
+      }
       
-      // 5. Update roof information with extracted data
+      // 7. Update roof information with extracted data
       await this.updateRoofInformation(roofId, extractedData, inspectionDate);
       
       console.log('Successfully stored historical inspection:', inspection.id);
@@ -545,6 +557,205 @@ export class HistoricalInspectionService {
     return findings.join('\n');
   }
   
+  /**
+   * Extract executive summary from PDF data
+   */
+  private static extractExecutiveSummary(extractedData: ExtractedPDFData): string {
+    const summary: string[] = [];
+    
+    // Start with overall condition and key findings
+    summary.push(`EXECUTIVE SUMMARY`);
+    summary.push(`Overall Roof Condition: ${extractedData.overallCondition.toUpperCase()}`);
+    
+    if (extractedData.roofArea > 0) {
+      summary.push(`Roof Area: ${extractedData.roofArea.toLocaleString()} square feet`);
+    }
+    
+    if (extractedData.roofType) {
+      summary.push(`Roof System: ${extractedData.roofType}`);
+    }
+    
+    // Summary of deficiencies
+    if (extractedData.issues && extractedData.issues.length > 0) {
+      summary.push('');
+      summary.push('KEY FINDINGS:');
+      
+      const criticalIssues = extractedData.issues.filter(i => i.severity === 'critical').length;
+      const highIssues = extractedData.issues.filter(i => i.severity === 'high').length;
+      const mediumIssues = extractedData.issues.filter(i => i.severity === 'medium').length;
+      const lowIssues = extractedData.issues.filter(i => i.severity === 'low').length;
+      
+      summary.push(`Total Issues Identified: ${extractedData.issues.length}`);
+      if (criticalIssues > 0) summary.push(`• Critical Issues: ${criticalIssues}`);
+      if (highIssues > 0) summary.push(`• High Priority Issues: ${highIssues}`);
+      if (mediumIssues > 0) summary.push(`• Medium Priority Issues: ${mediumIssues}`);
+      if (lowIssues > 0) summary.push(`• Low Priority Issues: ${lowIssues}`);
+      
+      // List most critical issues
+      const topIssues = extractedData.issues
+        .filter(i => i.severity === 'critical' || i.severity === 'high')
+        .slice(0, 5);
+      
+      if (topIssues.length > 0) {
+        summary.push('');
+        summary.push('PRIORITY ISSUES:');
+        topIssues.forEach((issue, index) => {
+          summary.push(`${index + 1}. ${issue.location}: ${issue.description} (${issue.severity.toUpperCase()})`);
+        });
+      }
+    }
+    
+    // Cost estimates
+    if (extractedData.estimatedRepairCost > 0) {
+      summary.push('');
+      summary.push(`ESTIMATED REPAIR COST: $${extractedData.estimatedRepairCost.toLocaleString()}`);
+    }
+    
+    // Recommended timeframe
+    if (extractedData.recommendedTimeframe) {
+      summary.push(`RECOMMENDED ACTION TIMEFRAME: ${extractedData.recommendedTimeframe}`);
+    }
+    
+    // Priority actions
+    if (extractedData.priorityActions && extractedData.priorityActions.length > 0) {
+      summary.push('');
+      summary.push('IMMEDIATE ACTIONS REQUIRED:');
+      extractedData.priorityActions.forEach((action, index) => {
+        summary.push(`${index + 1}. ${action}`);
+      });
+    }
+    
+    // Inspection classification information
+    if (extractedData.inspectionTypeClassification && extractedData.inspectionTypeClassification.primaryType !== 'unknown') {
+      summary.push('');
+      summary.push(`INSPECTION TYPE: ${extractedData.inspectionTypeClassification.primaryType.toUpperCase().replace('_', ' ')} (${Math.round(extractedData.inspectionTypeClassification.confidence * 100)}% confidence)`);
+    }
+    
+    return summary.join('\n');
+  }
+
+  /**
+   * Store extracted deficiencies as individual database records
+   */
+  private static async storeExtractedDeficiencies(inspectionId: string, issues: ExtractedPDFData['issues']): Promise<void> {
+    if (!issues || issues.length === 0) {
+      console.log('No deficiencies to store from PDF');
+      return;
+    }
+
+    try {
+      const deficiencies = issues.map(issue => ({
+        inspection_id: inspectionId,
+        deficiency_type: this.normalizeDeficiencyType(issue.type),
+        severity: issue.severity,
+        description: issue.description,
+        location_description: issue.location,
+        estimated_cost: issue.estimatedCost || 0,
+        priority_level: issue.severity,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      }));
+
+      const { error } = await supabase
+        .from('inspection_deficiencies')
+        .insert(deficiencies);
+
+      if (error) {
+        console.error('Error storing deficiencies:', error);
+        throw error;
+      }
+
+      console.log(`Successfully stored ${deficiencies.length} deficiencies from PDF`);
+    } catch (error) {
+      console.error('Error storing extracted deficiencies:', error);
+      // Don't throw - this is not critical enough to fail the entire import
+    }
+  }
+
+  /**
+   * Store capital expenses based on extracted data
+   */
+  private static async storeCapitalExpenses(inspectionId: string, extractedData: ExtractedPDFData): Promise<void> {
+    if (!extractedData.priorityActions || extractedData.priorityActions.length === 0) {
+      return;
+    }
+
+    try {
+      // Create capital expenses from major issues and priority actions
+      const capitalExpenses = [];
+      
+      // Add major repair items based on high-cost deficiencies
+      const majorIssues = extractedData.issues.filter(issue => 
+        (issue.estimatedCost && issue.estimatedCost > 5000) || 
+        issue.severity === 'critical' || 
+        issue.severity === 'high'
+      );
+
+      majorIssues.forEach(issue => {
+        capitalExpenses.push({
+          inspection_id: inspectionId,
+          expense_type: 'repair',
+          description: `${issue.location}: ${issue.description}`,
+          estimated_cost: issue.estimatedCost || 10000, // Default estimate for major issues
+          priority: issue.severity,
+          recommended_timeline: extractedData.recommendedTimeframe || '6-12 months',
+          created_at: new Date().toISOString()
+        });
+      });
+
+      // Add general maintenance items if overall condition is poor
+      if (extractedData.overallCondition === 'poor' || extractedData.overallCondition === 'critical') {
+        capitalExpenses.push({
+          inspection_id: inspectionId,
+          expense_type: 'maintenance',
+          description: `Comprehensive roof maintenance due to ${extractedData.overallCondition} condition`,
+          estimated_cost: Math.max(extractedData.estimatedRepairCost, 15000),
+          priority: extractedData.overallCondition === 'critical' ? 'high' : 'medium',
+          recommended_timeline: extractedData.overallCondition === 'critical' ? 'Immediate' : '3-6 months',
+          created_at: new Date().toISOString()
+        });
+      }
+
+      if (capitalExpenses.length > 0) {
+        const { error } = await supabase
+          .from('inspection_capital_expenses')
+          .insert(capitalExpenses);
+
+        if (error) {
+          console.error('Error storing capital expenses:', error);
+        } else {
+          console.log(`Successfully stored ${capitalExpenses.length} capital expenses from PDF`);
+        }
+      }
+    } catch (error) {
+      console.error('Error storing capital expenses:', error);
+      // Don't throw - this is not critical enough to fail the entire import
+    }
+  }
+
+  /**
+   * Normalize deficiency types from extracted issues
+   */
+  private static normalizeDeficiencyType(issueType: string): string {
+    const type = issueType.toLowerCase();
+    
+    // Map common issue types to standardized categories
+    if (type.includes('membrane') || type.includes('surface')) return 'Membrane Failures';
+    if (type.includes('flashing')) return 'Perimeter Flashing';
+    if (type.includes('drain') || type.includes('drainage')) return 'Roofing Drains';
+    if (type.includes('ponding') || type.includes('water')) return 'Drainage Issues';
+    if (type.includes('penetration')) return 'Penetration';
+    if (type.includes('equipment')) return 'Roof Top Equipment';
+    if (type.includes('gutter')) return 'Gutters/Downspouts';
+    if (type.includes('scupper')) return 'Scuppers';
+    if (type.includes('debris')) return 'Debris';
+    if (type.includes('structural')) return 'Structural Issues';
+    if (type.includes('curb')) return 'Curb Flashing';
+    
+    // Default to general category
+    return 'General Wear';
+  }
+
   /**
    * Generate recommendations from extracted data
    */
