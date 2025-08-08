@@ -134,52 +134,49 @@ curl -X POST https://mkidder97.app.n8n.cloud/webhook/roofmind-inspection-review 
 
 ### Frontend Trigger Points
 
-#### 1. Deficiency Alerts
-Add to `useInspectionAutosave.ts` completion handler:
+The RoofMind codebase includes a complete integration library at `/src/lib/n8nWorkflowTriggers.ts` with support for both direct webhook calls and Supabase proxy.
 
-```typescript
-const triggerDeficiencyAlerts = async (inspectionData: any) => {
-  if (inspectionData.deficiencies?.length > 0) {
-    try {
-      await fetch('https://mkidder97.app.n8n.cloud/webhook/roofmind-deficiency-alerts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          inspection_id: inspectionData.id,
-          property_name: inspectionData.property_name,
-          property_address: inspectionData.property_address,
-          inspector_name: inspectionData.inspector_name,
-          deficiencies: inspectionData.deficiencies
-        })
-      });
-    } catch (error) {
-      console.error('Failed to trigger deficiency alerts:', error);
-    }
-  }
-};
+#### 1. Configuration
+Set environment variables in your `.env` file:
 
-// Call after inspection completion
-await triggerDeficiencyAlerts(completedInspectionData);
+```env
+# Use direct webhook calls (set to true for Supabase proxy)
+VITE_USE_SUPABASE_PROXY=false
+
+# n8n webhook base URL
+VITE_N8N_WEBHOOK_BASE=https://mkidder97.app.n8n.cloud/webhook
 ```
 
-#### 2. AI Review Workflow
-Add to inspection completion flow:
+#### 2. Using the Integration Library
 
 ```typescript
-const triggerAIReview = async (inspectionData: any) => {
-  if (inspectionData.status === 'completed' || inspectionData.ready_to_send) {
-    try {
-      await fetch('https://mkidder97.app.n8n.cloud/webhook/roofmind-inspection-review', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(inspectionData)
-      });
-    } catch (error) {
-      console.error('Failed to trigger AI review:', error);
-    }
-  }
-};
+import { n8nWorkflowTriggers } from '@/lib/n8nWorkflowTriggers';
+
+// After inspection completion
+await n8nWorkflowTriggers.triggerInspectionWorkflows(inspectionData);
+
+// Or trigger individually
+if (inspectionData.deficiencies?.length > 0) {
+  await n8nWorkflowTriggers.triggerDeficiencyAlerts({
+    inspection_id: inspectionData.id,
+    property_name: inspectionData.property_name,
+    property_address: inspectionData.property_address,
+    inspector_name: inspectionData.inspector_name,
+    deficiencies: inspectionData.deficiencies
+  });
+}
+
+// Test connectivity
+const connectivity = await n8nWorkflowTriggers.testWorkflowConnectivity();
+console.log('Workflows connected:', connectivity);
 ```
+
+#### 3. Integration Example
+See `/src/lib/integrations/n8nIntegration.ts` for complete examples of:
+- Triggering workflows on inspection completion
+- Testing workflow connectivity
+- Properly formatting payloads
+- Helper functions for data extraction
 
 ### Perfect Inspection Criteria Configuration
 

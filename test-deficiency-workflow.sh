@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Test RoofMind Deficiency Alert Workflow
-curl -X POST https://mkidder97.app.n8n.cloud/webhook/roofmind-deficiency-alerts \
+curl -X POST https://mkidder97.app.n8n.cloud/webhook-test/roofmind-deficiency-alerts \
   -H "Content-Type: application/json" \
   -d '{
     "inspection_id": "test-123",

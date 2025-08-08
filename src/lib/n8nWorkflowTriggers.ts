@@ -5,7 +5,9 @@
 
 import { supabase } from '@/integrations/supabase/client';
 
-// Configuration: All calls go through secure edge proxy
+// Configuration
+const N8N_BASE_URL = import.meta.env.VITE_N8N_WEBHOOK_BASE || 'https://mkidder97.app.n8n.cloud/webhook';
+const USE_SUPABASE_PROXY = import.meta.env.VITE_USE_SUPABASE_PROXY === 'true';
 
 export interface DeficiencyAlertPayload {
   inspection_id: string;
@@ -77,6 +79,9 @@ export interface InspectionReviewPayload {
 }
 
 class N8nWorkflowTriggers {
+  private deficiencyAlertsUrl = `${N8N_BASE_URL}/roofmind-deficiency-alerts`;
+  private inspectionReviewUrl = `${N8N_BASE_URL}/roofmind-inspection-review`;
+
   /**
    * Trigger deficiency alert workflow
    * Detects membrane failures and immediate repairs
@@ -87,11 +92,46 @@ class N8nWorkflowTriggers {
     error?: string;
   }> {
     try {
-      const { data, error } = await supabase.functions.invoke('trigger-workflow', {
-        body: { workflow: 'deficiency-alerts', payload }
+      console.log('Triggering deficiency alerts workflow:', {
+        inspection_id: payload.inspection_id,
+        deficiency_count: payload.deficiencies.length,
+        membrane_failures: payload.deficiencies.filter(d => 
+          d.description.toLowerCase().includes('membrane failure')
+        ).length,
+        immediate_repairs: payload.deficiencies.filter(d => 
+          d.isImmediateRepair === true
+        ).length
       });
-      if (error) throw error;
-      return { success: true, data: data || {} };
+
+      if (USE_SUPABASE_PROXY) {
+        // Use Supabase edge function proxy
+        const { data, error } = await supabase.functions.invoke('trigger-workflow', {
+          body: { workflow: 'deficiency-alerts', payload }
+        });
+        if (error) throw error;
+        return { success: true, data: data || {} };
+      } else {
+        // Direct webhook call
+        const response = await fetch(this.deficiencyAlertsUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+        console.log('Deficiency alerts workflow completed:', result);
+
+        return {
+          success: true,
+          data: result
+        };
+      }
     } catch (error) {
       console.error('Failed to trigger deficiency alerts:', error);
       return {
@@ -112,11 +152,44 @@ class N8nWorkflowTriggers {
     error?: string;
   }> {
     try {
-      const { data, error } = await supabase.functions.invoke('trigger-workflow', {
-        body: { workflow: 'inspection-review', payload }
+      console.log('Triggering AI inspection review workflow:', {
+        inspection_id: payload.inspection_id,
+        property: payload.property_name,
+        status: payload.status,
+        has_executive_summary: !!payload.executiveSummary,
+        deficiency_count: payload.deficiencies?.length || 0,
+        photo_count: payload.photos?.length || 0
       });
-      if (error) throw error;
-      return { success: true, data: data || {} };
+
+      if (USE_SUPABASE_PROXY) {
+        // Use Supabase edge function proxy
+        const { data, error } = await supabase.functions.invoke('trigger-workflow', {
+          body: { workflow: 'inspection-review', payload }
+        });
+        if (error) throw error;
+        return { success: true, data: data || {} };
+      } else {
+        // Direct webhook call
+        const response = await fetch(this.inspectionReviewUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(payload)
+        });
+
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        const result = await response.json();
+        console.log('AI inspection review workflow completed:', result);
+
+        return {
+          success: true,
+          data: result
+        };
+      }
     } catch (error) {
       console.error('Failed to trigger AI inspection review:', error);
       return {
@@ -267,32 +340,64 @@ class N8nWorkflowTriggers {
       aiReview: false
     };
 
-    // Test deficiency alerts workflow
-    try {
-      const { data, error } = await supabase.functions.invoke('trigger-workflow', {
-        body: { workflow: 'deficiency-alerts', payload: {
-          inspection_id: 'connectivity-test',
-          property_name: 'Test Property',
-          deficiencies: []
-        } }
-      });
-      results.deficiencyAlerts = !error;
-    } catch (error) {
-      console.warn('Deficiency alerts workflow not accessible:', error);
-    }
+    if (USE_SUPABASE_PROXY) {
+      // Test via Supabase proxy
+      try {
+        const { data, error } = await supabase.functions.invoke('trigger-workflow', {
+          body: { workflow: 'deficiency-alerts', payload: {
+            inspection_id: 'connectivity-test',
+            property_name: 'Test Property',
+            deficiencies: []
+          } }
+        });
+        results.deficiencyAlerts = !error;
+      } catch (error) {
+        console.warn('Deficiency alerts workflow not accessible:', error);
+      }
 
-    // Test AI review workflow
-    try {
-      const { data, error } = await supabase.functions.invoke('trigger-workflow', {
-        body: { workflow: 'inspection-review', payload: {
-          inspection_id: 'connectivity-test',
-          property_name: 'Test Property',
-          status: 'completed'
-        } }
-      });
-      results.aiReview = !error;
-    } catch (error) {
-      console.warn('AI review workflow not accessible:', error);
+      try {
+        const { data, error } = await supabase.functions.invoke('trigger-workflow', {
+          body: { workflow: 'inspection-review', payload: {
+            inspection_id: 'connectivity-test',
+            property_name: 'Test Property',
+            status: 'completed'
+          } }
+        });
+        results.aiReview = !error;
+      } catch (error) {
+        console.warn('AI review workflow not accessible:', error);
+      }
+    } else {
+      // Test direct webhooks
+      try {
+        const response = await fetch(this.deficiencyAlertsUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            inspection_id: 'connectivity-test',
+            property_name: 'Test Property',
+            deficiencies: []
+          })
+        });
+        results.deficiencyAlerts = response.status < 500;
+      } catch (error) {
+        console.warn('Deficiency alerts workflow not accessible:', error);
+      }
+
+      try {
+        const response = await fetch(this.inspectionReviewUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            inspection_id: 'connectivity-test',
+            property_name: 'Test Property',
+            status: 'completed'
+          })
+        });
+        results.aiReview = response.status < 500;
+      } catch (error) {
+        console.warn('AI review workflow not accessible:', error);
+      }
     }
 
     return results;
