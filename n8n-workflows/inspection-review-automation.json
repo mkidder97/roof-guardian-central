@@ -1,0 +1,310 @@
+{
+  "name": "RoofMind AI Inspection Review & Report Generation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "roofmind-inspection-review",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-inspection-review",
+      "name": "Inspection Review Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "roofmind-inspection-review"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-inspection-data",
+              "leftValue": "={{ $json.inspection_id }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "isNotEmpty"
+              }
+            },
+            {
+              "id": "has-ready-status",
+              "leftValue": "={{ $json.status }}",
+              "rightValue": "completed,ready_for_review",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "validate-inspection-input",
+      "name": "Validate Inspection Input",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Calculate Perfect Inspection Criteria Score\nconst inspection = $input.item.json;\n\n// Initialize scoring components\nlet photoScore = 0;\nlet deficiencyScore = 0;\nlet completenessScore = 0;\nlet qualityIssues = [];\nlet recommendations = [];\n\n// Photo Analysis (30% of total score)\nconst photos = inspection.photos || [];\nconst overviewPhotos = photos.filter(p => p.type === 'overview').length;\nconst deficiencyPhotos = photos.filter(p => p.type === 'deficiency').length;\n\nif (overviewPhotos >= 4) {\n  photoScore += 70; // Base score for minimum coverage\n  if (overviewPhotos >= 6) photoScore += 15; // Bonus for comprehensive coverage\n} else {\n  qualityIssues.push(`Only ${overviewPhotos} overview photos (minimum 4 required)`);\n  recommendations.push('Add overview photos from all roof directions (North, South, East, West)');\n}\n\nif (deficiencyPhotos >= (inspection.deficiencies?.length || 0) * 2) {\n  photoScore += 15; // Adequate deficiency documentation\n} else {\n  qualityIssues.push('Insufficient deficiency photos (recommend 2+ per deficiency)');\n  recommendations.push('Capture multiple angles of each deficiency for better documentation');\n}\n\n// Deficiency Analysis (40% of total score)\nconst deficiencies = inspection.deficiencies || [];\nif (deficiencies.length > 0) {\n  deficiencyScore += 30; // Base score for having deficiencies\n  \n  let completeDeficiencies = 0;\n  deficiencies.forEach(def => {\n    let defComplete = true;\n    \n    // Check required fields\n    if (!def.description || def.description.length < 20) {\n      defComplete = false;\n      qualityIssues.push(`Deficiency \"${def.category || 'Unknown'}\" needs detailed description`);\n    }\n    \n    if (!def.location || def.location.trim() === '') {\n      defComplete = false;\n      qualityIssues.push(`Deficiency \"${def.category || 'Unknown'}\" missing location`);\n    }\n    \n    if (!def.budgetAmount && !def.estimatedCost) {\n      defComplete = false;\n      qualityIssues.push(`Deficiency \"${def.category || 'Unknown'}\" missing cost estimate`);\n    }\n    \n    if (defComplete) completeDeficiencies++;\n  });\n  \n  deficiencyScore += (completeDeficiencies / deficiencies.length) * 30;\n} else {\n  qualityIssues.push('No deficiencies documented');\n  recommendations.push('Ensure thorough inspection covers all potential issues');\n}\n\n// Completeness Analysis (30% of total score)\nif (inspection.executiveSummary?.summaryText && inspection.executiveSummary.summaryText.length > 100) {\n  completenessScore += 40;\n} else {\n  qualityIssues.push('Executive summary missing or too brief');\n  recommendations.push('Provide comprehensive executive summary (minimum 100 characters)');\n}\n\nif (inspection.notes && inspection.notes.length > 50) {\n  completenessScore += 20;\n} else {\n  qualityIssues.push('Inspection notes missing or too brief');\n  recommendations.push('Add detailed inspection notes covering methodology and observations');\n}\n\nif (inspection.weather_conditions) {\n  completenessScore += 10;\n} else {\n  qualityIssues.push('Weather conditions not documented');\n  recommendations.push('Document weather conditions during inspection');\n}\n\n// Safety and Access Documentation\nconst hasAccessNotes = inspection.notes?.toLowerCase().includes('access') || \n                      inspection.notes?.toLowerCase().includes('safety') ||\n                      inspection.executiveSummary?.inspectorNotes?.toLowerCase().includes('safety');\n                      \nif (hasAccessNotes) {\n  completenessScore += 10;\n} else {\n  qualityIssues.push('Safety and access procedures not documented');\n  recommendations.push('Document roof access method and safety measures taken');\n}\n\n// Calculate final score\nconst totalScore = Math.round((photoScore * 0.3) + (deficiencyScore * 0.4) + (completenessScore * 0.3));\n\n// Determine quality grade\nlet qualityGrade, qualityStatus;\nif (totalScore >= 90) {\n  qualityGrade = 'Excellent';\n  qualityStatus = 'approved';\n} else if (totalScore >= 80) {\n  qualityGrade = 'Good';\n  qualityStatus = 'approved_with_notes';\n} else if (totalScore >= 70) {\n  qualityGrade = 'Fair';\n  qualityStatus = 'needs_improvement';\n} else {\n  qualityGrade = 'Poor';\n  qualityStatus = 'requires_revision';\n}\n\n// Generate industry cost validation\nconst costValidation = deficiencies.map(def => {\n  const cost = def.budgetAmount || def.estimatedCost || 0;\n  let validation = { category: def.category, cost: cost, status: 'reasonable' };\n  \n  // Basic cost validation rules (in real implementation, use industry database)\n  switch(def.category?.toLowerCase()) {\n    case 'membrane failures':\n      if (cost < 500) validation.status = 'too_low';\n      if (cost > 15000) validation.status = 'too_high';\n      break;\n    case 'immediate repair':\n      if (cost < 200) validation.status = 'too_low';\n      break;\n    case 'flashing':\n    case 'perimeter flashing':\n    case 'curb flashing':\n      if (cost < 100) validation.status = 'too_low';\n      if (cost > 5000) validation.status = 'too_high';\n      break;\n  }\n  \n  return validation;\n});\n\nreturn [{\n  json: {\n    ...inspection,\n    qualityScore: totalScore,\n    qualityGrade: qualityGrade,\n    qualityStatus: qualityStatus,\n    qualityIssues: qualityIssues,\n    recommendations: recommendations,\n    costValidation: costValidation,\n    photoAnalysis: {\n      total: photos.length,\n      overview: overviewPhotos,\n      deficiency: deficiencyPhotos,\n      score: Math.round(photoScore)\n    },\n    deficiencyAnalysis: {\n      total: deficiencies.length,\n      complete: deficiencies.filter(d => d.description && d.location && (d.budgetAmount || d.estimatedCost)).length,\n      score: Math.round(deficiencyScore)\n    },\n    completenessAnalysis: {\n      hasExecutiveSummary: !!(inspection.executiveSummary?.summaryText),\n      hasNotes: !!(inspection.notes),\n      hasWeatherConditions: !!(inspection.weather_conditions),\n      hasSafetyNotes: hasAccessNotes,\n      score: Math.round(completenessScore)\n    }\n  }\n}];\n"
+      },
+      "id": "calculate-quality-score",
+      "name": "Calculate Perfect Inspection Score",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [680, 180]
+    },
+    {
+      "parameters": {
+        "model": "anthropic/claude-3.5-sonnet",
+        "options": {
+          "temperature": 0.3,
+          "maxTokens": 2000
+        },
+        "prompt": "=You are a professional roof inspection quality reviewer for RoofMind, a leading commercial roofing inspection company. Review this inspection data and provide detailed feedback.\n\n**INSPECTION DATA:**\nProperty: {{ $json.property_name }}\nInspection ID: {{ $json.inspection_id }}\nInspector: {{ $json.inspector_name }}\nQuality Score: {{ $json.qualityScore }}/100 ({{ $json.qualityGrade }})\n\n**EXECUTIVE SUMMARY:**\n{{ $json.executiveSummary?.summaryText || 'No executive summary provided' }}\n\n**DEFICIENCIES ({{ $json.deficiencies?.length || 0 }} total):**\n{{ ($json.deficiencies || []).map((def, i) => `${i+1}. ${def.category}: ${def.description} (Location: ${def.location || 'Not specified'}, Cost: $${(def.budgetAmount || def.estimatedCost || 0).toLocaleString()})`).join('\\n') }}\n\n**CAPITAL EXPENSES:**\n{{ ($json.capitalExpenses || []).map(cap => `${cap.description} - Year ${cap.year}: $${cap.estimatedCost.toLocaleString()}`).join('\\n') || 'None specified' }}\n\n**QUALITY ISSUES DETECTED:**\n{{ ($json.qualityIssues || []).map(issue => `• ${issue}`).join('\\n') }}\n\n**Please provide:**\n\n1. **SPELLING & GRAMMAR REVIEW**: Check all text for errors and provide corrections\n2. **COST ESTIMATE VALIDATION**: Assess if cost estimates are reasonable for each deficiency type\n3. **TECHNICAL ACCURACY**: Review terminology and classifications for industry standards\n4. **COMPLETENESS ASSESSMENT**: Evaluate if inspection meets RoofMind quality standards\n5. **BRAND VOICE COMPLIANCE**: Ensure professional, authoritative tone consistent with RoofMind standards\n6. **SPECIFIC RECOMMENDATIONS**: Provide actionable improvements\n\n**RoofMind Brand Standards:**\n- Professional, technical language\n- Detailed, accurate descriptions\n- Industry-standard terminology\n- Cost-conscious recommendations\n- Safety-first approach\n- Clear, actionable findings\n\nFormat your response as JSON with the following structure:\n```json\n{\n  \"overallAssessment\": \"Summary of inspection quality\",\n  \"grammarCorrections\": [\"List of spelling/grammar issues and corrections\"],\n  \"costValidation\": [\"Assessment of each cost estimate\"],\n  \"technicalReview\": [\"Technical accuracy observations\"],\n  \"completenessScore\": \"X/10 with explanation\",\n  \"brandCompliance\": \"Assessment of brand voice adherence\",\n  \"recommendedEdits\": [\"Specific changes to improve quality\"],\n  \"finalRecommendation\": \"APPROVE/APPROVE_WITH_EDITS/REJECT with reasoning\"\n}\n```"
+      },
+      "id": "openrouter-ai-review",
+      "name": "OpenRouter AI Quality Review",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [900, 180],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "openrouter-api",
+          "name": "OpenRouter API Key"
+        }
+      },
+      "parameters": {
+        "url": "https://openrouter.ai/api/v1/chat/completions",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Authorization",
+              "value": "Bearer {{ $credentials.httpHeaderAuth.password }}"
+            },
+            {
+              "name": "Content-Type", 
+              "value": "application/json"
+            },
+            {
+              "name": "HTTP-Referer",
+              "value": "https://roofmind.app"
+            },
+            {
+              "name": "X-Title",
+              "value": "RoofMind Inspection Review"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"model\": \"anthropic/claude-3.5-sonnet\",\n  \"messages\": [\n    {\n      \"role\": \"user\",\n      \"content\": \"{{ $node['calculate-quality-score'].json.prompt }}\"\n    }\n  ],\n  \"temperature\": 0.3,\n  \"max_tokens\": 2000\n}",
+        "options": {}
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Parse AI response and generate enhanced report\nconst inspection = $input.item.json;\nconst aiResponse = JSON.parse($('openrouter-ai-review').item.json.choices[0].message.content);\n\n// Create enhanced inspection report\nconst enhancedReport = {\n  // Original inspection data\n  inspectionId: inspection.inspection_id,\n  propertyName: inspection.property_name,\n  propertyAddress: inspection.property_address,\n  inspectorName: inspection.inspector_name,\n  inspectionDate: new Date().toISOString().split('T')[0],\n  \n  // Quality assessment\n  qualityScore: inspection.qualityScore,\n  qualityGrade: inspection.qualityGrade,\n  qualityStatus: inspection.qualityStatus,\n  \n  // AI enhancements\n  aiReview: aiResponse,\n  \n  // Enhanced executive summary with AI corrections\n  enhancedExecutiveSummary: {\n    originalSummary: inspection.executiveSummary?.summaryText || '',\n    overallCondition: inspection.executiveSummary?.overallCondition || 'Fair',\n    overallRating: inspection.executiveSummary?.overallRating || 3,\n    keyFindings: inspection.executiveSummary?.keyFindings || [],\n    criticalIssues: inspection.executiveSummary?.criticalIssues || [],\n    recommendedActions: inspection.executiveSummary?.recommendedActions || [],\n    budgetRecommendation: inspection.executiveSummary?.budgetRecommendation || 'Minor Repairs',\n    nextInspectionDate: inspection.executiveSummary?.nextInspectionDate || '',\n    aiEnhancements: aiResponse.recommendedEdits || []\n  },\n  \n  // Enhanced deficiency list\n  enhancedDeficiencies: (inspection.deficiencies || []).map(def => ({\n    ...def,\n    costValidation: inspection.costValidation?.find(cv => cv.category === def.category) || { status: 'reasonable' },\n    aiSuggestions: aiResponse.recommendedEdits?.filter(edit => edit.includes(def.category)) || []\n  })),\n  \n  // Photo analysis\n  photoAnalysis: inspection.photoAnalysis,\n  \n  // Completeness metrics\n  completenessMetrics: {\n    ...inspection.completenessAnalysis,\n    missingElements: inspection.qualityIssues,\n    recommendations: inspection.recommendations\n  },\n  \n  // Report metadata\n  reportMetadata: {\n    generatedAt: new Date().toISOString(),\n    generatedBy: 'RoofMind AI Review System',\n    version: '2.0',\n    reviewStatus: aiResponse.finalRecommendation,\n    requiresHumanReview: aiResponse.finalRecommendation !== 'APPROVE'\n  }\n};\n\n// Generate PDF-ready HTML content\nconst htmlReport = `\n<!DOCTYPE html>\n<html>\n<head>\n    <title>Enhanced Inspection Report - ${enhancedReport.propertyName}</title>\n    <style>\n        body { font-family: 'Arial', sans-serif; margin: 0; padding: 20px; color: #333; line-height: 1.6; }\n        .header { background: linear-gradient(135deg, #2563eb, #1d4ed8); color: white; padding: 30px; text-align: center; margin: -20px -20px 30px -20px; }\n        .company-logo { font-size: 24px; font-weight: bold; margin-bottom: 10px; }\n        .report-title { font-size: 20px; margin-bottom: 5px; }\n        .report-subtitle { font-size: 14px; opacity: 0.9; }\n        .quality-banner { background: ${enhancedReport.qualityScore >= 80 ? '#10b981' : enhancedReport.qualityScore >= 70 ? '#f59e0b' : '#ef4444'}; color: white; padding: 15px; text-align: center; margin: 20px 0; border-radius: 8px; }\n        .section { margin: 30px 0; }\n        .section-title { font-size: 18px; font-weight: bold; color: #1f2937; border-bottom: 2px solid #e5e7eb; padding-bottom: 8px; margin-bottom: 15px; }\n        .property-info { background: #f8fafc; padding: 20px; border-radius: 8px; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px; }\n        .info-item { }\n        .info-label { font-weight: bold; color: #4b5563; font-size: 12px; text-transform: uppercase; }\n        .info-value { font-size: 16px; margin-top: 2px; }\n        .deficiency-item { border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin: 15px 0; }\n        .deficiency-header { display: flex; justify-content: between; align-items: center; margin-bottom: 10px; }\n        .deficiency-title { font-weight: bold; font-size: 16px; }\n        .cost-badge { background: #10b981; color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; }\n        .ai-suggestion { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 12px; margin: 10px 0; font-style: italic; }\n        .recommendations { background: #fef3c7; border: 1px solid #fbbf24; padding: 15px; border-radius: 8px; }\n        .footer { margin-top: 50px; padding: 20px; background: #f9fafb; text-align: center; color: #6b7280; font-size: 12px; }\n        @media print { .header { background: #2563eb !important; } }\n    </style>\n</head>\n<body>\n    <div class=\"header\">\n        <div class=\"company-logo\">🏠 ROOFMIND</div>\n        <div class=\"report-title\">Enhanced Inspection Report</div>\n        <div class=\"report-subtitle\">AI-Reviewed & Quality Assured</div>\n    </div>\n    \n    <div class=\"quality-banner\">\n        <strong>Quality Score: ${enhancedReport.qualityScore}/100 (${enhancedReport.qualityGrade})</strong>\n        <br>Status: ${enhancedReport.aiReview.finalRecommendation}\n    </div>\n    \n    <div class=\"section\">\n        <div class=\"section-title\">Property Information</div>\n        <div class=\"property-info\">\n            <div class=\"info-item\">\n                <div class=\"info-label\">Property Name</div>\n                <div class=\"info-value\">${enhancedReport.propertyName}</div>\n            </div>\n            <div class=\"info-item\">\n                <div class=\"info-label\">Address</div>\n                <div class=\"info-value\">${enhancedReport.propertyAddress || 'Not provided'}</div>\n            </div>\n            <div class=\"info-item\">\n                <div class=\"info-label\">Inspector</div>\n                <div class=\"info-value\">${enhancedReport.inspectorName}</div>\n            </div>\n            <div class=\"info-item\">\n                <div class=\"info-label\">Inspection Date</div>\n                <div class=\"info-value\">${enhancedReport.inspectionDate}</div>\n            </div>\n        </div>\n    </div>\n    \n    <div class=\"section\">\n        <div class=\"section-title\">Executive Summary</div>\n        <p><strong>Overall Condition:</strong> ${enhancedReport.enhancedExecutiveSummary.overallCondition}</p>\n        <p><strong>Rating:</strong> ${enhancedReport.enhancedExecutiveSummary.overallRating}/5 Stars</p>\n        <p>${enhancedReport.enhancedExecutiveSummary.originalSummary}</p>\n        \n        ${enhancedReport.enhancedExecutiveSummary.aiEnhancements.length > 0 ? `\n        <div class=\"ai-suggestion\">\n            <strong>AI Enhancement Suggestions:</strong>\n            <ul>\n                ${enhancedReport.enhancedExecutiveSummary.aiEnhancements.map(suggestion => `<li>${suggestion}</li>`).join('')}\n            </ul>\n        </div>` : ''}\n    </div>\n    \n    <div class=\"section\">\n        <div class=\"section-title\">Deficiencies Found (${enhancedReport.enhancedDeficiencies.length})</div>\n        ${enhancedReport.enhancedDeficiencies.map(def => `\n        <div class=\"deficiency-item\">\n            <div class=\"deficiency-header\">\n                <div class=\"deficiency-title\">${def.category || 'Unknown Category'}</div>\n                <div class=\"cost-badge\">$${(def.budgetAmount || def.estimatedCost || 0).toLocaleString()}</div>\n            </div>\n            <p><strong>Location:</strong> ${def.location || 'Not specified'}</p>\n            <p><strong>Description:</strong> ${def.description || 'No description provided'}</p>\n            <p><strong>Severity:</strong> ${def.severity || 'Not specified'}</p>\n            ${def.costValidation.status !== 'reasonable' ? `<p><strong>Cost Note:</strong> Estimate may be ${def.costValidation.status.replace('_', ' ')}</p>` : ''}\n        </div>`).join('')}\n    </div>\n    \n    <div class=\"section\">\n        <div class=\"section-title\">Quality Analysis</div>\n        <p><strong>Photo Coverage:</strong> ${enhancedReport.photoAnalysis.total} photos (${enhancedReport.photoAnalysis.overview} overview, ${enhancedReport.photoAnalysis.deficiency} deficiency)</p>\n        <p><strong>Documentation Score:</strong> ${enhancedReport.completenessMetrics.score}/30</p>\n        \n        ${enhancedReport.completenessMetrics.missingElements.length > 0 ? `\n        <div class=\"recommendations\">\n            <strong>Areas for Improvement:</strong>\n            <ul>\n                ${enhancedReport.completenessMetrics.missingElements.map(issue => `<li>${issue}</li>`).join('')}\n            </ul>\n        </div>` : ''}\n    </div>\n    \n    <div class=\"section\">\n        <div class=\"section-title\">AI Review Summary</div>\n        <p><strong>Overall Assessment:</strong> ${enhancedReport.aiReview.overallAssessment}</p>\n        <p><strong>Completeness Score:</strong> ${enhancedReport.aiReview.completenessScore}</p>\n        <p><strong>Final Recommendation:</strong> ${enhancedReport.aiReview.finalRecommendation}</p>\n        \n        ${enhancedReport.aiReview.grammarCorrections?.length > 0 ? `\n        <div class=\"ai-suggestion\">\n            <strong>Grammar & Spelling Notes:</strong>\n            <ul>\n                ${enhancedReport.aiReview.grammarCorrections.map(correction => `<li>${correction}</li>`).join('')}\n            </ul>\n        </div>` : ''}\n    </div>\n    \n    <div class=\"footer\">\n        Report generated by RoofMind AI Review System v${enhancedReport.reportMetadata.version}<br>\n        Generated on ${new Date(enhancedReport.reportMetadata.generatedAt).toLocaleDateString()}<br>\n        Inspection ID: ${enhancedReport.inspectionId}\n    </div>\n</body>\n</html>`;\n\nreturn [{\n  json: {\n    enhancedReport: enhancedReport,\n    htmlContent: htmlReport,\n    pdfReady: true,\n    needsHumanReview: enhancedReport.reportMetadata.requiresHumanReview\n  }\n}];\n"
+      },
+      "id": "generate-enhanced-report",
+      "name": "Generate Enhanced Report",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 180]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "send",
+        "message": {
+          "to": {
+            "emailAddress": "michaelkidder2@gmail.com"
+          },
+          "subject": "📋 AI Review Complete: {{ $json.enhancedReport.propertyName }} ({{ $json.enhancedReport.qualityGrade }} - {{ $json.enhancedReport.aiReview.finalRecommendation }})",
+          "body": {
+            "type": "html",
+            "content": "<!DOCTYPE html>\n<html>\n<head>\n    <style>\n        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 800px; margin: 0 auto; padding: 20px; }\n        .header { background: linear-gradient(135deg, #3b82f6, #1d4ed8); color: white; padding: 20px; text-align: center; border-radius: 8px; margin-bottom: 20px; }\n        .quality-score { background: {{ $json.enhancedReport.qualityScore >= 80 ? '#10b981' : $json.enhancedReport.qualityScore >= 70 ? '#f59e0b' : '#ef4444' }}; color: white; padding: 15px; text-align: center; border-radius: 8px; margin: 20px 0; }\n        .section { margin: 20px 0; padding: 15px; border: 1px solid #e5e7eb; border-radius: 8px; }\n        .section-title { font-weight: bold; color: #1f2937; margin-bottom: 10px; border-bottom: 2px solid #e5e7eb; padding-bottom: 5px; }\n        .property-info { background: #f8fafc; padding: 15px; border-radius: 8px; }\n        .action-needed { background: #fef3c7; border: 1px solid #fbbf24; padding: 15px; border-radius: 8px; }\n        .recommendations { background: #eff6ff; border-left: 4px solid #3b82f6; padding: 15px; margin: 10px 0; }\n        .footer { margin-top: 30px; padding: 15px; background: #f9fafb; text-align: center; color: #6b7280; font-size: 12px; border-radius: 8px; }\n        ul { margin: 10px 0; padding-left: 20px; }\n        .edit-button { background: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block; margin: 10px 5px 0 0; }\n    </style>\n</head>\n<body>\n    <div class=\"header\">\n        <h1>🤖 AI Inspection Review Complete</h1>\n        <p>Enhanced report ready for review and approval</p>\n    </div>\n    \n    <div class=\"quality-score\">\n        <h2>Quality Score: {{ $json.enhancedReport.qualityScore }}/100 ({{ $json.enhancedReport.qualityGrade }})</h2>\n        <p><strong>AI Recommendation:</strong> {{ $json.enhancedReport.aiReview.finalRecommendation }}</p>\n    </div>\n    \n    <div class=\"property-info\">\n        <h3>📍 Property Information</h3>\n        <p><strong>Property:</strong> {{ $json.enhancedReport.propertyName }}</p>\n        <p><strong>Address:</strong> {{ $json.enhancedReport.propertyAddress || 'Not provided' }}</p>\n        <p><strong>Inspector:</strong> {{ $json.enhancedReport.inspectorName }}</p>\n        <p><strong>Inspection ID:</strong> {{ $json.enhancedReport.inspectionId }}</p>\n        <p><strong>Review Date:</strong> {{ new Date().toLocaleDateString() }}</p>\n    </div>\n    \n    <div class=\"section\">\n        <div class=\"section-title\">🎯 AI Assessment Summary</div>\n        <p><strong>Overall Assessment:</strong> {{ $json.enhancedReport.aiReview.overallAssessment }}</p>\n        <p><strong>Completeness Score:</strong> {{ $json.enhancedReport.aiReview.completenessScore }}</p>\n        <p><strong>Brand Compliance:</strong> {{ $json.enhancedReport.aiReview.brandCompliance }}</p>\n    </div>\n    \n    {{ $json.enhancedReport.aiReview.grammarCorrections?.length > 0 ? '<div class=\"section\"><div class=\"section-title\">✏️ Spelling & Grammar Review</div><ul>' + $json.enhancedReport.aiReview.grammarCorrections.map(correction => '<li>' + correction + '</li>').join('') + '</ul></div>' : '' }}\n    \n    {{ $json.enhancedReport.aiReview.costValidation?.length > 0 ? '<div class=\"section\"><div class=\"section-title\">💰 Cost Estimate Validation</div><ul>' + $json.enhancedReport.aiReview.costValidation.map(validation => '<li>' + validation + '</li>').join('') + '</ul></div>' : '' }}\n    \n    {{ $json.enhancedReport.aiReview.technicalReview?.length > 0 ? '<div class=\"section\"><div class=\"section-title\">🔧 Technical Review</div><ul>' + $json.enhancedReport.aiReview.technicalReview.map(review => '<li>' + review + '</li>').join('') + '</ul></div>' : '' }}\n    \n    {{ $json.enhancedReport.aiReview.recommendedEdits?.length > 0 ? '<div class=\"action-needed\"><div class=\"section-title\">📝 Recommended Edits</div><ul>' + $json.enhancedReport.aiReview.recommendedEdits.map(edit => '<li>' + edit + '</li>').join('') + '</ul></div>' : '' }}\n    \n    <div class=\"recommendations\">\n        <div class=\"section-title\">📊 Quality Metrics</div>\n        <p><strong>Photo Analysis:</strong> {{ $json.enhancedReport.photoAnalysis.total }} total photos ({{ $json.enhancedReport.photoAnalysis.overview }} overview, {{ $json.enhancedReport.photoAnalysis.deficiency }} deficiency) - Score: {{ $json.enhancedReport.photoAnalysis.score }}/30</p>\n        <p><strong>Deficiency Analysis:</strong> {{ $json.enhancedReport.deficiencyAnalysis.complete }}/{{ $json.enhancedReport.deficiencyAnalysis.total }} complete - Score: {{ $json.enhancedReport.deficiencyAnalysis.score }}/40</p>\n        <p><strong>Completeness:</strong> Score {{ $json.enhancedReport.completenessMetrics.score }}/30</p>\n        \n        {{ $json.enhancedReport.completenessMetrics.missingElements?.length > 0 ? '<p><strong>Missing Elements:</strong></p><ul>' + $json.enhancedReport.completenessMetrics.missingElements.map(element => '<li>' + element + '</li>').join('') + '</ul>' : '' }}\n    </div>\n    \n    <div class=\"section\">\n        <div class=\"section-title\">🎬 Next Steps</div>\n        {{ $json.needsHumanReview ? '<div class=\"action-needed\"><p><strong>⚠️ Human Review Required</strong></p><p>This report requires manual review and approval before finalization due to quality concerns or recommendations.</p></div>' : '<p>✅ Report meets quality standards and can be approved for client delivery.</p>' }}\n        \n        <div style=\"margin-top: 20px;\">\n            <a href=\"https://roofmind.app/admin/reports/edit/{{ $json.enhancedReport.inspectionId }}\" class=\"edit-button\">📝 Edit Report</a>\n            <a href=\"https://roofmind.app/admin/reports/approve/{{ $json.enhancedReport.inspectionId }}\" class=\"edit-button\" style=\"background: #10b981;\">✅ Approve Report</a>\n            <a href=\"https://roofmind.app/admin/reports/download/{{ $json.enhancedReport.inspectionId }}\" class=\"edit-button\" style=\"background: #6b7280;\">📥 Download PDF</a>\n        </div>\n    </div>\n    \n    <div class=\"footer\">\n        This review was generated by RoofMind's AI Quality Assurance System<br>\n        Report ID: {{ $json.enhancedReport.inspectionId }} | Generated: {{ new Date().toLocaleString() }}<br>\n        Questions? Reply to this email or contact support.\n    </div>\n</body>\n</html>"
+          }
+        }
+      },
+      "id": "email-review-results",
+      "name": "Email Review Results",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [1340, 180],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gmail-roofmind",
+          "name": "Gmail RoofMind Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "url": "https://cycfmmxveqcpqtmncmup.supabase.co/rest/v1/inspection_reports",
+        "method": "POST",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "apikey",
+              "value": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN5Y2ZtbXh2ZXFjcHF0bW5jbXVwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1Mjc5MDg1MSwiZXhwIjoyMDY4MzY2ODUxfQ.lSkzBLqHs5DKWGsMLbLZrOoL2KZIYBCHNlLuLhFWm5M"
+            },
+            {
+              "name": "Authorization",
+              "value": "Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImN5Y2ZtbXh2ZXFjcHF0bW5jbXVwIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1Mjc5MDg1MSwiZXhwIjoyMDY4MzY2ODUxfQ.lSkzBLqHs5DKWGsMLbLZrOoL2KZIYBCHNlLuLhFWm5M"
+            },
+            {
+              "name": "Content-Type",
+              "value": "application/json"
+            },
+            {
+              "name": "Prefer",
+              "value": "return=representation"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"inspection_id\": \"{{ $json.enhancedReport.inspectionId }}\",\n  \"findings\": \"{{ JSON.stringify($json.enhancedReport.enhancedExecutiveSummary) }}\",\n  \"recommendations\": \"{{ JSON.stringify($json.enhancedReport.aiReview.recommendedEdits) }}\",\n  \"status\": \"{{ $json.needsHumanReview ? 'needs_review' : 'completed' }}\",\n  \"priority_level\": \"{{ $json.enhancedReport.qualityGrade }}\",\n  \"estimated_cost\": {{ $json.enhancedReport.enhancedDeficiencies.reduce((sum, def) => sum + (def.budgetAmount || def.estimatedCost || 0), 0) }},\n  \"report_url\": \"https://roofmind.app/reports/{{ $json.enhancedReport.inspectionId }}.pdf\",\n  \"photos_urls\": {{ JSON.stringify(($json.enhancedReport.enhancedDeficiencies || []).flatMap(def => (def.photos || []).map(p => p.url || p.publicUrl)).filter(Boolean)) }}\n}",
+        "options": {}
+      },
+      "id": "save-to-supabase",
+      "name": "Save Enhanced Report to Database",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4,
+      "position": [1340, 360]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 200,
+        "responseBody": "{\n  \"success\": true,\n  \"message\": \"Inspection review completed successfully\",\n  \"inspection_id\": \"{{ $json.enhancedReport.inspectionId }}\",\n  \"quality_score\": {{ $json.enhancedReport.qualityScore }},\n  \"quality_grade\": \"{{ $json.enhancedReport.qualityGrade }}\",\n  \"ai_recommendation\": \"{{ $json.enhancedReport.aiReview.finalRecommendation }}\",\n  \"needs_human_review\": {{ $json.needsHumanReview }},\n  \"report_url\": \"https://roofmind.app/reports/{{ $json.enhancedReport.inspectionId }}.pdf\",\n  \"timestamp\": \"{{ new Date().toISOString() }}\"\n}"
+      },
+      "id": "success-response-review",
+      "name": "Success Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1560, 180]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 400,
+        "responseBody": "{\n  \"success\": false,\n  \"error\": \"Invalid inspection data: Missing inspection_id or invalid status\",\n  \"required_fields\": [\"inspection_id\", \"status\"],\n  \"valid_statuses\": [\"completed\", \"ready_for_review\"],\n  \"timestamp\": \"{{ new Date().toISOString() }}\"\n}"
+      },
+      "id": "error-response-review",
+      "name": "Error Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [680, 420]
+    }
+  ],
+  "connections": {
+    "webhook-inspection-review": {
+      "main": [
+        [
+          {
+            "node": "validate-inspection-input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "validate-inspection-input": {
+      "main": [
+        [
+          {
+            "node": "calculate-quality-score",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "error-response-review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "calculate-quality-score": {
+      "main": [
+        [
+          {
+            "node": "openrouter-ai-review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "openrouter-ai-review": {
+      "main": [
+        [
+          {
+            "node": "generate-enhanced-report",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "generate-enhanced-report": {
+      "main": [
+        [
+          {
+            "node": "email-review-results",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "save-to-supabase",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "email-review-results": {
+      "main": [
+        [
+          {
+            "node": "success-response-review",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2024-08-08T00:00:00.000Z",
+      "updatedAt": "2024-08-08T00:00:00.000Z",
+      "id": "roofmind-ai-review",
+      "name": "RoofMind AI Review"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2024-08-08T00:00:00.000Z",
+  "versionId": "1"
+}

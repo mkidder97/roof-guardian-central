@@ -1,0 +1,287 @@
+{
+  "name": "RoofMind Deficiency Alert Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "roofmind-deficiency-alerts",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-deficiency-trigger",
+      "name": "Deficiency Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [240, 300],
+      "webhookId": "roofmind-deficiency-alerts"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "has-deficiencies",
+              "leftValue": "={{ $json.deficiencies }}",
+              "rightValue": "",
+              "operator": {
+                "type": "array",
+                "operation": "notEmpty"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "validate-input",
+      "name": "Validate Input Data",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "fieldToSplitOut": "deficiencies",
+        "options": {}
+      },
+      "id": "split-deficiencies",
+      "name": "Split Deficiencies",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [680, 180]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "loose"
+          },
+          "conditions": [
+            {
+              "id": "membrane-failure-check",
+              "leftValue": "={{ $json.description }}",
+              "rightValue": "membrane failure",
+              "operator": {
+                "type": "string",
+                "operation": "contains"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-membrane-failure",
+      "name": "Check Membrane Failure",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [900, 80]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "immediate-repair-check",
+              "leftValue": "={{ $json.isImmediateRepair }}",
+              "rightValue": true,
+              "operator": {
+                "type": "boolean",
+                "operation": "equal"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "check-immediate-repair",
+      "name": "Check Immediate Repair",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2,
+      "position": [900, 280]
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "send",
+        "message": {
+          "to": {
+            "emailAddress": "michaelkidder2@gmail.com"
+          },
+          "subject": "🚨 Membrane Failure Detected at {{ $('webhook-deficiency-trigger').item.json.property_name || 'Unknown Property' }}{{ $('webhook-deficiency-trigger').item.json.property_address ? ', ' + $('webhook-deficiency-trigger').item.json.property_address : '' }}",
+          "body": {
+            "type": "html",
+            "content": "<!DOCTYPE html>\n<html>\n<head>\n    <style>\n        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }\n        .alert-header { background-color: #dc3545; color: white; padding: 15px; text-align: center; }\n        .content { padding: 20px; }\n        .field { margin-bottom: 15px; }\n        .field strong { color: #dc3545; }\n        .footer { background-color: #f8f9fa; padding: 15px; font-size: 12px; color: #666; }\n    </style>\n</head>\n<body>\n    <div class=\"alert-header\">\n        <h2>🚨 MEMBRANE FAILURE DETECTED</h2>\n    </div>\n    <div class=\"content\">\n        <div class=\"field\">\n            <strong>Property:</strong> {{ $('webhook-deficiency-trigger').item.json.property_name || 'Unknown Property' }}\n        </div>\n        <div class=\"field\">\n            <strong>Address:</strong> {{ $('webhook-deficiency-trigger').item.json.property_address || 'Not provided' }}\n        </div>\n        <div class=\"field\">\n            <strong>Inspection ID:</strong> {{ $('webhook-deficiency-trigger').item.json.inspection_id || 'Not provided' }}\n        </div>\n        <div class=\"field\">\n            <strong>Inspector:</strong> {{ $('webhook-deficiency-trigger').item.json.inspector_name || 'Not provided' }}\n        </div>\n        <div class=\"field\">\n            <strong>Location on Roof:</strong> {{ $json.location || 'Not specified' }}\n        </div>\n        <div class=\"field\">\n            <strong>Description:</strong><br>{{ $json.description || 'No description provided' }}\n        </div>\n        <div class=\"field\">\n            <strong>Estimated Cost:</strong> ${{ ($json.budgetAmount || $json.estimatedCost || 0).toLocaleString() }}\n        </div>\n        <div class=\"field\">\n            <strong>Severity:</strong> {{ $json.severity || 'Not specified' }}\n        </div>\n        <div class=\"field\">\n            <strong>Photos:</strong> {{ ($json.photos && $json.photos.length) ? $json.photos.length + ' photo(s) available' : 'No photos attached' }}\n        </div>\n        <div class=\"field\">\n            <strong>Detection Time:</strong> {{ $json.detectionTimestamp ? new Date($json.detectionTimestamp).toLocaleString() : new Date().toLocaleString() }}\n        </div>\n    </div>\n    <div class=\"footer\">\n        This alert was automatically generated by RoofMind's deficiency detection system.<br>\n        Please review this issue immediately and coordinate with the field inspector.\n    </div>\n</body>\n</html>"
+          }
+        }
+      },
+      "id": "email-membrane-failure",
+      "name": "Email Membrane Failure Alert",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [1120, 80],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gmail-roofmind",
+          "name": "Gmail RoofMind Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "authentication": "oAuth2",
+        "operation": "send",
+        "message": {
+          "to": {
+            "emailAddress": "repairs@roofmind.app"
+          },
+          "subject": "⚠️ Immediate Repair Needed at {{ $('webhook-deficiency-trigger').item.json.property_name || 'Unknown Property' }}",
+          "body": {
+            "type": "html",
+            "content": "<!DOCTYPE html>\n<html>\n<head>\n    <style>\n        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }\n        .alert-header { background-color: #fd7e14; color: white; padding: 15px; text-align: center; }\n        .content { padding: 20px; }\n        .field { margin-bottom: 15px; }\n        .field strong { color: #fd7e14; }\n        .priority-high { background-color: #fff3cd; border: 1px solid #ffeaa7; padding: 10px; border-radius: 5px; }\n        .footer { background-color: #f8f9fa; padding: 15px; font-size: 12px; color: #666; }\n    </style>\n</head>\n<body>\n    <div class=\"alert-header\">\n        <h2>⚠️ IMMEDIATE REPAIR REQUIRED</h2>\n    </div>\n    <div class=\"content\">\n        <div class=\"priority-high\">\n            <strong>PRIORITY:</strong> This deficiency has been flagged for immediate repair and requires urgent attention.\n        </div>\n        <br>\n        <div class=\"field\">\n            <strong>Property:</strong> {{ $('webhook-deficiency-trigger').item.json.property_name || 'Unknown Property' }}\n        </div>\n        <div class=\"field\">\n            <strong>Address:</strong> {{ $('webhook-deficiency-trigger').item.json.property_address || 'Not provided' }}\n        </div>\n        <div class=\"field\">\n            <strong>Inspection ID:</strong> {{ $('webhook-deficiency-trigger').item.json.inspection_id || 'Not provided' }}\n        </div>\n        <div class=\"field\">\n            <strong>Inspector:</strong> {{ $('webhook-deficiency-trigger').item.json.inspector_name || 'Not provided' }}\n        </div>\n        <div class=\"field\">\n            <strong>Category:</strong> {{ $json.category || 'Not specified' }}\n        </div>\n        <div class=\"field\">\n            <strong>Location on Roof:</strong> {{ $json.location || 'Not specified' }}\n        </div>\n        <div class=\"field\">\n            <strong>Description:</strong><br>{{ $json.description || 'No description provided' }}\n        </div>\n        <div class=\"field\">\n            <strong>Estimated Cost:</strong> ${{ ($json.budgetAmount || $json.estimatedCost || 0).toLocaleString() }}\n        </div>\n        <div class=\"field\">\n            <strong>Criticality Score:</strong> {{ $json.criticalityScore || 'Not calculated' }}/100\n        </div>\n        <div class=\"field\">\n            <strong>Supervisor Alert Needed:</strong> {{ $json.needsSupervisorAlert ? 'Yes' : 'No' }}\n        </div>\n        {{ $json.photos && $json.photos.length > 0 ? '<div class=\"field\"><strong>Photo URLs:</strong><br>' + $json.photos.map(photo => photo.url || photo.publicUrl).filter(Boolean).join('<br>') + '</div>' : '' }}\n        <div class=\"field\">\n            <strong>Detection Time:</strong> {{ $json.detectionTimestamp ? new Date($json.detectionTimestamp).toLocaleString() : new Date().toLocaleString() }}\n        </div>\n    </div>\n    <div class=\"footer\">\n        This alert was automatically generated by RoofMind's critical issue detection system.<br>\n        Please coordinate immediate repair scheduling and notify the property manager if necessary.\n    </div>\n</body>\n</html>"
+          }
+        }
+      },
+      "id": "email-immediate-repair",
+      "name": "Email Immediate Repair Alert",
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2,
+      "position": [1120, 280],
+      "credentials": {
+        "gmailOAuth2": {
+          "id": "gmail-roofmind",
+          "name": "Gmail RoofMind Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 200,
+        "responseBody": "{\n  \"success\": true,\n  \"message\": \"Deficiency alerts processed successfully\",\n  \"processed_deficiencies\": {{ $('split-deficiencies').item.json.totalItems }},\n  \"membrane_failures\": {{ $('split-deficiencies').all().filter(item => item.json.description && item.json.description.toLowerCase().includes('membrane failure')).length }},\n  \"immediate_repairs\": {{ $('split-deficiencies').all().filter(item => item.json.isImmediateRepair === true).length }},\n  \"timestamp\": \"{{ new Date().toISOString() }}\"\n}"
+      },
+      "id": "success-response",
+      "name": "Success Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1340, 180]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseCode": 400,
+        "responseBody": "{\n  \"success\": false,\n  \"error\": \"Invalid input data: Missing or empty deficiencies array\",\n  \"timestamp\": \"{{ new Date().toISOString() }}\"\n}"
+      },
+      "id": "error-response",
+      "name": "Error Response",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [680, 420]
+    }
+  ],
+  "connections": {
+    "webhook-deficiency-trigger": {
+      "main": [
+        [
+          {
+            "node": "validate-input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "validate-input": {
+      "main": [
+        [
+          {
+            "node": "split-deficiencies",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "error-response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "split-deficiencies": {
+      "main": [
+        [
+          {
+            "node": "check-membrane-failure",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "check-immediate-repair",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "success-response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-membrane-failure": {
+      "main": [
+        [
+          {
+            "node": "email-membrane-failure",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "check-immediate-repair": {
+      "main": [
+        [
+          {
+            "node": "email-immediate-repair",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "tags": [
+    {
+      "createdAt": "2024-08-08T00:00:00.000Z",
+      "updatedAt": "2024-08-08T00:00:00.000Z",
+      "id": "roofmind-alerts",
+      "name": "RoofMind Alerts"
+    }
+  ],
+  "triggerCount": 0,
+  "updatedAt": "2024-08-08T00:00:00.000Z",
+  "versionId": "1"
+}
