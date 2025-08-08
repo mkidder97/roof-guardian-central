@@ -512,7 +512,15 @@ const InspectorInterface = () => {
 
 
   const handleCompleteInspection = useCallback(async (inspectionData: any) => {
-    console.log('Inspection completed:', inspectionData);
+    console.log('🎯 [Inspector Interface] handleCompleteInspection called with data:', {
+      inspectionId: inspectionData.inspectionId,
+      propertyName: inspectionData.propertyName,
+      deficiencies: inspectionData.deficiencies?.length || 0,
+      hasOverviewPhotos: (inspectionData.overviewPhotos?.length || 0) > 0,
+      hasExecutiveSummary: !!inspectionData.executiveSummary
+    });
+    
+    console.log('🔍 [Inspector Interface] Full inspection data structure:', inspectionData);
     
     try {
       // Update inspection status through unified system
@@ -526,11 +534,56 @@ const InspectorInterface = () => {
       }
       
       // Trigger n8n workflows for deficiency alerts and AI review
+      console.log('🚀 [Inspector Interface] Starting n8n workflow trigger section...');
       try {
-        const { n8nWorkflowTriggers } = await import('@/lib/n8nWorkflowTriggers');
+        console.log('📦 [Inspector Interface] Importing n8nWorkflowTriggers module...');
+        const n8nModule = await import('@/lib/n8nWorkflowTriggers');
+        console.log('✅ [Inspector Interface] Module imported successfully:', Object.keys(n8nModule));
+        
+        const { n8nWorkflowTriggers } = n8nModule;
+        console.log('✅ [Inspector Interface] n8nWorkflowTriggers extracted:', typeof n8nWorkflowTriggers);
         
         console.log('🚀 [Inspector Interface] Triggering n8n workflows for:', inspectionData.inspectionId);
+        console.log('📋 [Inspector Interface] n8n Configuration:', {
+          USE_SUPABASE_PROXY: import.meta.env.VITE_USE_SUPABASE_PROXY,
+          N8N_WEBHOOK_BASE: import.meta.env.VITE_N8N_WEBHOOK_BASE,
+          deficiencyUrl: `${import.meta.env.VITE_N8N_WEBHOOK_BASE || 'https://mkidder97.app.n8n.cloud/webhook'}/roofmind-deficiency-alerts`,
+          aiReviewUrl: `${import.meta.env.VITE_N8N_WEBHOOK_BASE || 'https://mkidder97.app.n8n.cloud/webhook'}/roofmind-inspection-review`
+        });
         console.log('Inspection data:', inspectionData);
+        
+        // Get current user for workflow data
+        const { data: { user } } = await supabase.auth.getUser();
+        console.log('Current user for n8n workflow:', user);
+        
+        // Get user details from users table
+        let userDetails = {
+          first_name: '',
+          last_name: '',
+          email: user?.email || ''
+        };
+        
+        if (user) {
+          try {
+            const { data: userRecord } = await supabase
+              .from('users')
+              .select('first_name, last_name, email')
+              .eq('auth_user_id', user.id)
+              .single();
+            
+            if (userRecord) {
+              userDetails = {
+                first_name: userRecord.first_name || '',
+                last_name: userRecord.last_name || '',
+                email: userRecord.email || user.email || ''
+              };
+            }
+          } catch (userError) {
+            console.warn('Could not fetch user details from users table:', userError);
+          }
+        }
+        
+        console.log('User details for workflow:', userDetails);
         
         // Format the inspection data for n8n
         const workflowData = {
@@ -548,16 +601,32 @@ const InspectorInterface = () => {
             property_name: inspectionData.propertyName,
             address: inspectionData.propertyAddress
           },
-          users: {
-            first_name: user?.first_name || '',
-            last_name: user?.last_name || '',
-            email: user?.email || ''
-          }
+          users: userDetails
         };
         
+        console.log('📤 [Inspector Interface] Sending workflow data:', {
+          ...workflowData,
+          deficiencies_count: workflowData.deficiencies?.length || 0,
+          photos_count: workflowData.overviewPhotos?.length || 0,
+          has_executive_summary: !!workflowData.executiveSummary
+        });
+        
+        console.log('🎯 [Inspector Interface] About to call triggerInspectionWorkflows...');
+        console.log('🎯 [Inspector Interface] n8nWorkflowTriggers object:', n8nWorkflowTriggers);
+        console.log('🎯 [Inspector Interface] triggerInspectionWorkflows method:', typeof n8nWorkflowTriggers.triggerInspectionWorkflows);
+        
         const workflowResults = await n8nWorkflowTriggers.triggerInspectionWorkflows(workflowData);
+        console.log('🎉 [Inspector Interface] Workflow call completed!');
         
         console.log('✅ [Inspector Interface] n8n workflow results:', workflowResults);
+        
+        if (!workflowResults.deficiencyAlerts.success) {
+          console.error('❌ Deficiency alerts workflow failed:', workflowResults.deficiencyAlerts.error);
+        }
+        
+        if (!workflowResults.aiReview.success) {
+          console.error('❌ AI review workflow failed:', workflowResults.aiReview.error);
+        }
         
         if (workflowResults.deficiencyAlerts.success && inspectionData.deficiencies?.length > 0) {
           toast({

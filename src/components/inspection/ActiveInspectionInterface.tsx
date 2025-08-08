@@ -878,8 +878,10 @@ export function ActiveInspectionInterface({
 
       // Call the original completion handler
       const inspectionData = {
+        inspectionId: currentSessionId, // Add the inspection ID for n8n workflows
         propertyId,
         propertyName,
+        propertyAddress: propertyName, // Use property name as fallback for address
         startTime,
         endTime: new Date(),
         deficiencies,
@@ -897,6 +899,15 @@ export function ActiveInspectionInterface({
           overviewPhotoCount: overviewPhotos.length
         }
       };
+
+      console.log('📝 [ActiveInspectionInterface] Calling onComplete with inspection data:', {
+        inspectionId: inspectionData.inspectionId,
+        propertyName: inspectionData.propertyName,
+        propertyAddress: inspectionData.propertyAddress,
+        deficienciesCount: inspectionData.deficiencies?.length || 0,
+        photosCount: inspectionData.overviewPhotos?.length || 0,
+        hasExecutiveSummary: !!inspectionData.executiveSummaryData
+      });
 
       onComplete(inspectionData);
 
