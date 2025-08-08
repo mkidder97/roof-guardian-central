@@ -819,7 +819,17 @@ export function ActiveInspectionInterface({
   };
 
   const handleCompleteInspection = async () => {
+    console.log('🚀 [ActiveInspectionInterface] Complete inspection button clicked!');
+    console.log('📊 [ActiveInspectionInterface] Current state:', {
+      deficiencies: deficiencies.length,
+      overviewPhotos: overviewPhotos.length,
+      sessionId,
+      propertyId,
+      propertyName
+    });
+    
     if (deficiencies.length === 0 && overviewPhotos.length === 0) {
+      console.log('❌ [ActiveInspectionInterface] Validation failed: No deficiencies or photos');
       toast({
         title: "Incomplete Inspection",
         description: "Please add at least some photos or deficiencies",
@@ -827,8 +837,11 @@ export function ActiveInspectionInterface({
       });
       return;
     }
+    
+    console.log('✅ [ActiveInspectionInterface] Basic validation passed');
 
     try {
+      console.log('🔄 [ActiveInspectionInterface] Starting completion process...');
       // Ensure we have a session before completion
       let currentSessionId = sessionId;
       
@@ -912,7 +925,13 @@ export function ActiveInspectionInterface({
       onComplete(inspectionData);
 
     } catch (error) {
-      console.error('Error completing inspection:', error);
+      console.error('❌ [ActiveInspectionInterface] Error completing inspection:', error);
+      console.error('❌ [ActiveInspectionInterface] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+      console.error('❌ [ActiveInspectionInterface] Error details:', {
+        errorType: typeof error,
+        errorConstructor: error?.constructor?.name,
+        errorMessage: error instanceof Error ? error.message : String(error)
+      });
       
       let errorMessage = "Failed to complete inspection. Please try again.";
       
@@ -930,6 +949,7 @@ export function ActiveInspectionInterface({
         }
       }
       
+      console.log('🚨 [ActiveInspectionInterface] Showing error toast:', errorMessage);
       toast({
         title: "Completion Failed",
         description: errorMessage,
@@ -1093,9 +1113,13 @@ export function ActiveInspectionInterface({
               ← Back
             </Button>
             <Button 
-              onClick={handleCompleteInspection} 
+              onClick={() => {
+                console.log('🔥 [ActiveInspectionInterface] COMPLETE BUTTON CLICKED! 🔥');
+                handleCompleteInspection();
+              }} 
               size="sm"
               className="bg-green-600 hover:bg-green-700 text-xs md:text-sm"
+              id="complete-inspection-btn"
             >
               <CheckCircle className="h-3 w-3 md:h-4 md:w-4 mr-1 md:mr-2" />
               Complete
