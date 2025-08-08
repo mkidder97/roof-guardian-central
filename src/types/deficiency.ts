@@ -13,6 +13,14 @@ export interface Deficiency {
   budgetAmount: number;
   status: 'identified' | 'in_progress' | 'resolved';
   photos: Photo[];
+  // Critical issue management fields
+  isImmediateRepair?: boolean;
+  needsSupervisorAlert?: boolean;
+  criticalityScore?: number; // 0-100 automated severity assessment
+  detectionTimestamp?: string; // When critical issue was detected
+  alertSentAt?: string; // When supervisor alert was sent
+  acknowledgedAt?: string; // When supervisor acknowledged alert
+  acknowledgedBy?: string; // User ID who acknowledged
 }
 
 export interface Photo {

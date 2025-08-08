@@ -34,16 +34,21 @@ import {
   Sun,
   FolderOpen,
   Building2,
-  Download
+  Download,
+  Shield,
+  Zap,
+  Phone
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useInspectionAutosave } from "@/hooks/useInspectionAutosave";
+import { ImmediateRepairModal } from "./ImmediateRepairModal";
 import { RoofCompositionCapture } from "./RoofCompositionCapture";
 import { MinimalInspectionChecklist } from "./MinimalInspectionChecklist";
 import { ExecutiveSummary } from "./ExecutiveSummary";
 import { WorkflowDataExporter } from "./WorkflowDataExporter";
 import { FloatingCameraButton } from "./FloatingCameraButton";
+import type { CriticalityAnalysis } from '@/lib/CriticalIssueDetector';
 
 interface Photo {
   id: string;
@@ -63,6 +68,11 @@ interface Deficiency {
   photos: Photo[];
   severity: 'low' | 'medium' | 'high';
   status: 'identified' | 'documented' | 'resolved';
+  // Critical issue management fields
+  isImmediateRepair?: boolean;
+  needsSupervisorAlert?: boolean;
+  criticalityScore?: number;
+  detectionTimestamp?: string;
 }
 
 interface CapitalExpense {
@@ -185,6 +195,11 @@ export function ActiveInspectionInterface({
   const [roofCompositionData, setRoofCompositionData] = useState<any>({});
   const [checklistData, setChecklistData] = useState<any>({});
   const [executiveSummaryData, setExecutiveSummaryData] = useState<any>(null);
+  
+  // Critical issue management state
+  const [showImmediateRepairModal, setShowImmediateRepairModal] = useState(false);
+  const [selectedDeficiencyForRepair, setSelectedDeficiencyForRepair] = useState<Deficiency | null>(null);
+  const [criticalAnalysisForRepair, setCriticalAnalysisForRepair] = useState<CriticalityAnalysis | null>(null);
 
   // New deficiency form
   const [newDeficiency, setNewDeficiency] = useState({
@@ -213,11 +228,39 @@ export function ActiveInspectionInterface({
     lastUpdated: new Date().toISOString()
   };
 
-  // Use autosave hook
-  const { sessionId, forceSave } = useInspectionAutosave({
+  // Handle critical issue detection
+  const handleCriticalIssueDetected = useCallback((deficiency: Deficiency, analysis: CriticalityAnalysis) => {
+    console.warn('🚨 Critical issue detected:', {
+      location: deficiency.location,
+      description: deficiency.description,
+      score: analysis.score,
+      urgency: analysis.urgencyLevel
+    });
+
+    // Show critical issue alert
+    toast({
+      title: "⚠️ Critical Issue Detected",
+      description: `${analysis.urgencyLevel.toUpperCase()} issue found: ${deficiency.location}`,
+      variant: analysis.isEmergency ? "destructive" : "default",
+      duration: 8000,
+    });
+  }, [toast]);
+
+  // Use autosave hook with critical detection enabled
+  const { 
+    sessionId, 
+    forceSave, 
+    criticalAlerts, 
+    clearCriticalAlerts, 
+    getCurrentCriticalIssues,
+    hasCriticalIssues,
+    criticalIssueCount
+  } = useInspectionAutosave({
     propertyId,
     inspectionData: currentInspectionData,
-    enabled: inspectionStarted
+    enabled: inspectionStarted,
+    enableCriticalDetection: true,
+    onCriticalIssueDetected: handleCriticalIssueDetected
   });
 
   // New capital expense form
@@ -529,6 +572,50 @@ export function ActiveInspectionInterface({
       description: `$${expense.estimatedCost.toLocaleString()} expense documented`,
     });
   };
+
+  // Handle immediate repair request creation
+  const handleCreateImmediateRepair = useCallback((deficiency: Deficiency, analysis?: CriticalityAnalysis) => {
+    setSelectedDeficiencyForRepair(deficiency);
+    setCriticalAnalysisForRepair(analysis || null);
+    setShowImmediateRepairModal(true);
+  }, []);
+
+  // Handle immediate repair completion
+  const handleImmediateRepairCreated = useCallback((repair: any) => {
+    toast({
+      title: "Immediate Repair Created",
+      description: `${repair.urgency.toUpperCase()} repair request created for ${repair.property_name}`,
+      variant: repair.urgency === 'emergency' ? "destructive" : "default"
+    });
+
+    // Clear critical alerts related to this deficiency if resolved
+    if (selectedDeficiencyForRepair && criticalAlerts.length > 0) {
+      const alertsToKeep = criticalAlerts.filter(
+        alert => alert.deficiency.id !== selectedDeficiencyForRepair.id
+      );
+      if (alertsToKeep.length < criticalAlerts.length) {
+        clearCriticalAlerts();
+        // Re-add remaining alerts if any
+        // Note: This is simplified - a real implementation might be more sophisticated
+      }
+    }
+
+    setSelectedDeficiencyForRepair(null);
+    setCriticalAnalysisForRepair(null);
+  }, [selectedDeficiencyForRepair, criticalAlerts, clearCriticalAlerts, toast]);
+
+  // Get critical status for a deficiency
+  const getDeficiencyCriticalStatus = useCallback((deficiency: Deficiency) => {
+    if (deficiency.isImmediateRepair) return 'immediate';
+    if (deficiency.needsSupervisorAlert) return 'supervisor';
+    if (deficiency.criticalityScore && deficiency.criticalityScore >= 60) return 'critical';
+    return 'normal';
+  }, []);
+
+  // Get critical alert for a specific deficiency
+  const getCriticalAlertForDeficiency = useCallback((deficiency: Deficiency) => {
+    return criticalAlerts.find(alert => alert.deficiency.id === deficiency.id);
+  }, [criticalAlerts]);
 
   // File upload functions
   const handleFileUpload = async (files: FileList | null, type: 'warranty' | 'cad' | 'other') => {
@@ -882,6 +969,13 @@ export function ActiveInspectionInterface({
               <Badge variant="secondary" className="bg-blue-500 text-xs">
                 Active Inspection
               </Badge>
+              {/* Critical Issue Counter */}
+              {hasCriticalIssues && (
+                <Badge variant="destructive" className="animate-pulse">
+                  <AlertTriangle className="h-3 w-3 mr-1" />
+                  {criticalIssueCount} Critical
+                </Badge>
+              )}
             </div>
           </div>
           <div className="flex gap-1 md:gap-2 ml-2">
@@ -904,6 +998,43 @@ export function ActiveInspectionInterface({
           </div>
         </div>
       </div>
+
+      {/* Critical Issues Alert Banner */}
+      {criticalAlerts.length > 0 && (
+        <div className="bg-red-50 border-b border-red-200 p-3">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex items-start gap-3">
+              <AlertTriangle className="h-5 w-5 text-red-600 mt-0.5 flex-shrink-0" />
+              <div className="flex-1 min-w-0">
+                <h3 className="text-sm font-semibold text-red-800 mb-1">
+                  🚨 {criticalAlerts.length} Critical Issue{criticalAlerts.length > 1 ? 's' : ''} Detected
+                </h3>
+                <div className="space-y-1">
+                  {criticalAlerts.slice(0, 2).map((alert, index) => (
+                    <p key={index} className="text-xs text-red-700">
+                      • {alert.deficiency.location}: {alert.analysis.urgencyLevel.toUpperCase()} (Score: {alert.analysis.score})
+                    </p>
+                  ))}
+                  {criticalAlerts.length > 2 && (
+                    <p className="text-xs text-red-600 font-medium">
+                      +{criticalAlerts.length - 2} more critical issue{criticalAlerts.length > 3 ? 's' : ''}
+                    </p>
+                  )}
+                </div>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={clearCriticalAlerts}
+                className="text-red-600 border-red-300 hover:bg-red-100 text-xs"
+              >
+                <X className="h-3 w-3 mr-1" />
+                Dismiss
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto p-2 md:p-4">
@@ -1139,37 +1270,111 @@ export function ActiveInspectionInterface({
                         </Card>
                       ) : (
                         <div className="grid gap-4">
-                          {deficiencies.map((deficiency) => (
-                            <Card key={deficiency.id} className="p-4">
-                              <div className="flex justify-between items-start">
-                                <div className="flex-1">
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <Badge className={getSeverityColor(deficiency.severity)}>
-                                      {deficiency.severity.toUpperCase()}
-                                    </Badge>
-                                    <Badge variant="outline">{deficiency.category}</Badge>
+                          {deficiencies.map((deficiency) => {
+                            const criticalStatus = getDeficiencyCriticalStatus(deficiency);
+                            const criticalAlert = getCriticalAlertForDeficiency(deficiency);
+                            const isCritical = criticalStatus !== 'normal';
+                            
+                            return (
+                              <Card 
+                                key={deficiency.id} 
+                                className={`p-4 ${isCritical ? 'border-l-4 border-l-red-500 bg-red-50/30' : ''}`}
+                              >
+                                <div className="flex justify-between items-start">
+                                  <div className="flex-1">
+                                    <div className="flex items-center gap-2 mb-2 flex-wrap">
+                                      <Badge className={getSeverityColor(deficiency.severity)}>
+                                        {deficiency.severity.toUpperCase()}
+                                      </Badge>
+                                      <Badge variant="outline">{deficiency.category}</Badge>
+                                      
+                                      {/* Critical Issue Indicators */}
+                                      {deficiency.isImmediateRepair && (
+                                        <Badge variant="destructive" className="bg-red-600">
+                                          <Zap className="h-3 w-3 mr-1" />
+                                          IMMEDIATE REPAIR
+                                        </Badge>
+                                      )}
+                                      {deficiency.needsSupervisorAlert && !deficiency.isImmediateRepair && (
+                                        <Badge variant="destructive" className="bg-orange-600">
+                                          <Shield className="h-3 w-3 mr-1" />
+                                          SUPERVISOR ALERT
+                                        </Badge>
+                                      )}
+                                      {deficiency.criticalityScore && deficiency.criticalityScore >= 60 && !deficiency.needsSupervisorAlert && (
+                                        <Badge variant="secondary" className="bg-yellow-600 text-white">
+                                          <AlertTriangle className="h-3 w-3 mr-1" />
+                                          HIGH RISK ({deficiency.criticalityScore})
+                                        </Badge>
+                                      )}
+                                    </div>
+
+                                    <h3 className="font-semibold">{deficiency.location}</h3>
+                                    {deficiency.description && (
+                                      <p className="text-gray-600 mt-1">{deficiency.description}</p>
+                                    )}
+                                    {deficiency.budgetAmount > 0 && (
+                                      <p className="text-sm text-green-600 mt-1">
+                                        Budget: ${deficiency.budgetAmount.toLocaleString()}
+                                      </p>
+                                    )}
+
+                                    {/* Critical Issue Analysis Display */}
+                                    {criticalAlert && (
+                                      <div className="mt-3 p-3 bg-red-100 border border-red-200 rounded-lg">
+                                        <div className="flex items-start gap-2">
+                                          <AlertTriangle className="h-4 w-4 text-red-600 mt-0.5 flex-shrink-0" />
+                                          <div>
+                                            <p className="text-sm font-semibold text-red-800">
+                                              Critical Analysis: {criticalAlert.analysis.urgencyLevel.toUpperCase()} (Score: {criticalAlert.analysis.score}/100)
+                                            </p>
+                                            <p className="text-xs text-red-700 mt-1">
+                                              Keywords: {criticalAlert.analysis.triggeredKeywords.slice(0, 3).join(', ')}
+                                            </p>
+                                            <div className="flex flex-wrap gap-1 mt-2">
+                                              {criticalAlert.analysis.riskFactors.safety && (
+                                                <Badge variant="destructive" className="text-xs">Safety Risk</Badge>
+                                              )}
+                                              {criticalAlert.analysis.riskFactors.structural && (
+                                                <Badge variant="destructive" className="text-xs">Structural Risk</Badge>
+                                              )}
+                                              {criticalAlert.analysis.riskFactors.weatherExposure && (
+                                                <Badge variant="secondary" className="text-xs">Weather Risk</Badge>
+                                              )}
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
                                   </div>
-                                  <h3 className="font-semibold">{deficiency.location}</h3>
-                                  {deficiency.description && (
-                                    <p className="text-gray-600 mt-1">{deficiency.description}</p>
-                                  )}
-                                  {deficiency.budgetAmount > 0 && (
-                                    <p className="text-sm text-green-600 mt-1">
-                                      Budget: ${deficiency.budgetAmount.toLocaleString()}
-                                    </p>
-                                  )}
+
+                                  <div className="flex flex-col gap-2 ml-4">
+                                    {/* Immediate Repair Button */}
+                                    {isCritical && (
+                                      <Button 
+                                        variant="destructive" 
+                                        size="sm"
+                                        onClick={() => handleCreateImmediateRepair(deficiency, criticalAlert?.analysis)}
+                                        className="whitespace-nowrap"
+                                      >
+                                        <Phone className="h-3 w-3 mr-1" />
+                                        {deficiency.isImmediateRepair ? 'Emergency Repair' : 'Escalate'}
+                                      </Button>
+                                    )}
+                                    
+                                    <div className="flex gap-2">
+                                      <Button variant="outline" size="sm">
+                                        <Camera className="h-4 w-4" />
+                                      </Button>
+                                      <Button variant="outline" size="sm">
+                                        <Edit className="h-4 w-4" />
+                                      </Button>
+                                    </div>
+                                  </div>
                                 </div>
-                                <div className="flex gap-2">
-                                  <Button variant="outline" size="sm">
-                                    <Camera className="h-4 w-4" />
-                                  </Button>
-                                  <Button variant="outline" size="sm">
-                                    <Edit className="h-4 w-4" />
-                                  </Button>
-                                </div>
-                              </div>
-                            </Card>
-                          ))}
+                              </Card>
+                            );
+                          })}
                         </div>
                       )}
                     </section>
@@ -1900,6 +2105,23 @@ export function ActiveInspectionInterface({
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      {/* Immediate Repair Modal */}
+      <ImmediateRepairModal
+        open={showImmediateRepairModal}
+        onOpenChange={setShowImmediateRepairModal}
+        inspectionId={sessionId || ''}
+        deficiency={selectedDeficiencyForRepair || undefined}
+        propertyInfo={{
+          id: propertyId,
+          name: propertyName,
+          address: propertyName, // Simplified - could be enhanced with actual address
+          city: 'Unknown City',
+          state: 'Unknown State'
+        }}
+        criticalityAnalysis={criticalAnalysisForRepair || undefined}
+        onRepairCreated={handleImmediateRepairCreated}
+      />
 
       {/* Floating Camera Button - Only show during active inspection */}
       {inspectionStarted && (

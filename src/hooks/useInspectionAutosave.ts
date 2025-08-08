@@ -1,5 +1,8 @@
-import { useEffect, useRef, useCallback } from 'react';
+import { useEffect, useRef, useCallback, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { criticalIssueDetector } from '@/lib/CriticalIssueDetector';
+import type { Deficiency } from '@/types/deficiency';
+import type { CriticalityAnalysis } from '@/lib/CriticalIssueDetector';
 
 interface InspectionSession {
   property_id: string;
@@ -13,17 +16,102 @@ interface UseInspectionAutosaveProps {
   inspectionData: any;
   autoSaveInterval?: number; // milliseconds
   enabled?: boolean;
+  enableCriticalDetection?: boolean; // Enable automatic critical issue detection
+  onCriticalIssueDetected?: (deficiency: Deficiency, analysis: CriticalityAnalysis) => void;
+}
+
+interface CriticalIssueAlert {
+  deficiency: Deficiency;
+  analysis: CriticalityAnalysis;
+  timestamp: string;
 }
 
 export function useInspectionAutosave({
   propertyId,
   inspectionData,
   autoSaveInterval = 30000, // 30 seconds default
-  enabled = true
+  enabled = true,
+  enableCriticalDetection = true,
+  onCriticalIssueDetected
 }: UseInspectionAutosaveProps) {
   const lastSavedRef = useRef<string>('');
   const intervalRef = useRef<NodeJS.Timeout>();
   const sessionIdRef = useRef<string | null>(null);
+  
+  // Critical issue detection state
+  const [criticalAlerts, setCriticalAlerts] = useState<CriticalIssueAlert[]>([]);
+  const [lastAnalyzedDeficiencies, setLastAnalyzedDeficiencies] = useState<string>('');
+  const criticalDetectionRef = useRef<NodeJS.Timeout>();
+
+  // Analyze deficiencies for critical issues
+  const analyzeCriticalIssues = useCallback(async (deficiencies: Deficiency[]) => {
+    if (!enableCriticalDetection || !deficiencies?.length) return;
+
+    try {
+      const newAlerts: CriticalIssueAlert[] = [];
+      
+      for (const deficiency of deficiencies) {
+        // Skip if deficiency is already analyzed (has criticality score)
+        if (deficiency.criticalityScore !== undefined) continue;
+        
+        const analysis = criticalIssueDetector.analyzeDeficiency(deficiency);
+        
+        // If this is a critical issue, create an alert
+        if (analysis.needsSupervisorAlert || analysis.isImmediateRepair) {
+          const alert: CriticalIssueAlert = {
+            deficiency: {
+              ...deficiency,
+              isImmediateRepair: analysis.isImmediateRepair,
+              needsSupervisorAlert: analysis.needsSupervisorAlert,
+              criticalityScore: analysis.score,
+              detectionTimestamp: new Date().toISOString()
+            },
+            analysis,
+            timestamp: new Date().toISOString()
+          };
+          
+          newAlerts.push(alert);
+          
+          // Call the callback if provided
+          if (onCriticalIssueDetected) {
+            onCriticalIssueDetected(alert.deficiency, analysis);
+          }
+        }
+      }
+      
+      if (newAlerts.length > 0) {
+        setCriticalAlerts(prev => [...prev, ...newAlerts]);
+        
+        // Log critical issues for debugging
+        console.warn(`🚨 ${newAlerts.length} critical issues detected:`, 
+          newAlerts.map(a => ({
+            description: a.deficiency.description,
+            score: a.analysis.score,
+            urgency: a.analysis.urgencyLevel
+          }))
+        );
+      }
+    } catch (error) {
+      console.error('Error analyzing critical issues:', error);
+    }
+  }, [enableCriticalDetection, onCriticalIssueDetected]);
+
+  // Enhanced save session with critical issue tracking
+  const enhancedSaveSession = useCallback(async (data: any, status: 'active' | 'completed' | 'abandoned' = 'active') => {
+    try {
+      // Analyze deficiencies for critical issues before saving
+      if (data?.deficiencies && enableCriticalDetection) {
+        await analyzeCriticalIssues(data.deficiencies);
+      }
+      
+      // Continue with original save logic
+      return await saveSession(data, status);
+    } catch (error) {
+      console.error('Error in enhanced save session:', error);
+      // Fall back to original save if critical analysis fails
+      return await saveSession(data, status);
+    }
+  }, [analyzeCriticalIssues, enableCriticalDetection]);
 
   // Save session to database
   const saveSession = useCallback(async (data: any, status: 'active' | 'completed' | 'abandoned' = 'active') => {
@@ -205,9 +293,9 @@ export function useInspectionAutosave({
         clearTimeout(intervalRef.current);
       }
       
-      // Set new save timeout
+      // Set new save timeout with enhanced critical detection
       intervalRef.current = setTimeout(() => {
-        saveSession(inspectionData);
+        enhancedSaveSession(inspectionData);
       }, autoSaveInterval);
     }
 
@@ -216,7 +304,35 @@ export function useInspectionAutosave({
         clearTimeout(intervalRef.current);
       }
     };
-  }, [inspectionData, enabled, autoSaveInterval, saveSession]);
+  }, [inspectionData, enabled, autoSaveInterval, enhancedSaveSession]);
+
+  // Critical issue detection effect - runs independently from auto-save
+  useEffect(() => {
+    if (!enableCriticalDetection || !inspectionData?.deficiencies) return;
+
+    const deficienciesString = JSON.stringify(inspectionData.deficiencies);
+    
+    // Only analyze if deficiencies have changed
+    if (deficienciesString !== lastAnalyzedDeficiencies) {
+      setLastAnalyzedDeficiencies(deficienciesString);
+      
+      // Clear existing timeout
+      if (criticalDetectionRef.current) {
+        clearTimeout(criticalDetectionRef.current);
+      }
+      
+      // Set timeout for critical analysis (faster than auto-save for urgent issues)
+      criticalDetectionRef.current = setTimeout(() => {
+        analyzeCriticalIssues(inspectionData.deficiencies);
+      }, 2000); // 2 seconds for critical detection
+    }
+
+    return () => {
+      if (criticalDetectionRef.current) {
+        clearTimeout(criticalDetectionRef.current);
+      }
+    };
+  }, [inspectionData?.deficiencies, enableCriticalDetection, lastAnalyzedDeficiencies, analyzeCriticalIssues]);
 
   // Cleanup on unmount
   useEffect(() => {
@@ -224,33 +340,50 @@ export function useInspectionAutosave({
       if (intervalRef.current) {
         clearTimeout(intervalRef.current);
       }
+      if (criticalDetectionRef.current) {
+        clearTimeout(criticalDetectionRef.current);
+      }
     };
   }, []);
 
   // Complete session
   const completeSession = useCallback(async () => {
     if (inspectionData) {
-      await saveSession(inspectionData, 'completed');
+      await enhancedSaveSession(inspectionData, 'completed');
       sessionIdRef.current = null;
     }
-  }, [inspectionData, saveSession]);
+  }, [inspectionData, enhancedSaveSession]);
 
   // Abandon session
   const abandonSession = useCallback(async () => {
     if (sessionIdRef.current) {
-      await saveSession(inspectionData, 'abandoned');
+      await enhancedSaveSession(inspectionData, 'abandoned');
       sessionIdRef.current = null;
     }
-  }, [inspectionData, saveSession]);
+  }, [inspectionData, enhancedSaveSession]);
 
   // Force save current data immediately
   const forceSave = useCallback(async () => {
     if (inspectionData) {
-      const session = await saveSession(inspectionData);
+      const session = await enhancedSaveSession(inspectionData);
       return session;
     }
     return null;
-  }, [inspectionData, saveSession]);
+  }, [inspectionData, enhancedSaveSession]);
+
+  // Clear critical alerts
+  const clearCriticalAlerts = useCallback(() => {
+    setCriticalAlerts([]);
+  }, []);
+
+  // Get critical issues for inspection
+  const getCurrentCriticalIssues = useCallback(() => {
+    if (!inspectionData?.deficiencies) return [];
+    
+    return inspectionData.deficiencies.filter((def: Deficiency) => 
+      def.isImmediateRepair || def.needsSupervisorAlert || (def.criticalityScore && def.criticalityScore >= 60)
+    );
+  }, [inspectionData]);
 
   return {
     saveSession,
@@ -258,6 +391,13 @@ export function useInspectionAutosave({
     completeSession,
     abandonSession,
     forceSave,
-    sessionId: sessionIdRef.current
+    sessionId: sessionIdRef.current,
+    // Critical issue management
+    criticalAlerts,
+    clearCriticalAlerts,
+    analyzeCriticalIssues,
+    getCurrentCriticalIssues,
+    hasCriticalIssues: criticalAlerts.length > 0,
+    criticalIssueCount: criticalAlerts.length
   };
 }

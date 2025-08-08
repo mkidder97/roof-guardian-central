@@ -31,6 +31,14 @@ export interface UnifiedInspection {
   archived_at?: string | null;
   ready_to_send?: boolean;
   proof_check_notes?: string | null;
+  // Critical issue management fields
+  hasCriticalIssues?: boolean;
+  criticalIssueCount?: number;
+  lastCriticalityCheck?: string;
+  supervisorAlertSent?: boolean;
+  supervisorAlertSentAt?: string;
+  emergencyContactMade?: boolean;
+  emergencyContactAt?: string;
 
   // Joined data from related tables
   roofs?: {
@@ -65,6 +73,11 @@ export interface Inspection {
   updated_at?: string;
   ready_to_send?: boolean;
   proof_check_notes?: string | null;
+  // Critical issue management fields
+  hasCriticalIssues?: boolean;
+  criticalIssueCount?: number;
+  lastCriticalityCheck?: string;
+  supervisorAlertSent?: boolean;
 
   // Joined data
   roofs?: {
@@ -108,6 +121,11 @@ export interface InspectionSyncData {
   archived_at?: string | null;
   ready_to_send?: boolean;
   proof_check_notes?: string | null;
+  // Critical issue management fields
+  hasCriticalIssues?: boolean;
+  criticalIssueCount?: number;
+  lastCriticalityCheck?: string;
+  supervisorAlertSent?: boolean;
   
   // Joined data
   roofs?: {
