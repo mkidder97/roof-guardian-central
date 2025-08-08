@@ -405,7 +405,7 @@ export class CriticalIssueDetector {
 
   private calculateConfidenceLevel(matchCount: number, descriptionLength: number): number {
     // Base confidence on keyword matches and description detail
-    let confidence = Math.min(100, (matchCount * 20) + (Math.min(descriptionLength / 10, 40)));
+    const confidence = Math.min(100, (matchCount * 20) + (Math.min(descriptionLength / 10, 40)));
     return Math.round(confidence);
   }
 

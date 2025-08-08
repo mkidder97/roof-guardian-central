@@ -163,7 +163,7 @@ async function parseInspectionReport(text: string): Promise<Omit<ExtractedPDFDat
   // Enhanced Inspection Type Classification
   const inspectionTypeResult = classifyInspectionType(text, reportType);
   const inspectionType = inspectionTypeResult.type;
-  let urgencyLevel: 'low' | 'medium' | 'high' | 'critical' = inspectionTypeResult.urgency;
+  const urgencyLevel: 'low' | 'medium' | 'high' | 'critical' = inspectionTypeResult.urgency;
   
   // Extract issues with enhanced pattern matching
   const issues: ExtractedPDFData['issues'] = [];

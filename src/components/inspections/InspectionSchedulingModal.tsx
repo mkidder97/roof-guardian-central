@@ -927,6 +927,10 @@ export function InspectionSchedulingModal({ open, onOpenChange, directMode = fal
         ? new Date(`${scheduledDate}T${scheduledTime}`)
         : new Date(`${scheduledDate}T09:00:00`);
 
+      // Get current user for created_by field
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) throw new Error('User not authenticated');
+
       // Create inspection record
       const { data: inspectionData, error: inspectionError } = await supabase
         .from('inspections')
@@ -937,7 +941,9 @@ export function InspectionSchedulingModal({ open, onOpenChange, directMode = fal
           status: 'scheduled',
           inspection_type: inspectionType,
           priority: priority as InspectionPriority,
-          notes: notes || `Direct inspection scheduled for ${selectedProperty.property_name}`
+          notes: notes || `Direct inspection scheduled for ${selectedProperty.property_name}`,
+          created_by: user.user.id,
+          created_via: 'direct' // Mark as direct-mode creation
         })
         .select()
         .single();
@@ -1047,6 +1053,110 @@ export function InspectionSchedulingModal({ open, onOpenChange, directMode = fal
     }
     endTimer('createDirectInspection');
   }, [directInspectionData, toast, startTimer, endTimer]);
+
+  // Create Supabase inspections for successful n8n campaigns
+  const createInspectionsForSuccessfulCampaigns = useCallback(async (successfulResults: ProcessingResult[]) => {
+    try {
+      const { data: user } = await supabase.auth.getUser();
+      if (!user.user) {
+        throw new Error('User not authenticated');
+      }
+
+      const inspectionInserts = [];
+      
+      // Build inspection records from successful campaign results
+      for (const result of successfulResults) {
+        if (!result.campaignData) continue;
+        
+        for (const property of result.campaignData.properties) {
+          // Use property-specific inspector override if available, otherwise use campaign default
+          const propertyInspector = propertyInspectorOverrides[property.roof_id] || selectedInspector;
+          if (!propertyInspector) continue;
+
+          inspectionInserts.push({
+            roof_id: property.roof_id,
+            inspector_id: propertyInspector.auth_user_id,
+            status: 'scheduled',
+            inspection_type: filters.inspectionType || 'annual',
+            created_by: user.user.id,
+            created_via: 'n8n', // Mark as n8n-created
+            scheduled_date: new Date().toISOString().split('T')[0], // Use today as placeholder
+            notes: `Campaign: ${result.campaignData.campaign_name}`,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+        }
+      }
+
+      if (inspectionInserts.length > 0) {
+        console.log(`Creating ${inspectionInserts.length} Supabase inspections for successful campaigns`);
+        
+        const { data: insertedInspections, error: insertError } = await supabase
+          .from('inspections')
+          .insert(inspectionInserts)
+          .select('id, roof_id, inspector_id');
+
+        if (insertError) {
+          console.error('Failed to create Supabase inspections:', insertError);
+          
+          // Show warning but don't fail the entire operation
+          toast({
+            title: "Warning: Inspection Records",
+            description: `n8n campaigns created successfully, but failed to create ${inspectionInserts.length} inspection records in database. Inspectors may not see assignments immediately.`,
+            variant: "destructive",
+          });
+          
+          return;
+        }
+
+        console.log(`Successfully created ${insertedInspections?.length || 0} inspection records`);
+        
+        // Emit inspection creation events for each created inspection
+        if (insertedInspections) {
+          insertedInspections.forEach((inspection, index) => {
+            const originalInsert = inspectionInserts[index];
+            const inspector = propertyInspectorOverrides[originalInsert.roof_id] || selectedInspector;
+            const property = selectedProperties.find(p => p.id === originalInsert.roof_id);
+            
+            if (inspector && property) {
+              // Create a properly formatted inspection object for the event system
+              const createdInspection = {
+                ...inspection,
+                scheduled_date: originalInsert.scheduled_date,
+                status: originalInsert.status as InspectionStatus,
+                inspection_type: originalInsert.inspection_type as InspectionType,
+                notes: originalInsert.notes,
+                roofs: {
+                  property_name: property.property_name,
+                  address: property.address,
+                  city: property.city,
+                  state: property.state
+                },
+                users: {
+                  first_name: inspector.full_name.split(' ')[0],
+                  last_name: inspector.full_name.split(' ').slice(1).join(' '),
+                  email: inspector.email
+                },
+                created_at: originalInsert.created_at,
+                updated_at: originalInsert.updated_at
+              };
+
+              emitInspectionCreated(createdInspection);
+            }
+          });
+        }
+      }
+
+    } catch (error) {
+      console.error('Error creating Supabase inspections for campaigns:', error);
+      
+      toast({
+        title: "Warning: Database Integration",
+        description: "Campaigns were created successfully, but there was an issue syncing with the inspector dashboard. Please contact support if inspections don't appear.",
+        variant: "destructive",
+      });
+    }
+  }, [propertyInspectorOverrides, selectedInspector, selectedProperties, filters.inspectionType, toast, emitInspectionCreated]);
 
   const handleStartWorkflow = useCallback(async () => {
     startTimer('startWorkflow');
@@ -1173,16 +1283,17 @@ export function InspectionSchedulingModal({ open, onOpenChange, directMode = fal
         results: [...results.successful, ...results.failed]
       }));
 
-      // Emit unified events for batch campaign creation
+      // Create Supabase inspections for successful campaigns
       if (results.successful.length > 0) {
+        await createInspectionsForSuccessfulCampaigns(results.successful);
+        
         // Trigger global data refresh for all inspection-related components
         emitDataRefresh(['inspections_tab', 'inspection_history', 'inspector_interface']);
         
         // Emit campaign creation events for each successful campaign
         results.successful.forEach(result => {
           if (result.campaignData) {
-            // Note: This is for campaign creation, individual inspections will be created later
-            console.log('Batch campaign created:', result.campaignData.campaign_name);
+            console.log('Batch campaign created with Supabase inspections:', result.campaignData.campaign_name);
           }
         });
       }
