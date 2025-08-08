@@ -11,6 +11,9 @@ import { UnifiedDashboard } from "./pages/UnifiedDashboard";
 import AuthPage from "./components/auth/AuthPage";
 import NotFound from "./pages/NotFound";
 import InspectorInterface from "./pages/InspectorInterface";
+import { AdminDashboard } from "./components/admin/AdminDashboard";
+import { CriticalIssueRealtimeAlerts } from "./components/inspection/CriticalIssueRealtimeAlerts";
+import "./styles/mobile-responsive.css";
 
 const queryClient = new QueryClient();
 
@@ -53,15 +56,25 @@ const AppRoutes = () => {
   }
 
   return (
-    <Routes>
-      <Route path="/" element={<UnifiedDashboard />} />
-      <Route path="/dashboard" element={<UnifiedDashboard />} />
-      <Route path="/legacy" element={<Dashboard />} />
-      <Route path="/auth" element={<AuthPage />} />
-      <Route path="/inspector" element={<InspectorInterface />} />
-      {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+    <>
+      <Routes>
+        <Route path="/" element={<UnifiedDashboard />} />
+        <Route path="/dashboard" element={<UnifiedDashboard />} />
+        <Route path="/admin" element={<AdminDashboard />} />
+        <Route path="/legacy" element={<Dashboard />} />
+        <Route path="/auth" element={<AuthPage />} />
+        <Route path="/inspector" element={<InspectorInterface />} />
+        {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+      
+      {/* Real-time Critical Issue Alerts */}
+      <CriticalIssueRealtimeAlerts 
+        maxVisible={3}
+        position="top-right"
+        autoHide={false}
+      />
+    </>
   );
 };
 

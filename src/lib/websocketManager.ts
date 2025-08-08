@@ -53,6 +53,9 @@ class WebSocketManager {
    * Connect to WebSocket server
    */
   async connect(userId: string, authToken: string): Promise<void> {
+    if (!(import.meta.env.VITE_WS_ENABLED === 'true')) {
+      return;
+    }
     this.userId = userId;
     
     try {

@@ -1,6 +1,7 @@
 /**
- * Offline Manager for Inspector Interface
- * Handles offline data storage, sync, and connectivity detection
+ * Enhanced Offline Manager for RoofMind Inspector Interface
+ * Handles comprehensive offline data storage, sync, photo caching, and connectivity detection
+ * Supports critical issue management and real-time synchronization
  */
 
 import { inspectorEventBus, INSPECTOR_EVENTS } from './eventBus';
@@ -313,6 +314,23 @@ class OfflineManager {
 
   private generateId(): string {
     return `offline_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  }
+
+  // Convenience methods used by API layer
+  async saveInspectionOffline(data: any): Promise<string> {
+    return this.storeOfflineData('inspection', data);
+  }
+
+  async savePhotoOffline(data: any): Promise<string> {
+    return this.storeOfflineData('photo', data);
+  }
+
+  async saveCriticalIssueOffline(data: any): Promise<string> {
+    return this.storeOfflineData('deficiency', data);
+  }
+
+  async getAllInspectionsOffline(): Promise<any[]> {
+    return this.getOfflineData('inspection').map(i => i.data);
   }
 
   /**

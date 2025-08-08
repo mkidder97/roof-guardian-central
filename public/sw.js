@@ -1,10 +1,12 @@
 /**
- * Service Worker for Offline-First Inspector Interface
- * Enables field inspections without internet connectivity
+ * Enhanced Service Worker for Offline-First Inspector Interface
+ * Enables comprehensive field inspections without internet connectivity
+ * Supports photo caching, inspection data sync, and critical issue management
  */
 
 const BUILD_VERSION = typeof __BUILD_VERSION__ !== 'undefined' ? __BUILD_VERSION__ : Date.now().toString();
-const CACHE_NAME = `roof-guardian-inspector-${BUILD_VERSION}`;
+const CACHE_NAME = `roofmind-inspector-${BUILD_VERSION}`;
+const PHOTO_CACHE = `roofmind-photos-${BUILD_VERSION}`;
 const OFFLINE_URL = '/offline.html';
 
 // Critical resources to cache for offline functionality
@@ -179,10 +181,13 @@ self.addEventListener('message', event => {
       break;
       
     case 'GET_OFFLINE_STATUS':
-      event.ports[0].postMessage({
-        isOffline: !navigator.onLine,
-        queuedItems: getQueuedItemsCount()
-      });
+      (async () => {
+        const count = await getQueuedItemsCount();
+        event.ports[0].postMessage({
+          isOffline: !navigator.onLine,
+          queuedItems: count,
+        });
+      })();
       break;
       
     case 'FORCE_SYNC':
@@ -238,8 +243,10 @@ async function handleOfflineWrite(request) {
     
     await queueOfflineRequest(requestData);
     
-    // Register for background sync
-    await self.registration.sync.register('inspection-sync');
+    // Register for background sync if available
+    if ('sync' in self.registration) {
+      await self.registration.sync.register('inspection-sync');
+    }
     
     // Return a success response for the UI
     return new Response(
@@ -333,13 +340,23 @@ async function openOfflineDB() {
   });
 }
 
-function getQueuedItemsCount() {
-  // Return count of queued items for offline sync
-  return 0; // Placeholder
+async function getQueuedItemsCount() {
+  try {
+    const db = await openOfflineDB();
+    const transaction = db.transaction(['requests'], 'readonly');
+    const store = transaction.objectStore('requests');
+    return new Promise((resolve, reject) => {
+      const countRequest = store.getAllKeys();
+      countRequest.onsuccess = () => resolve(countRequest.result.length || 0);
+      countRequest.onerror = () => reject(0);
+    });
+  } catch (e) {
+    return 0;
+  }
 }
 
 function triggerBackgroundSync() {
-  if ('serviceWorker' in navigator && 'sync' in window.ServiceWorkerRegistration.prototype) {
+  if ('sync' in self.registration) {
     self.registration.sync.register('inspection-sync');
     self.registration.sync.register('photo-sync');
   }
