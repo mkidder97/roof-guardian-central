@@ -214,6 +214,78 @@ export function InspectionReviewInterface({
 
       onSave?.(updatedInspection);
       
+      // Trigger n8n workflows for completed inspection
+      try {
+        const { n8nWorkflowTriggers } = await import('@/lib/n8nWorkflowTriggers');
+        
+        console.log('🚀 Triggering n8n workflows for completed inspection:', updatedInspection.id);
+        
+        // Format the inspection data for n8n
+        const workflowData = {
+          id: updatedInspection.id,
+          property_name: updatedInspection.roofs?.property_name || 'Unknown Property',
+          property_address: updatedInspection.roofs ? 
+            `${updatedInspection.roofs.address || ''}, ${updatedInspection.roofs.city || ''}, ${updatedInspection.roofs.state || ''}`.replace(/^, |, $/g, '') : '',
+          status: 'completed',
+          deficiencies: deficiencies.map(def => ({
+            id: def.id,
+            category: def.category || def.type,
+            description: def.description,
+            location: def.location,
+            budgetAmount: def.budgetAmount || def.estimatedBudget,
+            estimatedCost: def.estimatedCost,
+            severity: def.severity,
+            // Check if it's immediate repair based on category name
+            isImmediateRepair: def.isImmediateRepair || (def.category || def.type || '').toLowerCase().includes('immediate repair'),
+            needsSupervisorAlert: def.needsSupervisorAlert || false,
+            criticalityScore: def.criticalityScore,
+            detectionTimestamp: new Date().toISOString(),
+            photos: def.photos || []
+          })),
+          executiveSummary: {
+            summaryText: inspectionNotes || 'Inspection completed',
+            overallCondition: 'Fair',
+            overallRating: 3,
+            keyFindings: deficiencies.map(d => d.description).slice(0, 3),
+            criticalIssues: deficiencies.filter(d => d.severity === 'high').map(d => d.description),
+            recommendedActions: ['Review deficiencies', 'Schedule repairs as needed'],
+            budgetRecommendation: 'As per deficiencies listed'
+          },
+          capitalExpenses: capitalExpenses,
+          overviewPhotos: overviewPhotos || [],
+          notes: inspectionNotes,
+          weather_conditions: weatherConditions,
+          roofs: updatedInspection.roofs,
+          users: updatedInspection.users
+        };
+        
+        const workflowResults = await n8nWorkflowTriggers.triggerInspectionWorkflows(workflowData);
+        
+        console.log('✅ n8n workflow results:', workflowResults);
+        
+        if (workflowResults.deficiencyAlerts.success && deficiencies.length > 0) {
+          toast({
+            title: "Deficiency Alerts Sent",
+            description: "Critical deficiencies have been reported via email",
+          });
+        }
+        
+        if (workflowResults.aiReview.success) {
+          toast({
+            title: "AI Review Initiated", 
+            description: "Inspection is being processed for quality review",
+          });
+        }
+      } catch (workflowError) {
+        console.error('❌ Failed to trigger n8n workflows:', workflowError);
+        // Don't fail the approval if workflows fail
+        toast({
+          title: "Workflow Warning",
+          description: "Inspection approved but automation workflows may not have triggered",
+          variant: "default"
+        });
+      }
+      
       toast({
         title: "Inspection Approved",
         description: "The inspection has been reviewed and marked as completed.",

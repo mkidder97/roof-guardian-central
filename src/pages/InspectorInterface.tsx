@@ -529,6 +529,9 @@ const InspectorInterface = () => {
       try {
         const { n8nWorkflowTriggers } = await import('@/lib/n8nWorkflowTriggers');
         
+        console.log('🚀 [Inspector Interface] Triggering n8n workflows for:', inspectionData.inspectionId);
+        console.log('Inspection data:', inspectionData);
+        
         // Format the inspection data for n8n
         const workflowData = {
           id: inspectionData.inspectionId,
@@ -554,7 +557,7 @@ const InspectorInterface = () => {
         
         const workflowResults = await n8nWorkflowTriggers.triggerInspectionWorkflows(workflowData);
         
-        console.log('n8n workflow results:', workflowResults);
+        console.log('✅ [Inspector Interface] n8n workflow results:', workflowResults);
         
         if (workflowResults.deficiencyAlerts.success && inspectionData.deficiencies?.length > 0) {
           toast({
