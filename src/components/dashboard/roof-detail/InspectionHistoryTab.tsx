@@ -39,7 +39,7 @@ export function InspectionHistoryTab({ roof }: InspectionHistoryTabProps) {
             city,
             state
           ),
-          users(
+          users!inspections_inspector_id_fkey(
             id,
             first_name,
             last_name,

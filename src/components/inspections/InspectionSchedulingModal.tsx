@@ -936,7 +936,7 @@ export function InspectionSchedulingModal({ open, onOpenChange, directMode = fal
         .from('inspections')
         .insert({
           roof_id: selectedProperty.id,
-          inspector_id: inspector.auth_user_id, // Use auth_user_id for proper assignment
+          inspector_id: inspector.id, // Use public.users.id for proper foreign key relationship
           scheduled_date: scheduledDate,
           status: 'scheduled',
           inspection_type: inspectionType,
@@ -955,7 +955,7 @@ export function InspectionSchedulingModal({ open, onOpenChange, directMode = fal
         .from('inspection_sessions')
         .insert({
           property_id: selectedProperty.id,
-          inspector_id: inspector.auth_user_id, // Use auth_user_id for proper assignment
+          inspector_id: inspector.auth_user_id, // inspection_sessions uses auth.users.id
           inspection_status: 'scheduled',
           session_data: {
             inspectionType,
@@ -1075,7 +1075,7 @@ export function InspectionSchedulingModal({ open, onOpenChange, directMode = fal
 
           inspectionInserts.push({
             roof_id: property.roof_id,
-            inspector_id: propertyInspector.auth_user_id,
+            inspector_id: propertyInspector.id, // Use public.users.id instead of auth_user_id
             status: 'scheduled',
             inspection_type: filters.inspectionType || 'annual',
             created_by: user.user.id,
