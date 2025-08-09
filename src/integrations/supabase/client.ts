@@ -5,34 +5,29 @@ import { createClient } from '@supabase/supabase-js';
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL as string;
 const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY as string;
 
-// Log environment variable status for debugging
-console.log('🔧 Supabase Environment Variables:', {
-  hasUrl: !!SUPABASE_URL,
-  hasKey: !!SUPABASE_PUBLISHABLE_KEY,
-  urlPreview: SUPABASE_URL ? `${SUPABASE_URL.substring(0, 30)}...` : 'MISSING',
-  keyPreview: SUPABASE_PUBLISHABLE_KEY ? `${SUPABASE_PUBLISHABLE_KEY.substring(0, 20)}...` : 'MISSING',
-  allEnvVars: Object.keys(import.meta.env).filter(key => key.startsWith('VITE_'))
-});
+// Log environment variable status for debugging (simplified to avoid React issues)
+try {
+  console.log('🔧 Supabase Environment Variables:', {
+    hasUrl: !!SUPABASE_URL,
+    hasKey: !!SUPABASE_PUBLISHABLE_KEY,
+    urlPreview: SUPABASE_URL ? `${SUPABASE_URL.substring(0, 30)}...` : 'MISSING'
+  });
 
-// Validate required environment variables
-if (!SUPABASE_URL) {
-  const error = new Error(
-    '❌ VITE_SUPABASE_URL environment variable is missing. ' +
-    'Please check that your .env file contains VITE_SUPABASE_URL. ' +
-    'Available env vars: ' + Object.keys(import.meta.env).filter(key => key.startsWith('VITE_')).join(', ')
-  );
-  console.error(error.message);
-  throw error;
-}
+  // Validate required environment variables
+  if (!SUPABASE_URL) {
+    const error = new Error('❌ VITE_SUPABASE_URL environment variable is missing.');
+    console.error(error.message);
+    throw error;
+  }
 
-if (!SUPABASE_PUBLISHABLE_KEY) {
-  const error = new Error(
-    '❌ VITE_SUPABASE_ANON_KEY environment variable is missing. ' +
-    'Please check that your .env file contains VITE_SUPABASE_ANON_KEY. ' +
-    'Available env vars: ' + Object.keys(import.meta.env).filter(key => key.startsWith('VITE_')).join(', ')
-  );
-  console.error(error.message);
-  throw error;
+  if (!SUPABASE_PUBLISHABLE_KEY) {
+    const error = new Error('❌ VITE_SUPABASE_ANON_KEY environment variable is missing.');
+    console.error(error.message);
+    throw error;
+  }
+} catch (envError) {
+  console.error('Environment variable validation failed:', envError);
+  throw envError;
 }
 
 // Import the supabase client like this:
