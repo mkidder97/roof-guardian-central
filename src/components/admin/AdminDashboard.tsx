@@ -15,7 +15,8 @@ import {
   Settings,
   Plus,
   Filter,
-  Search
+  Search,
+  CheckCircle
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { InspectionSchedulingModal } from '@/components/inspections/InspectionSchedulingModal';
@@ -404,12 +405,13 @@ export function AdminDashboard({ className = '' }: AdminDashboardProps) {
 
       {/* Scheduling Modal */}
       <InspectionSchedulingModal
-        isOpen={showSchedulingModal}
-        onClose={() => setShowSchedulingModal(false)}
-        onScheduled={() => {
-          setShowSchedulingModal(false);
-          loadDashboardMetrics();
-          loadRecentActivity();
+        open={showSchedulingModal}
+        onOpenChange={(open) => {
+          setShowSchedulingModal(open);
+          if (!open) {
+            loadDashboardMetrics();
+            loadRecentActivity();
+          }
         }}
       />
     </div>

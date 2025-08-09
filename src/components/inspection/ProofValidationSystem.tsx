@@ -14,7 +14,8 @@ import {
   Clock,
   Eye,
   Shield,
-  Target
+  Target,
+  Clipboard
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
@@ -364,7 +365,7 @@ export function ProofValidationSystem({
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <ClipboardList className="h-5 w-5" />
+            <Clipboard className="h-5 w-5" />
             Proof Requirements
           </CardTitle>
         </CardHeader>

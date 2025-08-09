@@ -57,7 +57,7 @@ export function CriticalIssueRealtimeAlerts({
 
   useEffect(() => {
     // Subscribe to critical issue events
-    const unsubscribe = inspectorEventBus.on(INSPECTOR_EVENTS.criticalIssueDetected, handleNewCriticalIssue);
+    const unsubscribe = inspectorEventBus.on(INSPECTOR_EVENTS.DEFICIENCY_ADDED, handleNewCriticalIssue);
     
     // Load existing critical alerts
     loadExistingAlerts();

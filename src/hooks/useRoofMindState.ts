@@ -167,23 +167,41 @@ export function useRoofMindState() {
 
   // Setup offline status monitoring
   const setupOfflineStatusMonitoring = useCallback(async () => {
-    const status = await offlineManager.getOfflineStatus();
-    dispatch({ type: 'SET_OFFLINE_STATUS', payload: status });
-
-    // Monitor connectivity changes
-    const unsubscribe = offlineManager.onConnectionChange(async (online) => {
-      const updatedStatus = await offlineManager.getOfflineStatus();
-      dispatch({ type: 'SET_OFFLINE_STATUS', payload: updatedStatus });
-
-      if (online) {
-        // Refresh data when back online
-        await loadInspections();
-        await loadCriticalIssues();
-      }
+    const status = offlineManager.getConnectivityStatus();
+    dispatch({ 
+      type: 'SET_OFFLINE_STATUS', 
+      payload: { 
+        isOffline: !status.isOnline,
+        pendingSync: status.unsyncedItems,
+        lastSyncTime: state.offline.lastSyncTime
+      } 
     });
 
-    return unsubscribe;
-  }, []);
+    // Listen to connectivity and sync events via event bus
+    const offEnabled = inspectorEventBus.on(INSPECTOR_EVENTS.OFFLINE_MODE_ENABLED, () => {
+      const s = offlineManager.getConnectivityStatus();
+      dispatch({ type: 'SET_OFFLINE_STATUS', payload: { isOffline: true, pendingSync: s.unsyncedItems } });
+    });
+
+    const offDisabled = inspectorEventBus.on(INSPECTOR_EVENTS.OFFLINE_MODE_DISABLED, () => {
+      const s = offlineManager.getConnectivityStatus();
+      dispatch({ type: 'SET_OFFLINE_STATUS', payload: { isOffline: false, pendingSync: s.unsyncedItems } });
+      // Refresh data when back online
+      loadInspections();
+      loadCriticalIssues();
+    });
+
+    const offSynced = inspectorEventBus.on(INSPECTOR_EVENTS.DATA_SYNC_COMPLETED, () => {
+      const s = offlineManager.getConnectivityStatus();
+      dispatch({ type: 'SET_OFFLINE_STATUS', payload: { pendingSync: s.unsyncedItems, lastSyncTime: Date.now() } });
+    });
+
+    return () => {
+      offEnabled();
+      offDisabled();
+      offSynced();
+    };
+  }, [loadInspections, loadCriticalIssues, state.offline.lastSyncTime]);
 
   // Setup real-time subscriptions
   const setupRealtimeSubscriptions = useCallback(() => {
@@ -208,11 +226,9 @@ export function useRoofMindState() {
         dispatch({ type: 'ADD_CRITICAL_ISSUE', payload: payload.new });
         
         // Emit event for real-time alerts
-        inspectorEventBus.emit(INSPECTOR_EVENTS.criticalIssueDetected, {
-          payload: {
-            issue: payload.new,
-            timestamp: Date.now()
-          }
+        inspectorEventBus.emit(INSPECTOR_EVENTS.DEFICIENCY_ADDED, {
+          issue: payload.new,
+          timestamp: Date.now()
         });
       }
     });
@@ -224,13 +240,11 @@ export function useRoofMindState() {
   }, []);
 
   // Data loading functions
-  const loadInspections = useCallback(async () => {
+  async function loadInspections() {
     dispatch({ type: 'SET_LOADING', payload: { key: 'inspections', value: true } });
-    
     try {
       const response = await roofmindApi.getInspections();
       dispatch({ type: 'SET_INSPECTIONS', payload: response.data || [] });
-      
       if (response.offline) {
         console.log('Using offline inspection data');
       }
@@ -239,11 +253,10 @@ export function useRoofMindState() {
     } finally {
       dispatch({ type: 'SET_LOADING', payload: { key: 'inspections', value: false } });
     }
-  }, []);
+  }
 
-  const loadProperties = useCallback(async () => {
+  async function loadProperties() {
     dispatch({ type: 'SET_LOADING', payload: { key: 'properties', value: true } });
-    
     try {
       const response = await roofmindApi.getProperties();
       dispatch({ type: 'SET_PROPERTIES', payload: response.data || [] });
@@ -252,11 +265,10 @@ export function useRoofMindState() {
     } finally {
       dispatch({ type: 'SET_LOADING', payload: { key: 'properties', value: false } });
     }
-  }, []);
+  }
 
-  const loadCriticalIssues = useCallback(async () => {
+  async function loadCriticalIssues() {
     dispatch({ type: 'SET_LOADING', payload: { key: 'criticalIssues', value: true } });
-    
     try {
       const response = await roofmindApi.getCriticalIssues();
       dispatch({ type: 'SET_CRITICAL_ISSUES', payload: response.data || [] });
@@ -265,7 +277,7 @@ export function useRoofMindState() {
     } finally {
       dispatch({ type: 'SET_LOADING', payload: { key: 'criticalIssues', value: false } });
     }
-  }, []);
+  }
 
   // Inspection operations
   const createInspection = useCallback(async (inspectionData: any) => {
@@ -321,11 +333,9 @@ export function useRoofMindState() {
       dispatch({ type: 'ADD_CRITICAL_ISSUE', payload: response.data });
       
       // Emit event for immediate alerts
-      inspectorEventBus.emit(INSPECTOR_EVENTS.criticalIssueDetected, {
-        payload: {
-          issue: response.data,
-          timestamp: Date.now()
-        }
+      inspectorEventBus.emit(INSPECTOR_EVENTS.DEFICIENCY_ADDED, {
+        issue: response.data,
+        timestamp: Date.now()
       });
       
       return response.data;
@@ -390,14 +400,21 @@ export function useRoofMindState() {
   const forcSync = useCallback(async () => {
     if (state.offline.isOffline) return;
     
-    await offlineManager.syncWhenOnline();
+    await offlineManager.syncOfflineData();
     
     // Refresh data after sync
     await loadInspections();
     await loadCriticalIssues();
     
-    const status = await offlineManager.getOfflineStatus();
-    dispatch({ type: 'SET_OFFLINE_STATUS', payload: status });
+    const status = offlineManager.getConnectivityStatus();
+    dispatch({ 
+      type: 'SET_OFFLINE_STATUS', 
+      payload: { 
+        isOffline: !status.isOnline,
+        pendingSync: status.unsyncedItems,
+        lastSyncTime: Date.now()
+      } 
+    });
   }, [state.offline.isOffline, loadInspections, loadCriticalIssues]);
 
   return {
