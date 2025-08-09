@@ -506,7 +506,8 @@ function isValidStatusTransition(currentStatus: string | null | undefined, newSt
   };
   
   if (!currentStatus) {
-    return ['draft', 'scheduled'].includes(newStatus);
+    // Allow direct completion for Inspector Interface inspections
+    return ['draft', 'scheduled', 'completed', 'in_progress'].includes(newStatus);
   }
   
   return validTransitions[currentStatus]?.includes(newStatus) || false;
