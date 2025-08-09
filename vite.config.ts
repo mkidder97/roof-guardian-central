@@ -139,5 +139,6 @@ export default defineConfig(({ mode }) => ({
     alias: {
       "@": path.resolve(__dirname, "./src"),
     },
+    dedupe: ['react', 'react-dom'], // Prevent multiple React instances
   },
 }));
