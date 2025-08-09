@@ -884,6 +884,9 @@ export function ActiveInspectionInterface({
 
       if (error) throw error;
 
+      // Prefer the inspection ID returned by the edge function (falls back to session ID)
+      const completedInspectionId = (data as any)?.inspectionId || currentSessionId;
+
       toast({
         title: "Inspection Submitted",
         description: "Your inspection has been submitted for review and will be processed by the review team",
@@ -891,7 +894,7 @@ export function ActiveInspectionInterface({
 
       // Call the original completion handler
       const inspectionData = {
-        inspectionId: currentSessionId, // Add the inspection ID for n8n workflows
+        inspectionId: completedInspectionId, // Use inspection ID created by backend for follow-up workflows
         propertyId,
         propertyName,
         propertyAddress: propertyName, // Use property name as fallback for address
