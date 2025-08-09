@@ -618,14 +618,37 @@ const InspectorInterface = () => {
         const workflowResults = await n8nWorkflowTriggers.triggerInspectionWorkflows(workflowData);
         console.log('🎉 [Inspector Interface] Workflow call completed!');
         
-        console.log('✅ [Inspector Interface] n8n workflow results:', workflowResults);
+        console.log('✅ [Inspector Interface] Enhanced workflow results:', workflowResults);
+        console.log('📊 [Inspector Interface] Workflow summary:', workflowResults.summary);
         
-        if (!workflowResults.deficiencyAlerts.success) {
+        // Enhanced result handling with detailed logging
+        if (!workflowResults.deficiencyAlerts.success && workflowResults.summary.should_have_triggered_deficiency) {
           console.error('❌ Deficiency alerts workflow failed:', workflowResults.deficiencyAlerts.error);
+          console.error('🔍 Debug info:', workflowResults.deficiencyAlerts.debug);
+        } else if (workflowResults.deficiencyAlerts.success) {
+          console.log('✅ Deficiency alerts workflow succeeded');
         }
         
-        if (!workflowResults.aiReview.success) {
+        if (!workflowResults.aiReview.success && workflowResults.summary.should_have_triggered_ai_review) {
           console.error('❌ AI review workflow failed:', workflowResults.aiReview.error);
+          console.error('🔍 Debug info:', workflowResults.aiReview.debug);
+        } else if (workflowResults.aiReview.success) {
+          console.log('✅ AI review workflow succeeded');
+        }
+        
+        // Show user feedback based on results
+        if (workflowResults.summary.successful > 0) {
+          toast({
+            title: "Workflows Triggered",
+            description: `Successfully triggered ${workflowResults.summary.successful} of ${workflowResults.summary.total_triggered} workflows.`,
+            variant: "default"
+          });
+        } else if (workflowResults.summary.total_triggered > 0) {
+          toast({
+            title: "Workflow Warning", 
+            description: `Some workflows failed to trigger. Check console for details.`,
+            variant: "destructive"
+          });
         }
         
         if (workflowResults.deficiencyAlerts.success && inspectionData.deficiencies?.length > 0) {
