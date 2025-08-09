@@ -45,6 +45,21 @@ serve(async (req) => {
 
     const base = Deno.env.get('N8N_WEBHOOK_BASE') || ''
     const secret = Deno.env.get('N8N_SHARED_SECRET') || ''
+    
+    // Validate that secrets are configured
+    if (!base || !secret) {
+      console.error('❌ n8n secrets not configured:', { hasBase: !!base, hasSecret: !!secret })
+      return new Response(
+        JSON.stringify({ 
+          success: false, 
+          error: 'n8n integration not configured. Please set N8N_WEBHOOK_BASE and N8N_SHARED_SECRET secrets.' 
+        }), 
+        { 
+          status: 503, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        }
+      )
+    }
 
     const map: Record<string, string> = {
       'deficiency-alerts': `${base}/roofmind-deficiency-alerts`,
@@ -59,6 +74,15 @@ serve(async (req) => {
 
     const body = JSON.stringify(payload || {})
     const signature = await hmacSha256Hex(secret, body)
+    
+    // Log workflow trigger for debugging
+    console.log('🚀 Triggering n8n workflow:', {
+      workflow,
+      target,
+      payloadSize: body.length,
+      hasSignature: !!signature,
+      userId: userData.user.id
+    })
 
     const forwardResp = await fetch(target, {
       method: 'POST',
@@ -75,8 +99,18 @@ serve(async (req) => {
     try { data = JSON.parse(text) } catch { data = { raw: text } }
 
     if (!forwardResp.ok) {
+      console.error('❌ n8n workflow failed:', {
+        workflow,
+        status: forwardResp.status,
+        error: text
+      })
       return new Response(JSON.stringify({ success: false, status: forwardResp.status, error: text }), { status: 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
     }
+    
+    console.log('✅ n8n workflow triggered successfully:', {
+      workflow,
+      status: forwardResp.status
+    })
 
     return new Response(JSON.stringify({ success: true, data }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } })
   } catch (e) {

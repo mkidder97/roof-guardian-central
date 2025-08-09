@@ -218,7 +218,19 @@ export function useUnifiedInspectionEvents() {
           `)
           .single();
 
-        if (error) throw error;
+        if (error) {
+          // Log detailed error information
+          console.error('❌ [useUnifiedInspectionEvents] Database update error:', {
+            error,
+            errorCode: error.code,
+            errorMessage: error.message,
+            errorDetails: error.details,
+            errorHint: error.hint,
+            updates,
+            id
+          });
+          throw error;
+        }
 
         const inspection = data as InspectionSyncData;
 
@@ -321,10 +333,9 @@ export function useUnifiedInspectionEvents() {
           throw new Error(`Invalid status transition from ${previousStatus} to ${newStatus}`);
         }
 
-        // Update in database
+        // Update in database - only update the 'status' column (inspection_status doesn't exist)
         const updatedInspection = await inspectionLifecycle.update(id, { 
-          status: newStatus as InspectionStatus,
-          inspection_status: newStatus as InspectionStatus
+          status: newStatus as InspectionStatus
         });
 
         // Additional status-specific actions

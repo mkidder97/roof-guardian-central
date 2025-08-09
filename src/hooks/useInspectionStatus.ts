@@ -22,9 +22,9 @@ export function useInspectionStatus() {
       const { error } = await supabase
         .from('inspection_sessions')
         .update({
-          inspection_status: newStatus,
-          status_change_reason: options.reason,
+          status: newStatus,  // Changed from inspection_status (column doesn't exist)
           last_updated: new Date().toISOString()
+          // Removed status_change_reason (column doesn't exist)
         })
         .eq('id', sessionId);
 

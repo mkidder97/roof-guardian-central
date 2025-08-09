@@ -36,7 +36,7 @@ interface TriggerWorkflowParams {
   webhookUrl?: string
 }
 
-export interface ProcessingResult {
+interface ProcessingResult {
   success: boolean
   campaignData: CampaignWorkflowData
   response?: N8nWebhookResponse

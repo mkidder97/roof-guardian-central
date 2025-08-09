@@ -644,6 +644,11 @@ const InspectorInterface = () => {
       } catch (workflowError) {
         console.error('Failed to trigger n8n workflows:', workflowError);
         // Don't fail the inspection completion if workflows fail
+        toast({
+          title: "Workflow Notice",
+          description: "Inspection completed but automated workflows may not have triggered. Contact support if needed.",
+          variant: "default"
+        });
       }
       
       // Clear local state
@@ -667,11 +672,42 @@ const InspectorInterface = () => {
         photos: inspectionData.overviewPhotos?.length || 0
       });
     } catch (error) {
-      console.error('Error completing inspection:', error);
+      console.error('❌ [Inspector Interface] Completion error:', error);
+      
+      let errorMessage = "Failed to complete inspection. Please try again.";
+      let errorDetails = "";
+      
+      if (error instanceof Error) {
+        // Extract database error details
+        if (error.message.includes('column') && error.message.includes('does not exist')) {
+          errorMessage = "Database schema error detected.";
+          errorDetails = `Missing column: ${error.message}`;
+        } else if (error.message.includes('violates row-level security')) {
+          errorMessage = "Permission denied.";
+          errorDetails = "You don't have permission to update this inspection.";
+        } else if (error.message.includes('JWT') || error.message.includes('auth')) {
+          errorMessage = "Authentication error.";
+          errorDetails = "Please log in again.";
+        } else if (error.message.includes('Failed to create inspection session')) {
+          errorMessage = "Session creation failed.";
+          errorDetails = "Unable to save inspection data.";
+        } else {
+          errorDetails = error.message;
+        }
+      }
+      
       toast({
-        title: "Error",
-        description: "Failed to complete inspection. Please try again.",
+        title: "Inspection Error",
+        description: errorMessage + (errorDetails ? ` Details: ${errorDetails}` : ""),
         variant: "destructive"
+      });
+      
+      // Log detailed error for debugging
+      console.error('❌ [Inspector Interface] Error details:', {
+        error,
+        errorMessage,
+        errorDetails,
+        stack: error instanceof Error ? error.stack : undefined
       });
     }
   }, [toast, deselectProperty, inspectionLifecycle, dataSync, emitDataRefresh]);
